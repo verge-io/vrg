@@ -123,6 +123,12 @@ All commands support `--output table|wide|json|csv` and `--query` for field extr
 
 Tab completion is available for bash, zsh, fish, and PowerShell. Run `vrg --install-completion` for quick setup, or see the [Cookbook](docs/COOKBOOK.md) for manual configuration.
 
+**macOS zsh note:** If you see `compinit: insecure directories` after installing completions, fix the Homebrew directory permissions:
+
+```bash
+chmod 755 /opt/homebrew/share/zsh /opt/homebrew/share/zsh/site-functions
+```
+
 ## Global Options
 
 | Option | Short | Description |
