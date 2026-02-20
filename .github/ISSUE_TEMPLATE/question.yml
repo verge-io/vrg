@@ -1,0 +1,32 @@
+name: Question
+description: Ask a question about using Verge CLI
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about Verge CLI? We're happy to help! Please check the [documentation](https://docs.verge.io) first.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What are you trying to do?
+      description: Describe the task or goal you're working toward.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+      description: Describe any commands, configurations, or approaches you've already attempted.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other details such as your environment, related commands, or error output.
+    validations:
+      required: false
