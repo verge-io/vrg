@@ -4,7 +4,14 @@
 import importlib
 import os
 
+from PyInstaller.utils.hooks import collect_data_files
+
 block_cipher = None
+
+# Rich dynamically imports hyphenated modules in _unicode_data (e.g. unicode17-0-0.py)
+# that PyInstaller's module discovery can't find. include_py_files=True is required
+# because collect_data_files excludes .py by default.
+rich_unicode_datas = collect_data_files("rich._unicode_data", include_py_files=True)
 
 # Collect certifi CA bundle for HTTPS connections
 certifi_path = os.path.join(
@@ -19,6 +26,7 @@ a = Analysis(
     datas=[
         ("src/verge_cli/schemas/vrg-vm-template.schema.json", "verge_cli/schemas"),
         (certifi_path, "certifi"),
+        *rich_unicode_datas,
     ],
     hiddenimports=[
         # pyvergeos lazy-loads resources via @property on the client
