@@ -953,6 +953,7 @@ def mock_certificate() -> MagicMock:
     """Create a mock Certificate object."""
     cert = MagicMock()
     cert.key = 70
+    cert.domain = "example.com"
     cert.is_valid = True
     cert.cert_type_display = "Self-Signed"
     cert.key_type_display = "ECDSA"
