@@ -143,7 +143,7 @@ def tenant_storage_update(
 
     updates: dict[str, Any] = {}
     if provisioned_gb is not None:
-        updates["provisioned_gb"] = provisioned_gb
+        updates["provisioned"] = provisioned_gb * 1073741824
 
     if not updates:
         typer.echo("No updates specified.", err=True)

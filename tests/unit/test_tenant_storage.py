@@ -123,6 +123,8 @@ def test_tenant_storage_update(cli_runner, mock_client, mock_tenant, mock_tenant
 
     assert result.exit_code == 0
     mock_tenant.storage.update.assert_called_once()
+    call_args = mock_tenant.storage.update.call_args
+    assert call_args[1]["provisioned"] == 1000 * 1073741824
 
 
 def test_tenant_storage_update_no_changes(
