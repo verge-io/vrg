@@ -222,6 +222,7 @@ def main(
     # Store CLI overrides for lazy client creation
     ctx.ensure_object(dict)
     ctx.obj["config"] = config
+    ctx.obj["profile"] = profile
     ctx.obj["output_format"] = effective_output
     ctx.obj["verbosity"] = verbose
     ctx.obj["quiet"] = quiet

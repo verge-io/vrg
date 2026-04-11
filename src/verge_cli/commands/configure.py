@@ -126,6 +126,7 @@ def configure_setup(
 
 @app.command(name="show")
 def configure_show(
+    ctx: typer.Context,
     profile: str = typer.Option(
         None,
         "--profile",
@@ -147,6 +148,9 @@ def configure_show(
             console.print(f"[red]Error: {e}[/red]")
             raise typer.Exit(3) from None
         title = f"Profile: {profile}"
+    elif ctx.obj and ctx.obj.get("profile"):
+        profile_config = ctx.obj["config"]
+        title = "Effective Configuration"
     else:
         profile_config = get_effective_config()
         title = "Effective Configuration"
