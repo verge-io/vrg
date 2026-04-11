@@ -51,7 +51,7 @@ def _cert_to_dict(cert: Any, include_keys: bool = False) -> dict[str, Any]:
     """Convert SDK Certificate object to output dict."""
     result: dict[str, Any] = {
         "$key": int(cert.key),
-        "domain": cert.get("domain", cert.get("domainname", "")),
+        "domain": cert.domain,
         "domain_list": cert.get("domainlist", ""),
         "description": cert.get("description", ""),
         "type": cert.get("type", ""),
@@ -415,7 +415,7 @@ def cert_delete(
 
     # Fetch for confirmation message
     cert_obj = vctx.client.certificates.get(key=key)
-    domain = cert_obj.get("domain", cert_obj.get("domainname", str(key)))
+    domain = cert_obj.domain or str(key)
 
     if not confirm_action(f"Delete certificate '{domain}'?", yes=yes):
         typer.echo("Cancelled.")
