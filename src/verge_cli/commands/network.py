@@ -17,6 +17,7 @@ from verge_cli.commands import (
 )
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
 
@@ -52,6 +53,9 @@ def network_list(
     ] = None,
 ) -> None:
     """List virtual networks."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(ctx, lambda c: c.networks.list(), _network_to_dict, NETWORK_COLUMNS)
+        return
     vctx = get_context(ctx)
 
     # Build filter
