@@ -10,6 +10,7 @@ import typer
 from verge_cli.columns import ColumnDef, format_epoch
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_warning
 
 app = typer.Typer(
@@ -130,6 +131,9 @@ def list_cmd(
     ] = 100,
 ) -> None:
     """List system log entries."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(ctx, lambda c: c.logs.list(), _log_to_dict, LOG_COLUMNS)
+        return
     vctx = get_context(ctx)
 
     since_dt = _parse_datetime(since) if since else None

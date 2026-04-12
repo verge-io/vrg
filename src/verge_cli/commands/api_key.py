@@ -9,6 +9,7 @@ import typer
 from verge_cli.columns import API_KEY_COLUMNS, API_KEY_CREATED_COLUMNS
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success, output_warning
 from verge_cli.utils import confirm_action, resolve_resource_id
 
@@ -60,6 +61,9 @@ def api_key_list(
     ] = None,
 ) -> None:
     """List API keys."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(ctx, lambda c: c.api_keys.list(), _api_key_to_dict, API_KEY_COLUMNS)
+        return
     vctx = get_context(ctx)
 
     kwargs: dict[str, Any] = {}

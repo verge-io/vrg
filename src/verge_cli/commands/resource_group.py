@@ -10,6 +10,7 @@ import typer
 from verge_cli.columns import BOOL_STYLES, ColumnDef, format_bool_yn, format_epoch
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_error, output_result, output_success
 from verge_cli.utils import confirm_action
 
@@ -98,6 +99,11 @@ def list_cmd(
     ] = None,
 ) -> None:
     """List resource groups."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(
+            ctx, lambda c: c.resource_groups.list(), _group_to_dict, RESOURCE_GROUP_COLUMNS
+        )
+        return
     vctx = get_context(ctx)
 
     if device_type is not None:

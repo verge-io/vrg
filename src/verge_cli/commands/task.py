@@ -12,6 +12,7 @@ from verge_cli.columns import TASK_COLUMNS
 from verge_cli.commands import task_event, task_schedule, task_script, task_trigger
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_error, output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
 
@@ -78,6 +79,9 @@ def task_list(
     ] = None,
 ) -> None:
     """List tasks."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(ctx, lambda c: c.tasks.list(), _task_to_dict, TASK_COLUMNS)
+        return
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filter:
