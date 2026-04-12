@@ -15,6 +15,7 @@ from verge_cli.columns import (
 )
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
 
@@ -199,6 +200,11 @@ def gpu_list(
     ] = None,
 ) -> None:
     """List GPU configurations."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(
+            ctx, lambda c: c.nodes.all_gpus.list(), _gpu_to_dict, GPU_COLUMNS
+        )
+        return
     vctx = get_context(ctx)
     if node is not None:
         node_key = int(resolve_resource_id(vctx.client.nodes, node, "node"))

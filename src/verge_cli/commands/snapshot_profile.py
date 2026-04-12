@@ -10,6 +10,7 @@ from verge_cli.columns import SNAPSHOT_PROFILE_COLUMNS
 from verge_cli.commands import snapshot_profile_period
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
 
@@ -35,6 +36,14 @@ def _profile_to_dict(profile: Any) -> dict[str, Any]:
 @handle_errors()
 def profile_list(ctx: typer.Context) -> None:
     """List all snapshot profiles."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(
+            ctx,
+            lambda c: c.snapshot_profiles.list(),
+            _profile_to_dict,
+            SNAPSHOT_PROFILE_COLUMNS,
+        )
+        return
     vctx = get_context(ctx)
     profiles = vctx.client.snapshot_profiles.list()
     data = [_profile_to_dict(p) for p in profiles]
