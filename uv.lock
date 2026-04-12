@@ -522,14 +522,14 @@ wheels = [
 
 [[package]]
 name = "pyvergeos"
-version = "1.0.4"
+version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d0/26/12b4996b71dff69bc31c0249c53bc3649803ad60dc2057995403d8257cf5/pyvergeos-1.0.4.tar.gz", hash = "sha256:839d551f1700527a97803cfedc5907599a35b0474e5d9755c2e2d2e03659eab6", size = 811045, upload-time = "2026-02-11T23:38:41.74Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/65/8d579e9ad9120751370fd5e28bd318312af1428cca28d90a85d331c234b1/pyvergeos-1.1.1.tar.gz", hash = "sha256:1378a8af7601250235c0b9ed0382f190830b26b028cae43cc60e4d0e856e6f1d", size = 816263, upload-time = "2026-04-12T00:04:26.887Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/2e/84b64a1ee569d02af040620824d2cca73d4f9b0a94338268d4854d2a0d3f/pyvergeos-1.0.4-py3-none-any.whl", hash = "sha256:473ad24aafdadf99d93db6861de8917ec7c8a4879f75248c3d58f89df963cfd2", size = 405454, upload-time = "2026-02-11T23:38:40.405Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/5b/48b0cbf441bdc01f0d9d16d4a6817bdc2ed2264944f70f62a62fe496282c/pyvergeos-1.1.1-py3-none-any.whl", hash = "sha256:1030de6e50c1164a4d2efbd4f5cfe721df48a398046d715d0911a476912e5f83", size = 409309, upload-time = "2026-04-12T00:04:25.103Z" },
 ]
 
 [[package]]
@@ -913,7 +913,7 @@ wheels = [
 
 [[package]]
 name = "vrg"
-version = "1.0.0"
+version = "1.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
@@ -943,7 +943,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.0" },
-    { name = "pyvergeos", specifier = ">=1.0.4" },
+    { name = "pyvergeos", specifier = ">=1.1.1" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
