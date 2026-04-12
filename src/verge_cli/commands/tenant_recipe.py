@@ -10,6 +10,7 @@ from verge_cli.columns import ColumnDef, format_bool_yn
 from verge_cli.commands import tenant_recipe_instance, tenant_recipe_log
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_nas_resource
 
@@ -73,6 +74,11 @@ def list_cmd(
     ctx: typer.Context,
 ) -> None:
     """List tenant recipes."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(
+            ctx, lambda c: c.tenant_recipes.list(), _recipe_to_dict, TENANT_RECIPE_COLUMNS
+        )
+        return
     vctx = get_context(ctx)
     recipes = vctx.client.tenant_recipes.list()
     data = [_recipe_to_dict(r) for r in recipes]

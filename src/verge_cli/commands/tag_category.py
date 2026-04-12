@@ -9,6 +9,7 @@ import typer
 from verge_cli.columns import ColumnDef, format_bool_yn, format_epoch
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
 
@@ -72,6 +73,11 @@ def list_cmd(
     ] = None,
 ) -> None:
     """List tag categories."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(
+            ctx, lambda c: c.tag_categories.list(), _category_to_dict, TAG_CATEGORY_COLUMNS
+        )
+        return
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filter_expr is not None:

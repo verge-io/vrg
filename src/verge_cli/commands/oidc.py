@@ -10,6 +10,7 @@ from verge_cli.columns import OIDC_APP_COLUMNS
 from verge_cli.commands import oidc_group, oidc_log, oidc_user
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success, output_warning
 from verge_cli.utils import confirm_action, resolve_resource_id
 
@@ -86,6 +87,11 @@ def oidc_list(
     ] = False,
 ) -> None:
     """List OIDC applications."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(
+            ctx, lambda c: c.oidc_applications.list(), _oidc_app_to_dict, OIDC_APP_COLUMNS
+        )
+        return
     vctx = get_context(ctx)
 
     if enabled and disabled:
