@@ -9,6 +9,7 @@ import typer
 from verge_cli.columns import STORAGE_COLUMNS
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result
 from verge_cli.utils import resolve_resource_id
 
@@ -46,6 +47,11 @@ def storage_list(
     ctx: typer.Context,
 ) -> None:
     """List all storage tiers."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(
+            ctx, lambda c: c.storage_tiers.list(), _tier_to_dict, STORAGE_COLUMNS
+        )
+        return
     vctx = get_context(ctx)
 
     tiers = vctx.client.storage_tiers.list()

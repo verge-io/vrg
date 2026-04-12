@@ -181,6 +181,14 @@ def main(
             help="Suppress non-essential output.",
         ),
     ] = False,
+    all_profiles: Annotated[
+        bool,
+        typer.Option(
+            "--all-profiles",
+            "-A",
+            help="Run list commands across all configured profiles.",
+        ),
+    ] = False,
     no_color: Annotated[
         bool,
         typer.Option(
@@ -228,4 +236,5 @@ def main(
     ctx.obj["quiet"] = quiet
     ctx.obj["query"] = query
     ctx.obj["no_color"] = no_color
+    ctx.obj["all_profiles"] = all_profiles
     ctx.obj["_client"] = None  # Lazy-loaded client

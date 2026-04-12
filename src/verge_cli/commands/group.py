@@ -9,6 +9,7 @@ import typer
 from verge_cli.columns import GROUP_COLUMNS, GROUP_MEMBER_COLUMNS
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
 
@@ -69,6 +70,9 @@ def group_list(
     ] = None,
 ) -> None:
     """List groups."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(ctx, lambda c: c.groups.list(), _group_to_dict, GROUP_COLUMNS)
+        return
     vctx = get_context(ctx)
 
     kwargs: dict[str, Any] = {}

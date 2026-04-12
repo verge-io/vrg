@@ -10,6 +10,7 @@ import typer
 from verge_cli.columns import ColumnDef, format_epoch
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action
 
@@ -130,6 +131,9 @@ def list_cmd(
     ] = None,
 ) -> None:
     """List billing records."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(ctx, lambda c: c.billing.list(), _billing_to_dict, BILLING_COLUMNS)
+        return
     vctx = get_context(ctx)
 
     kwargs: dict[str, Any] = {}
