@@ -32,6 +32,7 @@
 | NAS User | `shakedown-user` | Local NAS user |
 | Cloud Snapshot | `shakedown-snap` | System-level snapshot |
 | VM Snapshot | `shakedown-vm-snap` | Per-VM snapshot |
+| Catalog | `shakedown-catalog` | Local catalog for recipe testing |
 | Recipe | `shakedown-recipe` | Local recipe for testing |
 | User | `shakedown-user-admin` | Test user account |
 | Group | `shakedown-group` | Test group |
@@ -539,13 +540,12 @@ Warmup / read-only tests. Use existing config or create one.
 - [ ] `vrg recipe log list` — lists recipe operation logs
 - [ ] `vrg recipe log get <log-id>` — log entry details
 
-### Recipe Create & Deploy (requires local catalog)
+### Recipe Create & Deploy
 
-> Creating a recipe requires a local catalog and a base VM. Skip if the Local
-> repository has no catalogs set up.
-
-- [ ] `vrg catalog list` — verify a local catalog exists (check for "Local" repo catalogs)
-- [ ] `vrg recipe create --name shakedown-recipe --catalog <local-catalog> --vm shakedown-vm --version 1.0.0` — recipe from shakedown-vm
+- [ ] `vrg catalog repo list` — identify a repository to use (note its name or key)
+- [ ] `vrg catalog create --name shakedown-catalog --repo <repo> --publishing-scope private` — create local catalog for recipe testing
+- [ ] `vrg catalog get shakedown-catalog` — verify catalog created
+- [ ] `vrg recipe create --name shakedown-recipe --catalog shakedown-catalog --vm shakedown-vm --version 1.0.0` — recipe from shakedown-vm (tests catalog name resolution)
 - [ ] `vrg recipe get shakedown-recipe` — verify recipe details
 - [ ] `vrg recipe section list shakedown-recipe` — verify auto-created sections
 - [ ] `vrg recipe question list shakedown-recipe` — verify auto-created questions (drive/NIC questions)
@@ -555,6 +555,7 @@ Warmup / read-only tests. Use existing config or create one.
 - [ ] `vrg vm stop shakedown-deployed` — stop before delete
 - [ ] `vrg vm delete shakedown-deployed --yes` — cleanup deployed VM
 - [ ] `vrg recipe delete shakedown-recipe --yes` — cleanup recipe
+- [ ] `vrg catalog delete shakedown-catalog --yes` — cleanup catalog
 
 ---
 
@@ -750,14 +751,12 @@ Warmup / read-only tests. Use existing config or create one.
 - [ ] `vrg catalog get <catalog>` — shows catalog details (name, repo, scope, enabled)
 - [ ] `vrg catalog log list` — shows catalog operation logs
 
-> If repo available for testing:
-
-- [ ] `vrg catalog create --name shakedown-catalog --repo <repo> --publishing-scope private` — catalog created
-- [ ] `vrg catalog get shakedown-catalog` — shows catalog details
-- [ ] `vrg catalog update shakedown-catalog --description "Shakedown catalog"` — updated
-- [ ] `vrg catalog disable shakedown-catalog` — disabled
-- [ ] `vrg catalog enable shakedown-catalog` — re-enabled
-- [ ] `vrg catalog delete shakedown-catalog --yes` — deleted
+- [ ] `vrg catalog create --name shakedown-catalog-crud --repo <repo> --publishing-scope private` — catalog created
+- [ ] `vrg catalog get shakedown-catalog-crud` — shows catalog details
+- [ ] `vrg catalog update shakedown-catalog-crud --description "Shakedown catalog"` — updated
+- [ ] `vrg catalog disable shakedown-catalog-crud` — disabled
+- [ ] `vrg catalog enable shakedown-catalog-crud` — re-enabled
+- [ ] `vrg catalog delete shakedown-catalog-crud --yes` — deleted
 
 ### System Updates
 

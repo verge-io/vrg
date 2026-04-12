@@ -151,7 +151,14 @@ def create_cmd(
     vm_key = resolve_resource_id(vctx.client.vms, vm, "vm")
     kwargs: dict[str, Any] = {"name": name, "vm": vm_key}
     if catalog is not None:
-        kwargs["catalog"] = catalog
+        # Catalog keys are 40-char hex strings; resolve name if needed
+        is_hex_key = len(catalog) == 40 and all(c in "0123456789abcdef" for c in catalog.lower())
+        if is_hex_key:
+            kwargs["catalog"] = catalog
+        else:
+            kwargs["catalog"] = resolve_nas_resource(
+                vctx.client.catalogs, catalog, resource_type="catalog"
+            )
     if version is not None:
         kwargs["version"] = version
     if description is not None:
@@ -159,7 +166,9 @@ def create_cmd(
     if notes is not None:
         kwargs["notes"] = notes
     kwargs["enabled"] = enabled
-    result = vctx.client.vm_recipes.create(**kwargs)
+    created = vctx.client.vm_recipes.create(**kwargs)
+    # POST only returns $key; fetch full object for display
+    result = vctx.client.vm_recipes.get(created.key)
     output_result(
         _recipe_to_dict(result),
         output_format=vctx.output_format,
