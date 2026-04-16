@@ -74,6 +74,7 @@ def _rule_to_dict(rule: Any) -> dict[str, Any]:
         "enabled": rule.get("enabled", True),
         "log": rule.get("log", False),
         "statistics": rule.get("statistics", False),
+        "trace": rule.get("trace", False),
         "order": rule.get("orderid", 0),
         "system_rule": rule.get("system_rule", False),
         "packets": rule.get("packets", 0),
