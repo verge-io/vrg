@@ -13,6 +13,7 @@ from verge_cli.commands import (
     network_diag,
     network_dns,
     network_host,
+    network_query,
     network_rule,
 )
 from verge_cli.context import get_context
@@ -32,6 +33,7 @@ app.add_typer(network_alias.app, name="alias")
 app.add_typer(network_diag.app, name="diag")
 app.add_typer(network_dns.app, name="dns")
 app.add_typer(network_host.app, name="host")
+app.add_typer(network_query.app, name="query")
 app.add_typer(network_rule.app, name="rule")
 
 
