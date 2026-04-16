@@ -370,6 +370,166 @@ def query_dmidecode(
     )
 
 
+@app.command("ipmi-sensor")
+@handle_errors()
+def query_ipmi_sensor(
+    ctx: typer.Context,
+    node: Annotated[str, typer.Argument(help="Node name or key")],
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
+    ] = 30,
+) -> None:
+    """Show IPMI sensor readings for a node."""
+    vctx = get_context(ctx)
+    node_key = resolve_resource_id(vctx.client.nodes, node, "node")
+    node_obj = vctx.client.nodes.get(node_key)
+
+    result = run_query(
+        node_obj.queries,
+        "ipmi-sensor",
+        timeout=timeout,
+        quiet=vctx.quiet,
+        label="Reading IPMI sensors...",
+    )
+
+    output_query_result(
+        result,
+        output_format=vctx.output_format,
+        query=vctx.query,
+        quiet=vctx.quiet,
+        no_color=vctx.no_color,
+    )
+
+
+@app.command("ipmi-sel")
+@handle_errors()
+def query_ipmi_sel(
+    ctx: typer.Context,
+    node: Annotated[str, typer.Argument(help="Node name or key")],
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
+    ] = 30,
+) -> None:
+    """Show IPMI System Event Log for a node."""
+    vctx = get_context(ctx)
+    node_key = resolve_resource_id(vctx.client.nodes, node, "node")
+    node_obj = vctx.client.nodes.get(node_key)
+
+    result = run_query(
+        node_obj.queries,
+        "ipmi-sel",
+        timeout=timeout,
+        quiet=vctx.quiet,
+        label="Reading IPMI event log...",
+    )
+
+    output_query_result(
+        result,
+        output_format=vctx.output_format,
+        query=vctx.query,
+        quiet=vctx.quiet,
+        no_color=vctx.no_color,
+    )
+
+
+@app.command("ipmi-fru")
+@handle_errors()
+def query_ipmi_fru(
+    ctx: typer.Context,
+    node: Annotated[str, typer.Argument(help="Node name or key")],
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
+    ] = 30,
+) -> None:
+    """Show IPMI FRU (Field Replaceable Unit) data for a node."""
+    vctx = get_context(ctx)
+    node_key = resolve_resource_id(vctx.client.nodes, node, "node")
+    node_obj = vctx.client.nodes.get(node_key)
+
+    result = run_query(
+        node_obj.queries,
+        "ipmi-fru",
+        timeout=timeout,
+        quiet=vctx.quiet,
+        label="Reading IPMI FRU data...",
+    )
+
+    output_query_result(
+        result,
+        output_format=vctx.output_format,
+        query=vctx.query,
+        quiet=vctx.quiet,
+        no_color=vctx.no_color,
+    )
+
+
+@app.command("ipmi-lan")
+@handle_errors()
+def query_ipmi_lan(
+    ctx: typer.Context,
+    node: Annotated[str, typer.Argument(help="Node name or key")],
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
+    ] = 30,
+) -> None:
+    """Show IPMI LAN configuration for a node."""
+    vctx = get_context(ctx)
+    node_key = resolve_resource_id(vctx.client.nodes, node, "node")
+    node_obj = vctx.client.nodes.get(node_key)
+
+    result = run_query(
+        node_obj.queries,
+        "ipmi-lan",
+        timeout=timeout,
+        quiet=vctx.quiet,
+        label="Reading IPMI LAN config...",
+    )
+
+    output_query_result(
+        result,
+        output_format=vctx.output_format,
+        query=vctx.query,
+        quiet=vctx.quiet,
+        no_color=vctx.no_color,
+    )
+
+
+@app.command("ipmi-chassis")
+@handle_errors()
+def query_ipmi_chassis(
+    ctx: typer.Context,
+    node: Annotated[str, typer.Argument(help="Node name or key")],
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
+    ] = 30,
+) -> None:
+    """Show IPMI chassis status for a node."""
+    vctx = get_context(ctx)
+    node_key = resolve_resource_id(vctx.client.nodes, node, "node")
+    node_obj = vctx.client.nodes.get(node_key)
+
+    result = run_query(
+        node_obj.queries,
+        "ipmi-chassis",
+        timeout=timeout,
+        quiet=vctx.quiet,
+        label="Reading IPMI chassis status...",
+    )
+
+    output_query_result(
+        result,
+        output_format=vctx.output_format,
+        query=vctx.query,
+        quiet=vctx.quiet,
+        no_color=vctx.no_color,
+    )
+
+
 @app.command("run")
 @handle_errors()
 def query_run(

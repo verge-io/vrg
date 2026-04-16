@@ -236,3 +236,119 @@ def test_dmidecode(cli_runner, mock_client, mock_node_for_query, mock_query_resu
     assert result.exit_code == 0
     mock_node_for_query.queries.run.assert_called_once_with("dmidecode", None, timeout=30)
     assert "Dell" in result.output
+
+
+def test_ipmi_sensor(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """IPMI sensor should call queries.run with ipmi-sensor type."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "ipmi-sensor"
+    mock_query_result.result = "CPU Temp | 45 degrees C | ok"
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["node", "query", "ipmi-sensor", "node1"])
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with("ipmi-sensor", None, timeout=30)
+
+
+def test_ipmi_sel(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """IPMI SEL should call queries.run with ipmi-sel type."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "ipmi-sel"
+    mock_query_result.result = "SEL has no entries"
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["node", "query", "ipmi-sel", "node1"])
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with("ipmi-sel", None, timeout=30)
+
+
+def test_ipmi_fru(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """IPMI FRU should call queries.run with ipmi-fru type."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "ipmi-fru"
+    mock_query_result.result = "FRU Device Description : Builtin FRU Device"
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["node", "query", "ipmi-fru", "node1"])
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with("ipmi-fru", None, timeout=30)
+
+
+def test_ipmi_lan(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """IPMI LAN should call queries.run with ipmi-lan type."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "ipmi-lan"
+    mock_query_result.result = "IP Address : 192.168.1.100"
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["node", "query", "ipmi-lan", "node1"])
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with("ipmi-lan", None, timeout=30)
+
+
+def test_ipmi_chassis(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """IPMI chassis should call queries.run with ipmi-chassis type."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "ipmi-chassis"
+    mock_query_result.result = "System Power : on"
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["node", "query", "ipmi-chassis", "node1"])
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with("ipmi-chassis", None, timeout=30)
+
+
+def test_run_generic(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """Generic run with custom type + JSON params."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "ip"
+    mock_query_result.result = "1: lo: <LOOPBACK,UP>"
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(
+        app,
+        ["node", "query", "run", "node1", "ip", "--params", '{"cmd": "addr"}'],
+    )
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with(
+        "ip", {"cmd": "addr"}, timeout=120,
+    )
+
+
+def test_run_generic_no_params(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """Generic run with type only, no --params."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "whatsmyip"
+    mock_query_result.result = "203.0.113.1"
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["node", "query", "run", "node1", "whatsmyip"])
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with("whatsmyip", None, timeout=120)
+
+
+def test_run_invalid_json(cli_runner, mock_client, mock_node_for_query):
+    """Bad --params JSON should exit with a clear error."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+
+    result = cli_runner.invoke(
+        app, ["node", "query", "run", "node1", "ip", "--params", "not-json"]
+    )
+
+    assert result.exit_code == 1
+    assert "Invalid JSON" in result.output
