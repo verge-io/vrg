@@ -7,6 +7,7 @@ from typing import Annotated, Any
 import typer
 
 from verge_cli.columns import NODE_COLUMNS, NODE_GPU_COLUMNS, NODE_PCI_COLUMNS
+from verge_cli.commands import node_query
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
 from verge_cli.multi import list_all_profiles
@@ -18,6 +19,8 @@ app = typer.Typer(
     help="Manage nodes.",
     no_args_is_help=True,
 )
+
+app.add_typer(node_query.app, name="query")
 
 
 def _node_to_dict(node: Any) -> dict[str, Any]:
