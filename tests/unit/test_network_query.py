@@ -184,3 +184,132 @@ def test_timeout_error(cli_runner, mock_client, mock_network_for_query):
     result = cli_runner.invoke(app, ["network", "query", "ping", "test-network", "8.8.8.8"])
 
     assert result.exit_code == 9
+
+
+def test_arp(cli_runner, mock_client, mock_network_for_query, mock_query_result):
+    """ARP should call queries.run with arp type."""
+    mock_client.networks.list.return_value = [mock_network_for_query]
+    mock_client.networks.get.return_value = mock_network_for_query
+    mock_query_result.query_type = "arp"
+    mock_query_result.result = "? (10.0.0.1) at 00:50:56:00:00:01 [ether] on eth0"
+    mock_network_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["network", "query", "arp", "test-network"])
+
+    assert result.exit_code == 0
+    mock_network_for_query.queries.run.assert_called_once_with("arp", None, timeout=30)
+
+
+def test_arp_scan(cli_runner, mock_client, mock_network_for_query, mock_query_result):
+    """ARP scan should call queries.run with arp-scan type."""
+    mock_client.networks.list.return_value = [mock_network_for_query]
+    mock_client.networks.get.return_value = mock_network_for_query
+    mock_query_result.query_type = "arp-scan"
+    mock_query_result.result = "10.0.0.1\t00:50:56:00:00:01"
+    mock_network_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["network", "query", "arp-scan", "test-network"])
+
+    assert result.exit_code == 0
+    mock_network_for_query.queries.run.assert_called_once_with("arp-scan", None, timeout=30)
+
+
+def test_firewall(cli_runner, mock_client, mock_network_for_query, mock_query_result):
+    """Firewall should call queries.run with firewall type."""
+    mock_client.networks.list.return_value = [mock_network_for_query]
+    mock_client.networks.get.return_value = mock_network_for_query
+    mock_query_result.query_type = "firewall"
+    mock_query_result.result = "table inet filter {\n  chain input {\n  }\n}"
+    mock_network_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["network", "query", "firewall", "test-network"])
+
+    assert result.exit_code == 0
+    mock_network_for_query.queries.run.assert_called_once_with("firewall", None, timeout=30)
+
+
+def test_trace(cli_runner, mock_client, mock_network_for_query, mock_query_result):
+    """Trace should call queries.run with trace type."""
+    mock_client.networks.list.return_value = [mock_network_for_query]
+    mock_client.networks.get.return_value = mock_network_for_query
+    mock_query_result.query_type = "trace"
+    mock_query_result.result = "trace id 1 inet filter input"
+    mock_network_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["network", "query", "trace", "test-network"])
+
+    assert result.exit_code == 0
+    mock_network_for_query.queries.run.assert_called_once_with("trace", None, timeout=30)
+
+
+def test_nmap(cli_runner, mock_client, mock_network_for_query, mock_query_result):
+    """Nmap should call queries.run with host param."""
+    mock_client.networks.list.return_value = [mock_network_for_query]
+    mock_client.networks.get.return_value = mock_network_for_query
+    mock_query_result.query_type = "nmap"
+    mock_query_result.result = "Host: 10.0.0.1 () Ports: 22/open/tcp//ssh///"
+    mock_network_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(
+        app, ["network", "query", "nmap", "test-network", "10.0.0.0/24"]
+    )
+
+    assert result.exit_code == 0
+    mock_network_for_query.queries.run.assert_called_once_with(
+        "nmap", {"host": "10.0.0.0/24"}, timeout=120,
+    )
+
+
+def test_tcp_connect(cli_runner, mock_client, mock_network_for_query, mock_query_result):
+    """TCP connect should call queries.run with host and port params."""
+    mock_client.networks.list.return_value = [mock_network_for_query]
+    mock_client.networks.get.return_value = mock_network_for_query
+    mock_query_result.query_type = "tcp_connect"
+    mock_query_result.result = "Connected to 10.0.0.1:443"
+    mock_network_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(
+        app, ["network", "query", "tcp-connect", "test-network", "10.0.0.1", "443"]
+    )
+
+    assert result.exit_code == 0
+    mock_network_for_query.queries.run.assert_called_once_with(
+        "tcp_connect", {"host": "10.0.0.1", "port": 443}, timeout=30,
+    )
+
+
+def test_run_generic(cli_runner, mock_client, mock_network_for_query, mock_query_result):
+    """Generic run with custom type + JSON params."""
+    mock_client.networks.list.return_value = [mock_network_for_query]
+    mock_client.networks.get.return_value = mock_network_for_query
+    mock_query_result.query_type = "ip"
+    mock_query_result.result = "1: lo: <LOOPBACK,UP>"
+    mock_network_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(
+        app,
+        ["network", "query", "run", "test-network", "ip", "--params", '{"cmd": "addr"}'],
+    )
+
+    assert result.exit_code == 0
+    mock_network_for_query.queries.run.assert_called_once_with(
+        "ip", {"cmd": "addr"}, timeout=120,
+    )
+
+
+def test_run_generic_no_params(cli_runner, mock_client, mock_network_for_query, mock_query_result):
+    """Generic run with type only, no --params."""
+    mock_client.networks.list.return_value = [mock_network_for_query]
+    mock_client.networks.get.return_value = mock_network_for_query
+    mock_query_result.query_type = "whatsmyip"
+    mock_query_result.result = "203.0.113.1"
+    mock_network_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(
+        app, ["network", "query", "run", "test-network", "whatsmyip"]
+    )
+
+    assert result.exit_code == 0
+    mock_network_for_query.queries.run.assert_called_once_with(
+        "whatsmyip", None, timeout=120,
+    )
