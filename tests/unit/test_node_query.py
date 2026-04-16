@@ -169,3 +169,70 @@ def test_json_output(cli_runner, mock_client, mock_node_for_query, mock_query_re
     assert data["query_type"] == "ping"
     assert data["status"] == "complete"
     assert data["key"] == "node123def456"
+
+
+def test_smartctl(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """Smartctl should call queries.run with device param."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "smartctl"
+    mock_query_result.result = "SMART overall-health self-assessment test result: PASSED"
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(
+        app, ["node", "query", "smartctl", "node1", "/dev/sda"]
+    )
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with(
+        "smartctl", {"device": "/dev/sda"}, timeout=60,
+    )
+    assert "PASSED" in result.output
+
+
+def test_smartctl_test(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """Smartctl-test should call queries.run with smartctl-test type."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "smartctl-test"
+    mock_query_result.result = "Self-test execution started"
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(
+        app, ["node", "query", "smartctl-test", "node1", "/dev/sda"]
+    )
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with(
+        "smartctl-test", {"device": "/dev/sda"}, timeout=60,
+    )
+
+
+def test_lsblk(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """Lsblk should call queries.run with lsblk type."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "lsblk"
+    mock_query_result.result = "NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINT\nsda 8:0 0 500G 0 disk"
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["node", "query", "lsblk", "node1"])
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with("lsblk", None, timeout=30)
+    assert "sda" in result.output
+
+
+def test_dmidecode(cli_runner, mock_client, mock_node_for_query, mock_query_result):
+    """Dmidecode should call queries.run with dmidecode type."""
+    mock_client.nodes.list.return_value = [mock_node_for_query]
+    mock_client.nodes.get.return_value = mock_node_for_query
+    mock_query_result.query_type = "dmidecode"
+    mock_query_result.result = "System Information\n  Manufacturer: Dell Inc."
+    mock_node_for_query.queries.run.return_value = mock_query_result
+
+    result = cli_runner.invoke(app, ["node", "query", "dmidecode", "node1"])
+
+    assert result.exit_code == 0
+    mock_node_for_query.queries.run.assert_called_once_with("dmidecode", None, timeout=30)
+    assert "Dell" in result.output
