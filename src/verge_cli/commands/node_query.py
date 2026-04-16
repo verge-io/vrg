@@ -238,6 +238,138 @@ def query_arp_scan(
     )
 
 
+@app.command("smartctl")
+@handle_errors()
+def query_smartctl(
+    ctx: typer.Context,
+    node: Annotated[str, typer.Argument(help="Node name or key")],
+    device: Annotated[str, typer.Argument(help="Device path (e.g. /dev/sda)")],
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
+    ] = 60,
+) -> None:
+    """Show SMART health and attributes for a drive."""
+    vctx = get_context(ctx)
+    node_key = resolve_resource_id(vctx.client.nodes, node, "node")
+    node_obj = vctx.client.nodes.get(node_key)
+
+    result = run_query(
+        node_obj.queries,
+        "smartctl",
+        {"device": device},
+        timeout=timeout,
+        quiet=vctx.quiet,
+        label=f"Reading SMART data for {device}...",
+    )
+
+    output_query_result(
+        result,
+        output_format=vctx.output_format,
+        query=vctx.query,
+        quiet=vctx.quiet,
+        no_color=vctx.no_color,
+    )
+
+
+@app.command("smartctl-test")
+@handle_errors()
+def query_smartctl_test(
+    ctx: typer.Context,
+    node: Annotated[str, typer.Argument(help="Node name or key")],
+    device: Annotated[str, typer.Argument(help="Device path (e.g. /dev/sda)")],
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
+    ] = 60,
+) -> None:
+    """Initiate a SMART self-test on a drive."""
+    vctx = get_context(ctx)
+    node_key = resolve_resource_id(vctx.client.nodes, node, "node")
+    node_obj = vctx.client.nodes.get(node_key)
+
+    result = run_query(
+        node_obj.queries,
+        "smartctl-test",
+        {"device": device},
+        timeout=timeout,
+        quiet=vctx.quiet,
+        label=f"Starting SMART test on {device}...",
+    )
+
+    output_query_result(
+        result,
+        output_format=vctx.output_format,
+        query=vctx.query,
+        quiet=vctx.quiet,
+        no_color=vctx.no_color,
+    )
+
+
+@app.command("lsblk")
+@handle_errors()
+def query_lsblk(
+    ctx: typer.Context,
+    node: Annotated[str, typer.Argument(help="Node name or key")],
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
+    ] = 30,
+) -> None:
+    """List block devices on a node."""
+    vctx = get_context(ctx)
+    node_key = resolve_resource_id(vctx.client.nodes, node, "node")
+    node_obj = vctx.client.nodes.get(node_key)
+
+    result = run_query(
+        node_obj.queries,
+        "lsblk",
+        timeout=timeout,
+        quiet=vctx.quiet,
+        label="Listing block devices...",
+    )
+
+    output_query_result(
+        result,
+        output_format=vctx.output_format,
+        query=vctx.query,
+        quiet=vctx.quiet,
+        no_color=vctx.no_color,
+    )
+
+
+@app.command("dmidecode")
+@handle_errors()
+def query_dmidecode(
+    ctx: typer.Context,
+    node: Annotated[str, typer.Argument(help="Node name or key")],
+    timeout: Annotated[
+        float,
+        typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
+    ] = 30,
+) -> None:
+    """Show DMI/SMBIOS hardware information for a node."""
+    vctx = get_context(ctx)
+    node_key = resolve_resource_id(vctx.client.nodes, node, "node")
+    node_obj = vctx.client.nodes.get(node_key)
+
+    result = run_query(
+        node_obj.queries,
+        "dmidecode",
+        timeout=timeout,
+        quiet=vctx.quiet,
+        label="Reading hardware info...",
+    )
+
+    output_query_result(
+        result,
+        output_format=vctx.output_format,
+        query=vctx.query,
+        quiet=vctx.quiet,
+        no_color=vctx.no_color,
+    )
+
+
 @app.command("run")
 @handle_errors()
 def query_run(
