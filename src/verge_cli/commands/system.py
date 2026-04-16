@@ -11,6 +11,7 @@ from verge_cli.columns import (
     SYSTEM_SETTING_COLUMNS,
     ColumnDef,
 )
+from verge_cli.commands import system_diag
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
 from verge_cli.output import output_result, output_success
@@ -20,6 +21,8 @@ app = typer.Typer(
     help="System information and management.",
     no_args_is_help=True,
 )
+
+app.add_typer(system_diag.app, name="diag")
 
 # ---------------------------------------------------------------------------
 # Settings sub-group
