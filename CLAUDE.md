@@ -105,6 +105,15 @@ Details: [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)
 3. Named profile in `~/.vrg/config.toml`
 4. Default profile
 
+## External References
+
+- **pyVergeOS SDK** (local): `/Volumes/HOME/projects/pyVergeOS`
+- **VergeOS API docs** (local): `/Users/larry/Development/VergeOS-Docs/`
+  - `docs/api-reference/` — Rendered endpoint documentation
+  - `RAW/api-schema/endpoints/*.json` — Canonical JSON schemas (336 endpoints)
+
+> **Important**: The SDK does not wrap every API endpoint. Never infer API limitations from SDK gaps — always check the API docs.
+
 ## Core Dependencies
 
 - **Python** 3.10+ | **Package Manager**: uv
