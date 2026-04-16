@@ -522,14 +522,14 @@ wheels = [
 
 [[package]]
 name = "pyvergeos"
-version = "1.1.1"
+version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/da/65/8d579e9ad9120751370fd5e28bd318312af1428cca28d90a85d331c234b1/pyvergeos-1.1.1.tar.gz", hash = "sha256:1378a8af7601250235c0b9ed0382f190830b26b028cae43cc60e4d0e856e6f1d", size = 816263, upload-time = "2026-04-12T00:04:26.887Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0c/f7/c8398873a3caa492e65d420f38647dd229e1c434e8620fdb9a01dbaf1101/pyvergeos-1.2.0.tar.gz", hash = "sha256:5cba9c6cc324920e3fad00bd6adfc2ea0de184c247614a37c4b69a734405f125", size = 846071, upload-time = "2026-04-16T18:36:01.244Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b6/5b/48b0cbf441bdc01f0d9d16d4a6817bdc2ed2264944f70f62a62fe496282c/pyvergeos-1.1.1-py3-none-any.whl", hash = "sha256:1030de6e50c1164a4d2efbd4f5cfe721df48a398046d715d0911a476912e5f83", size = 409309, upload-time = "2026-04-12T00:04:25.103Z" },
+    { url = "https://files.pythonhosted.org/packages/79/d0/8c9cb83c0663748d21dbab064deb7f405ef4cd89d306f12136515934f5b6/pyvergeos-1.2.0-py3-none-any.whl", hash = "sha256:d0248d4e293eec2296b6f6dc255122a82326cff7e76996f17c5839ed274b697b", size = 425378, upload-time = "2026-04-16T18:35:59.753Z" },
 ]
 
 [[package]]
@@ -943,7 +943,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.0" },
-    { name = "pyvergeos", specifier = ">=1.1.1" },
+    { name = "pyvergeos", specifier = ">=1.2.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
