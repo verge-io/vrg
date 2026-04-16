@@ -185,7 +185,7 @@ def test_smartctl(cli_runner, mock_client, mock_node_for_query, mock_query_resul
 
     assert result.exit_code == 0
     mock_node_for_query.queries.run.assert_called_once_with(
-        "smartctl", {"device": "/dev/sda"}, timeout=60,
+        "smartctl", {"path": "/dev/sda"}, timeout=60,
     )
     assert "PASSED" in result.output
 
@@ -204,7 +204,7 @@ def test_smartctl_test(cli_runner, mock_client, mock_node_for_query, mock_query_
 
     assert result.exit_code == 0
     mock_node_for_query.queries.run.assert_called_once_with(
-        "smartctl-test", {"device": "/dev/sda"}, timeout=60,
+        "smartctl-test", {"path": "/dev/sda"}, timeout=60,
     )
 
 

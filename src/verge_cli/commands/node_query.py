@@ -257,7 +257,7 @@ def query_smartctl(
     result = run_query(
         node_obj.queries,
         "smartctl",
-        {"device": device},
+        {"path": device},
         timeout=timeout,
         quiet=vctx.quiet,
         label=f"Reading SMART data for {device}...",
@@ -291,7 +291,7 @@ def query_smartctl_test(
     result = run_query(
         node_obj.queries,
         "smartctl-test",
-        {"device": device},
+        {"path": device},
         timeout=timeout,
         quiet=vctx.quiet,
         label=f"Starting SMART test on {device}...",
