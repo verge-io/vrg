@@ -14,8 +14,47 @@ from verge_cli.utils import confirm_action, resolve_nas_resource, resolve_resour
 
 app = typer.Typer(
     name="section",
-    help="Manage recipe sections.",
+    help=(
+        "Manage VM recipe sections — the logical groupings that arrange"
+        " recipe questions on the deployment form.\n\n"
+        "A **section** is a labeled container for recipe questions. When a"
+        " user deploys a recipe, questions appear on the form grouped by"
+        " section, which keeps long question lists organized (for example:"
+        " Networking, Credentials, Storage). VergeOS creates some sections"
+        " automatically — additional sections can be added for"
+        " recipe-specific questions.\n\n"
+        "Sections are scoped to a single recipe and are ordered by the"
+        " `orderid` field. Deleting a section cascades to every question"
+        " inside it, so move questions to another section first if you want"
+        " to keep them.\n\n"
+        "After editing sections, the parent recipe must be republished"
+        " before remote systems and tenants see the changes. See"
+        " `vrg recipe republish`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List sections on a recipe\n"
+        "    vrg recipe section list ubuntu-server\n\n"
+        "    # Inspect a section as JSON\n"
+        "    vrg -o json recipe section get ubuntu-server networking\n\n"
+        "    # Create a new section\n"
+        "    vrg recipe section create ubuntu-server \\\n"
+        "      --name credentials --description 'Admin account settings'\n\n"
+        "    # Rename a section and move it up in the form\n"
+        "    vrg recipe section update ubuntu-server credentials \\\n"
+        "      --name admin --order 10\n\n"
+        "    # Delete a section (cascades to its questions)\n"
+        "    vrg recipe section delete ubuntu-server old-section --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The first argument is always the recipe (name or 40-character hex"
+        " key). Sections are then addressed by their `name` or numeric key."
+        " When a recipe or section name matches multiple records, vrg prints"
+        " the matches and exits with code 7 — use the key to disambiguate.\n\n"
+        "`delete` removes the section and every question inside it."
+        " Confirmation is required unless `--yes` is supplied."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 RECIPE_SECTION_COLUMNS: list[ColumnDef] = [

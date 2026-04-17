@@ -112,7 +112,7 @@ Notes:
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `recipe_instance.py`
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `recipe_log.py`
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `recipe_question.py`
-- [ ] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `recipe_section.py`
+- [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `recipe_section.py`
 - [ ] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `tenant_recipe.py`
 - [ ] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `tenant_recipe_instance.py`
 - [ ] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `tenant_recipe_log.py`
