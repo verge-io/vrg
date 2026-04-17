@@ -27,7 +27,7 @@ app = typer.Typer(
         " source snapshot has changed. Tenants cannot create shared"
         " objects for themselves — only a parent can grant them.\n\n"
         "Use `-o json` for structured output and `--query` to pluck"
-        ' fields (e.g., `--query "[?is_inbox].name"`). Shared objects'
+        " fields (e.g., `--query [].name`), or pipe through jq for filtering. Shared objects"
         " resolve by `$key` (numeric) or `name`; an ambiguous name"
         " yields exit code 7 (multiple matches). `list` honors"
         " `--all-profiles` / `-A` to fan out across every configured"

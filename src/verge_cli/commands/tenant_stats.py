@@ -93,7 +93,7 @@ logs_app = typer.Typer(
         "    vrg -o json tenant logs list acme-corp --errors-only\n\n"
         "    # Filter to messages containing a substring\n"
         "    vrg -o json tenant logs list acme-corp"
-        " --query \"[?contains(message, 'quota')]\"\n\n"
+        " | jq '.[] | select(.message | contains(\"quota\"))'\n\n"
         "---\n\n"
         "**Notes:**\n\n"
         "This view shows what the parent system logged about the tenant,"

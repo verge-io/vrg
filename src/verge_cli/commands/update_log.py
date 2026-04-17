@@ -100,7 +100,7 @@ def list_cmd(
         vrg update log list
         vrg update log list --level error
         vrg update log list --level critical
-        vrg -o json update log list --query "[?level=='error'].text"
+        vrg -o json update log list | jq '.[] | select(.level == "error") | .text'
 
     Levels are `audit`, `message`, `warning`, `error`, `critical`.
     Useful `--query` fields: `level`, `text`, `object_name`,

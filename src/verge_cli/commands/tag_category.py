@@ -124,7 +124,7 @@ def list_cmd(
 
         vrg tag category list
         vrg -o json tag category list
-        vrg -o json tag category list --query "[?single_selection].name"
+        vrg -o json tag category list | jq '.[] | select(.single_selection) | .name'
 
     Useful `--query` fields: `name`, `single_selection`,
     `taggable_types`, `description`.

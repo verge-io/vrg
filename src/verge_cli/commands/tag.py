@@ -199,7 +199,7 @@ def list_cmd(
 
         vrg tag list
         vrg tag list --category Environment
-        vrg -o json tag list --query "[?category_name=='Environment'].name"
+        vrg -o json tag list | jq '.[] | select(.category_name == "Environment") | .name'
 
     Useful `--query` fields: `name`, `category_name`, `description`.
     """

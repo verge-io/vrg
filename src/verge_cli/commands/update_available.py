@@ -113,7 +113,7 @@ def list_cmd(
         vrg update available list --pending
         vrg update available list --downloaded
         vrg update available list --source 1 --branch 2
-        vrg -o json update available list --query "[?downloaded=='Y'].name"
+        vrg -o json update available list | jq '.[] | select(.downloaded == "Y") | .name'
 
     Reflects the candidate set from the last `vrg update check`.
     `--downloaded` and `--pending` are mutually exclusive. Useful
