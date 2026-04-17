@@ -114,7 +114,18 @@ def list_cmd(
         ),
     ] = None,
 ) -> None:
-    """List all registered sites."""
+    """List all registered sites.
+
+    Examples:
+
+        vrg site list
+        vrg site list --status online --enabled
+        vrg -o json site list --query "[?status!='online'].name"
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    Useful `--query` fields include `name`, `status`, `enabled`,
+    `authentication_status`, and `config_cloud_snapshots`.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.sites.list(), _site_to_dict, SITE_COLUMNS)
         return
@@ -142,7 +153,16 @@ def get_cmd(
     ctx: typer.Context,
     site: Annotated[str, typer.Argument(help="Site name or key")],
 ) -> None:
-    """Get details of a site."""
+    """Get details of a site.
+
+    Examples:
+
+        vrg site get dr-east
+        vrg -o json site get 3
+        vrg -o json site get dr-east --query "{status: status, url: url}"
+
+    Resolves `site` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
     item = vctx.client.sites.get(key)
@@ -182,7 +202,23 @@ def create_cmd(
         typer.Option("--auto-create-syncs/--no-auto-create-syncs", help="Auto-create sync configs"),
     ] = True,
 ) -> None:
-    """Create a new site connection."""
+    """Create a new site connection.
+
+    Examples:
+
+        vrg site create --name dr-east --url https://dr.example.com \\
+            --username admin --password 's3cret' --cloud-snapshots both
+
+        vrg site create --name offsite --url https://offsite.example.com \\
+            --username svc-sync --password 'pw' \\
+            --cloud-snapshots send --no-auto-create-syncs
+
+    Performs a one-time authentication handshake; the supplied credentials
+    are not stored after setup — ongoing replication uses a dedicated
+    service account. `--cloud-snapshots` accepts `disabled`, `send`,
+    `receive`, or `both`. Use `--allow-insecure` only for pairings over
+    self-signed TLS.
+    """
     vctx = get_context(ctx)
 
     kwargs: dict[str, Any] = {
@@ -224,7 +260,17 @@ def update_cmd(
         ),
     ] = None,
 ) -> None:
-    """Update a site's settings."""
+    """Update a site's settings.
+
+    Examples:
+
+        vrg site update dr-east --description "DR pair in us-east"
+        vrg site update dr-east --cloud-snapshots both
+        vrg site update 3 --name dr-east-primary
+
+    Resolves `site` by name or numeric key. Ambiguous names exit 7. Only
+    fields passed are updated.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
 
@@ -247,7 +293,18 @@ def delete_cmd(
     site: Annotated[str, typer.Argument(help="Site name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a site."""
+    """Delete a site.
+
+    Examples:
+
+        vrg site delete dr-east
+        vrg site delete 3 --yes
+
+    Destructive. Removes the pairing from this system; the remote site's
+    record of this pairing must be cleaned up separately. Existing
+    outgoing/incoming syncs tied to the site are affected — review them
+    first with `vrg site sync outgoing list --site <site>`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
 
@@ -265,7 +322,16 @@ def enable_cmd(
     ctx: typer.Context,
     site: Annotated[str, typer.Argument(help="Site name or key")],
 ) -> None:
-    """Enable a disabled site."""
+    """Enable a disabled site.
+
+    Examples:
+
+        vrg site enable dr-east
+        vrg site enable 3
+
+    Re-activates a site previously paused with `vrg site disable`. Does not
+    re-authenticate — if authentication has expired, use `vrg site reauth`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
     vctx.client.sites.enable(key)
@@ -278,7 +344,17 @@ def disable_cmd(
     ctx: typer.Context,
     site: Annotated[str, typer.Argument(help="Site name or key")],
 ) -> None:
-    """Disable a site without deleting it."""
+    """Disable a site without deleting it.
+
+    Examples:
+
+        vrg site disable dr-east
+        vrg site disable 3
+
+    Pauses replication and management traffic to the site while preserving
+    the pairing, credentials, and configured syncs. Re-enable with
+    `vrg site enable`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
     vctx.client.sites.disable(key)
@@ -293,7 +369,17 @@ def reauth_cmd(
     username: Annotated[str, typer.Option("--username", help="New username")],
     password: Annotated[str, typer.Option("--password", help="New password")],
 ) -> None:
-    """Re-authenticate with updated credentials."""
+    """Re-authenticate with updated credentials.
+
+    Examples:
+
+        vrg site reauth dr-east --username admin --password 'new-s3cret'
+        vrg site reauth 3 --username svc-sync --password 'rotated-pw'
+
+    Use after rotating the remote admin password or when the pairing has
+    drifted out of sync. The supplied credentials are used for a single
+    handshake only; they are not persisted.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
     vctx.client.sites.reauthenticate(key, username, password)
@@ -306,7 +392,17 @@ def refresh_cmd(
     ctx: typer.Context,
     site: Annotated[str, typer.Argument(help="Site name or key")],
 ) -> None:
-    """Refresh site connection and metadata."""
+    """Refresh site connection and metadata.
+
+    Examples:
+
+        vrg site refresh dr-east
+        vrg site refresh 3
+
+    Forces the local system to re-probe the remote site, updating status,
+    version, and capability metadata. Useful after a remote upgrade or when
+    `status` is stale.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
     vctx.client.sites.refresh_site(key)
