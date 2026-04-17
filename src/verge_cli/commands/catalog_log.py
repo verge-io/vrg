@@ -14,8 +14,24 @@ from verge_cli.utils import resolve_nas_resource
 
 app = typer.Typer(
     name="log",
-    help="View catalog operation logs.",
+    help=(
+        "View catalog operation logs — download, sync, and refresh"
+        " activity.\n\n"
+        "Catalog logs record events from recipe downloads, catalog"
+        " refreshes, and version checks. Each entry has a **level**"
+        " (`message`, `warning`, `error`, `critical`) and a timestamp.\n\n"
+        "Use `-o json` for machine-readable output. Filter with `--catalog`"
+        " (name or hex key) and `--level`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg catalog log list\n"
+        "    vrg catalog log list --catalog windows-server\n"
+        "    vrg catalog log list --level error\n"
+        "    vrg -o json catalog log list\n\n"
+        "---"
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 CATALOG_LOG_COLUMNS: list[ColumnDef] = [

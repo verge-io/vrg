@@ -59,7 +59,7 @@ app = typer.Typer(
         "\n\n"
         "---\n\n"
         "**Examples:**\n\n"
-        "    vrg configure add-profile prod --host https://vergeos.example.com --token $TOKEN\n\n"
+        "    vrg configure setup --profile prod\n\n"
         "    vrg vm list\n\n"
         "    vrg -o json vm get web-01\n\n"
         "    vrg --query status vm get web-01\n\n"

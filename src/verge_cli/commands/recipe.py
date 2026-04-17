@@ -60,7 +60,7 @@ app = typer.Typer(
         "    vrg recipe section list ubuntu-server\n"
         "    vrg recipe question list ubuntu-server\n\n"
         "    # List VMs deployed from a recipe\n"
-        "    vrg recipe instance list ubuntu-server\n\n"
+        "    vrg recipe instance list --recipe ubuntu-server\n\n"
         "---\n\n"
         "**Notes:**\n\n"
         "Recipes are referenced by name or 40-char hex key. When a name"

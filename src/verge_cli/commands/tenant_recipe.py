@@ -51,7 +51,7 @@ app = typer.Typer(
         "        --set YB_USER_NAME=admin --set YB_USER_PASSWORD=... \\\n"
         "        --set YB_NET_1_IP=10.50.0.10\n\n"
         "    # List tenants deployed from a recipe\n"
-        "    vrg tenant-recipe instance list customer-baseline\n\n"
+        "    vrg tenant-recipe instance list --recipe customer-baseline\n\n"
         "    # Update a recipe's description or version\n"
         "    vrg tenant-recipe update customer-baseline \\\n"
         "        --description 'Hardened tenant template' --version 2.0.0\n\n"

@@ -54,7 +54,7 @@ app = typer.Typer(
         "    vrg tenant stop acme-corp\n"
         "    vrg tenant restart acme-corp\n\n"
         "    # View tenant resource usage\n"
-        "    vrg tenant stats get acme-corp\n\n"
+        "    vrg tenant stats current acme-corp\n\n"
         "    # Manage tenant nodes and networking\n"
         "    vrg tenant node list acme-corp\n"
         "    vrg tenant net-block list acme-corp\n\n"
@@ -539,8 +539,26 @@ def tenant_isolate(
 
 crash_cart_app = typer.Typer(
     name="crash-cart",
-    help="Manage tenant crash carts.",
+    help=(
+        "Manage tenant crash carts — emergency console access to a tenant's"
+        " virtual nodes.\n\n"
+        "A **crash cart** is a temporary VNC console VM injected into a"
+        " tenant, giving the host operator direct keyboard/video access to"
+        " the tenant's nodes without requiring the tenant's network or UI"
+        " to be functional. Use when a tenant is unreachable and you need"
+        " to diagnose from inside.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg tenant crash-cart create acme-corp\n"
+        "    vrg tenant crash-cart create acme-corp --name debug-session\n"
+        "    vrg tenant crash-cart delete acme-corp -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Crash carts are scoped to a single tenant and should be deleted"
+        " after the emergency session. The tenant must be powered on."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 app.add_typer(crash_cart_app, name="crash-cart")
 

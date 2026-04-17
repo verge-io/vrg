@@ -14,8 +14,26 @@ from verge_cli.utils import resolve_resource_id
 
 app = typer.Typer(
     name="log",
-    help="View catalog repository logs.",
+    help=(
+        "View catalog repository logs — refresh, sync, and connection"
+        " activity.\n\n"
+        "Repository logs record events from remote repository refreshes,"
+        " connectivity checks, and recipe sync operations. Each entry has"
+        " a **level** (`message`, `warning`, `error`, `critical`) and a"
+        " timestamp. Useful for diagnosing failed refreshes against remote"
+        " repositories.\n\n"
+        "Use `-o json` for machine-readable output. Filter with `--repo`"
+        " (name or key) and `--level`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg catalog repo log list\n"
+        "    vrg catalog repo log list --repo MarketPlace\n"
+        "    vrg catalog repo log list --level error\n"
+        "    vrg -o json catalog repo log list\n\n"
+        "---"
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 REPO_LOG_COLUMNS: list[ColumnDef] = [
