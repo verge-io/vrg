@@ -142,7 +142,7 @@ def list_cmd(
         vrg recipe question list ubuntu-server
         vrg recipe question list ubuntu-server --section networking
         vrg -o json recipe question list ubuntu-server \\
-            --query "[?required].name"
+            | jq '.[] | select(.required) | .name'
 
     Useful `--query` fields: `name`, `display`, `type`, `required`,
     `default`, `hint`. Question `name` is the variable used in scripts

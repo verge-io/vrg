@@ -133,7 +133,7 @@ def list_cmd(
         vrg catalog list
         vrg catalog list --repo MarketPlace --enabled
         vrg -o json catalog list \\
-            --query "[?publishing_scope=='global'].name"
+            | jq '.[] | select(.publishing_scope == "global") | .name'
 
     Useful `--query` fields: `name`, `repository`, `publishing_scope`,
     `enabled`, `description`. Use `--filter` for server-side OData

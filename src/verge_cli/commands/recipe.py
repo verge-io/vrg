@@ -147,7 +147,7 @@ def list_cmd(
 
         vrg recipe list
         vrg recipe list --catalog MarketPlace --downloaded
-        vrg -o json recipe list --query "[?enabled].name"
+        vrg -o json recipe list | jq '.[] | select(.enabled) | .name'
 
     Useful `--query` fields: `name`, `enabled`, `description`, `notes`.
     Combine `--catalog` and `--downloaded` to narrow down to locally

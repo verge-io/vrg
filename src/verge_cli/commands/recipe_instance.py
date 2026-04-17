@@ -82,7 +82,7 @@ def list_cmd(
 
         vrg recipe instance list
         vrg recipe instance list --recipe ubuntu-server
-        vrg -o json recipe instance list --query "[?auto_update].name"
+        vrg -o json recipe instance list | jq '.[] | select(.auto_update) | .name'
 
     Useful `--query` fields: `name`, `recipe_name`, `auto_update`.
     """
