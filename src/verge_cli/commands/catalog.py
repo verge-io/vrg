@@ -126,7 +126,20 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled state."),
     ] = None,
 ) -> None:
-    """List catalogs."""
+    """List catalogs.
+
+    Examples:
+
+        vrg catalog list
+        vrg catalog list --repo MarketPlace --enabled
+        vrg -o json catalog list \\
+            --query "[?publishing_scope=='global'].name"
+
+    Useful `--query` fields: `name`, `repository`, `publishing_scope`,
+    `enabled`, `description`. Use `--filter` for server-side OData
+    filtering. Works with `--all-profiles` to list across every
+    configured profile.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.catalogs.list(), _catalog_to_dict, CATALOG_COLUMNS)
         return
@@ -161,7 +174,17 @@ def get_cmd(
     ctx: typer.Context,
     catalog: Annotated[str, typer.Argument(help="Catalog name or hex key.")],
 ) -> None:
-    """Get a catalog by name or key."""
+    """Get a catalog by name or key.
+
+    Examples:
+
+        vrg catalog get windows-server
+        vrg -o json catalog get windows-server
+        vrg -o json catalog get 8f3a...0b2c
+
+    Resolves `catalog` by name or SHA-1 hex key. Ambiguous names exit
+    with code 7 — use the hex key to disambiguate.
+    """
     vctx = get_context(ctx)
     key = _resolve_catalog(vctx, catalog)
     item = vctx.client.catalogs.get(key)
@@ -194,7 +217,20 @@ def create_cmd(
         typer.Option("--enabled/--no-enabled", help="Enable the catalog."),
     ] = True,
 ) -> None:
-    """Create a new catalog."""
+    """Create a new catalog.
+
+    Examples:
+
+        vrg catalog create --name internal-templates --repo Local
+        vrg catalog create --name windows-images --repo Local \\
+            --description 'Hardened Windows VM recipes' \\
+            --publishing-scope tenant
+
+    `--publishing-scope` accepts `private` (this system only), `tenant`
+    (system + its tenants), `global` (system + tenants + federated),
+    or `none` (disabled). The `--repo` association is **read-only after
+    creation** — catalogs cannot be moved between repositories.
+    """
     vctx = get_context(ctx)
     repo_key = resolve_resource_id(
         vctx.client.catalog_repositories,
@@ -243,7 +279,17 @@ def update_cmd(
         typer.Option("--enabled/--disabled", help="Enable or disable catalog."),
     ] = None,
 ) -> None:
-    """Update a catalog."""
+    """Update a catalog.
+
+    Examples:
+
+        vrg catalog update windows-server --publishing-scope tenant
+        vrg catalog update windows-server --description 'Retired 2024-Q4'
+        vrg catalog update windows-server --name windows-retired
+
+    Only flags you pass are changed. `repository` cannot be updated —
+    delete and recreate the catalog in the target repository instead.
+    """
     vctx = get_context(ctx)
     key = _resolve_catalog(vctx, catalog)
     kwargs: dict[str, Any] = {}
@@ -277,7 +323,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Delete a catalog."""
+    """Delete a catalog.
+
+    Examples:
+
+        vrg catalog delete internal-templates
+        vrg catalog delete internal-templates --yes
+
+    Recipes inside the catalog must be removed (or moved) before
+    deletion — otherwise the API returns an error. To temporarily hide
+    a catalog without deleting, use `vrg catalog disable` instead.
+    """
     vctx = get_context(ctx)
     key = _resolve_catalog(vctx, catalog)
     if not confirm_action(f"Delete catalog '{catalog}'?", yes=yes):
@@ -292,7 +348,17 @@ def enable_cmd(
     ctx: typer.Context,
     catalog: Annotated[str, typer.Argument(help="Catalog name or hex key.")],
 ) -> None:
-    """Enable a catalog."""
+    """Enable a catalog.
+
+    Examples:
+
+        vrg catalog enable windows-server
+        vrg catalog enable 8f3a...0b2c
+
+    Makes the catalog's recipes visible again according to its
+    publishing scope. Equivalent to `vrg catalog update <catalog>
+    --enabled`.
+    """
     vctx = get_context(ctx)
     key = _resolve_catalog(vctx, catalog)
     vctx.client.catalogs.update(key, enabled=True)
@@ -305,7 +371,17 @@ def disable_cmd(
     ctx: typer.Context,
     catalog: Annotated[str, typer.Argument(help="Catalog name or hex key.")],
 ) -> None:
-    """Disable a catalog."""
+    """Disable a catalog.
+
+    Examples:
+
+        vrg catalog disable windows-server
+        vrg catalog disable 8f3a...0b2c
+
+    Hides the catalog's recipes without deleting them. Deployed
+    instances keep running; new deploys cannot pick recipes from a
+    disabled catalog. Re-enable with `vrg catalog enable`.
+    """
     vctx = get_context(ctx)
     key = _resolve_catalog(vctx, catalog)
     vctx.client.catalogs.update(key, enabled=False)

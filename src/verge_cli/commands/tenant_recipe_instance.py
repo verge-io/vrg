@@ -78,7 +78,17 @@ def list_cmd(
         typer.Option("--recipe", help="Filter by tenant recipe name or key."),
     ] = None,
 ) -> None:
-    """List tenant recipe instances."""
+    """List tenant recipe instances.
+
+    Examples:
+
+        vrg tenant-recipe instance list
+        vrg tenant-recipe instance list --recipe customer-baseline
+        vrg -o json tenant-recipe instance list --query "[].name"
+
+    Useful `--query` fields: `name`, `recipe_name`. Without `--recipe`,
+    returns instances across every tenant recipe on the system.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if recipe is not None:
@@ -106,7 +116,16 @@ def get_cmd(
     ctx: typer.Context,
     instance: Annotated[str, typer.Argument(help="Instance name or key.")],
 ) -> None:
-    """Get a tenant recipe instance by name or key."""
+    """Get a tenant recipe instance by name or key.
+
+    Examples:
+
+        vrg tenant-recipe instance get acme-corp
+        vrg -o json tenant-recipe instance get 42
+
+    Resolves `instance` by name or numeric key. Ambiguous names exit
+    with code 7 — use the key to disambiguate.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(
         vctx.client.tenant_recipe_instances, instance, "tenant recipe instance"
@@ -132,7 +151,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a tenant recipe instance (removes tracking only)."""
+    """Delete a tenant recipe instance (removes tracking only).
+
+    Examples:
+
+        vrg tenant-recipe instance delete acme-corp
+        vrg tenant-recipe instance delete acme-corp --yes
+
+    Detaches the tenant from its recipe. The tenant — including its
+    VMs, networks, users, and storage — keeps running. To remove the
+    tenant, use `vrg tenant delete`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(
         vctx.client.tenant_recipe_instances, instance, "tenant recipe instance"
