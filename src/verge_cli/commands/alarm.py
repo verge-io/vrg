@@ -183,7 +183,7 @@ def list_cmd(
         vrg alarm list
         vrg alarm list --level critical
         vrg alarm list --owner-type Node --include-snoozed
-        vrg -o json alarm list --query "[?level=='error'].alarm_type"
+        vrg -o json alarm list | jq '.[] | select(.level == "error") | .alarm_type'
 
     Useful `--query` fields: `level`, `alarm_type`, `status`,
     `owner_type`, `owner_name`, `is_snoozed`, `is_resolvable`.

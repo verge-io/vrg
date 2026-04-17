@@ -115,7 +115,7 @@ def api_key_list(
 
         vrg api-key list
         vrg api-key list --user deploy-bot
-        vrg -o json api-key list --query "[?is_expired].name"
+        vrg -o json api-key list | jq '.[] | select(.is_expired) | .name'
 
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     Useful `--query` fields: `name`, `user_name`, `is_expired`, `expires`,

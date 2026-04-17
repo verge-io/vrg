@@ -151,7 +151,7 @@ def auth_source_list(
 
         vrg auth-source list
         vrg auth-source list --driver azure
-        vrg -o json auth-source list --query "[?show_on_login].name"
+        vrg -o json auth-source list | jq '.[] | select(.show_on_login) | .name'
 
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     Useful `--query` fields: `name`, `driver`, `show_on_login`, `debug`.
