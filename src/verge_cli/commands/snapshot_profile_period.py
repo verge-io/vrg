@@ -14,7 +14,53 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="period",
-    help="Manage snapshot profile periods.",
+    help=(
+        "Manage the schedule entries inside a snapshot profile.\n\n"
+        "A **period** is a single scheduled rule on a parent"
+        " [snapshot profile](#) — it fires snapshots at a given frequency"
+        " and controls how long those snapshots are kept. A profile with"
+        " no periods never fires, so periods are where the actual cadence"
+        " and retention live. Frequencies are `hourly`, `daily`, `weekly`,"
+        " `monthly`, or `yearly`; `retention` is expressed in seconds"
+        " (e.g., 86400 for 1 day). Fields ignored by lower frequencies"
+        " (e.g., `hour` on an hourly period) are forced to defaults.\n\n"
+        "Every command takes the parent profile as its first argument"
+        " (name or numeric key). Pair any `list` or `get` with `-o json`"
+        " for structured output; useful fields to `--query`: `name`,"
+        " `frequency`, `retention`, `min_snapshots`, `max_tier`,"
+        " `quiesce`, `immutable`. Period name resolution on `get`,"
+        " `update`, and `delete` raises exit code 7 when a name matches"
+        " more than one period — use the numeric `$key` in that case.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List periods on the default system profile\n"
+        "    vrg snapshot profile period list System\\ Snapshots\n\n"
+        "    # Inspect a single period as JSON\n"
+        "    vrg -o json snapshot profile period get webservers Hourly\n\n"
+        "    # Add an hourly period: fires at :00, keeps for 24h, keeps >=2\n"
+        "    vrg snapshot profile period create webservers \\\n"
+        "      --name Hourly --frequency hourly --retention 86400 \\\n"
+        "      --min-snapshots 2\n\n"
+        "    # Add a weekly period on Sunday at 03:00, retained 30 days\n"
+        "    vrg snapshot profile period create webservers \\\n"
+        "      --name Weekly --frequency weekly --retention 2592000 \\\n"
+        "      --day-of-week sun --hour 3 --minute 0\n\n"
+        "    # Toggle quiesce (application-consistent VM snapshots)\n"
+        "    vrg snapshot profile period update webservers Daily --quiesce\n\n"
+        "    # Remove a period\n"
+        "    vrg snapshot profile period delete webservers Hourly --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`quiesce` and `max_tier` apply only to VM and NAS volume"
+        " snapshots — they are ignored on system (cloud) snapshot"
+        " profiles. `immutable` applies only to system snapshot periods."
+        " `quiesce` requires the VergeOS guest agent inside the VM; when"
+        " the agent is absent the snapshot proceeds as crash-consistent."
+        " `min_snapshots` overrides `retention` — the minimum count is"
+        " kept even after expiration. Deleting a period stops future"
+        " firings but does not delete snapshots already created by it."
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
