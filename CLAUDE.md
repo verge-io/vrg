@@ -1,6 +1,10 @@
-# Verge CLI
+# CLAUDE.md
 
-> Command-line interface for VergeOS, wrapping the pyvergeos SDK to provide scriptable infrastructure management.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+Verge CLI (`vrg`) — a Python CLI for managing VergeOS infrastructure, wrapping the pyvergeos SDK. ~200+ commands across 28 domains (compute, networking, tenants, storage, identity, automation, monitoring).
 
 ## Documentation Index
 
@@ -13,106 +17,133 @@
 | [`docs/COOKBOOK.md`](docs/COOKBOOK.md) | Task-oriented recipes for common workflows |
 | [`docs/TEMPLATES.md`](docs/TEMPLATES.md) | Template language reference (`.vrg.yaml` format) |
 
-## Quick Start
+## Commands
 
 ```bash
-uv sync                              # Install dependencies
-uv run vrg --help                    # CLI help
-uv run vrg vm list                   # Example command
+# Setup
+uv sync --all-extras                     # Install all dependencies
 
-uv run pytest                        # Run all tests
-uv run pytest tests/unit/            # Unit tests only
-uv run ruff check                    # Lint
-uv run ruff format --check .         # Format check
-uv run mypy src/verge_cli            # Type check
-uv build                             # Build package
+# Run CLI
+uv run vrg --help                        # CLI help
+uv run vrg vm list                       # Example command
+
+# Tests
+uv run pytest                            # All tests
+uv run pytest tests/unit/                # Unit tests only
+uv run pytest tests/unit/test_vm.py::test_vm_list  # Single test
+uv run pytest -m "not integration"       # Skip integration tests
+uv run pytest tests/unit/ --cov          # With coverage
+
+# Linting & Formatting
+uv run ruff check .                      # Lint
+uv run ruff check . --fix                # Auto-fix lint issues
+uv run ruff format --check .             # Check formatting
+uv run ruff format .                     # Auto-format
+
+# Type Checking
+uv run mypy src/verge_cli                # Strict mode
+
+# Build
+uv build                                 # Build wheel + sdist
 ```
 
-## Project Structure
+**CI pipeline** (`.github/workflows/ci.yml`): lint → type check → test (3.10, 3.11, 3.12) → build.
 
-```text
-vrg/
-├── src/verge_cli/
-│   ├── __init__.py         # Version string
-│   ├── __main__.py         # Entry point for `python -m verge_cli`
-│   ├── cli.py              # Main Typer app, global options, command registration
-│   ├── config.py           # TOML config loading/saving, env var handling
-│   ├── auth.py             # pyvergeos client creation with credentials
-│   ├── context.py          # VergeContext dataclass passed to commands
-│   ├── columns.py          # ColumnDef system for table column definitions
-│   ├── output.py           # Table/JSON/CSV formatters with Rich
-│   ├── errors.py           # Exception classes and exit code mapping
-│   ├── utils.py            # Resolver (name→key) and waiter utilities
-│   ├── template/           # VM template subsystem (loader, schema, resolver, builder, units)
-│   ├── schemas/            # JSON schema for .vrg.yaml templates
-│   ├── multi.py            # Multi-profile list infrastructure (--all-profiles)
-│   └── commands/           # Command modules (~80 files, organized by domain)
-│       ├── _query_helpers.py   # Shared async query infrastructure (run_query, output_query_result)
-│       ├── vm.py, vm_drive.py, vm_nic.py, vm_device.py, vm_snapshot.py
-│       ├── network.py, network_rule.py, network_dns.py, network_host.py, network_alias.py, network_diag.py
-│       ├── network_query.py, network_dashboard.py
-│       ├── tenant.py, tenant_node.py, tenant_storage.py, tenant_net.py, tenant_snapshot.py, tenant_stats.py, tenant_share.py
-│       ├── nas.py, nas_service.py, nas_volume.py, nas_cifs.py, nas_nfs.py, nas_user.py, nas_sync.py, nas_files.py
-│       ├── cluster.py, node.py, node_nic.py, node_lldp.py, node_query.py
-│       ├── storage.py, snapshot.py, snapshot_profile.py, site.py, site_sync*.py
-│       ├── system_diag.py, doctor.py
-│       ├── user.py, group.py, permission.py, api_key.py, auth_source.py
-│       ├── task.py, task_schedule.py, task_trigger.py, task_event.py, task_script.py
-│       ├── recipe.py, recipe_section.py, recipe_question.py, recipe_instance.py, recipe_log.py
-│       ├── tag.py, tag_category.py, resource_group.py
-│       ├── certificate.py, oidc.py, oidc_user.py, oidc_group.py, oidc_log.py
-│       ├── catalog.py, catalog_repo.py, catalog_log.py, catalog_repo_log.py
-│       ├── update.py, update_source.py, update_branch.py, update_package.py, update_available.py, update_log.py
-│       ├── alarm.py, alarm_history.py, log.py
-│       ├── file.py, system.py, configure.py, completion.py
-│       └── ...
-├── tests/
-│   ├── conftest.py         # Shared fixtures (cli_runner, mock_client, 50+ resource mocks)
-│   ├── unit/               # Unit tests (~50+ test files)
-│   ├── integration/        # Integration tests (real API, marked)
-│   └── shakedown/          # End-to-end shakedown scripts
-├── docs/                   # Documentation (see index above)
-├── .claude/
-│   ├── PRD.md              # Full product requirements
-│   └── skills/             # Claude Code skills
-└── pyproject.toml          # Project metadata, dependencies, tool config
+## Architecture
+
+### Context Flow
+
+Global options parsed in `cli.py` main callback → stored in `ctx.obj` → accessed via `get_context(ctx)` in commands:
+
+```python
+@app.command()
+@handle_errors()
+def vm_list(ctx: typer.Context):
+    vctx = get_context(ctx)           # VergeContext with authenticated client
+    vms = vctx.client.vms.list()
+    output_result(
+        [_vm_to_dict(v) for v in vms],
+        columns=VM_COLUMNS,
+        output_format=vctx.output_format,
+        query=vctx.query,
+        quiet=vctx.quiet,
+        no_color=vctx.no_color,
+    )
 ```
 
-## Command Structure
+Key modules: `cli.py` (Typer app, global options) → `context.py` (VergeContext dataclass) → `auth.py` (lazy client creation) → `config.py` (TOML profiles, env vars).
 
+### Command Pattern
+
+Every command follows the same shape:
+1. `@handle_errors()` decorator catches exceptions, maps SDK errors to exit codes
+2. `get_context(ctx)` provides authenticated client + output settings
+3. SDK objects converted to dicts via `_foo_to_dict()` helpers
+4. `output_result()` handles table/wide/json/csv formatting
+
+### ColumnDef System (`columns.py`)
+
+Declarative table column definitions used by every list/get command:
+
+```python
+COLUMNS = [
+    ColumnDef("$key", header="Key"),
+    ColumnDef("name"),
+    ColumnDef("status", style_map=STATUS_STYLES, normalize_fn=normalize_lower),
+    ColumnDef("description", wide_only=True),  # Only in -o wide
+]
 ```
-vrg <domain> <action> [options]
-```
 
-27 top-level command groups with 200+ subcommands across compute, networking, tenants, storage, identity, automation, and monitoring. Examples:
+Shared style maps: `STATUS_STYLES` (running→green, stopped→dim, error→red), `FLAG_STYLES`, `BOOL_STYLES`.
 
-```bash
-vrg vm list                          # List VMs
-vrg -o json vm get web-01            # Get VM as JSON
-vrg network rule create ...          # Create firewall rule
-vrg tenant snapshot create acme ...  # Snapshot a tenant
-```
+### Name Resolution (`utils.py`)
 
-Full reference: [`docs/COMMANDS.md`](docs/COMMANDS.md) | VM templates: [`docs/TEMPLATES.md`](docs/TEMPLATES.md)
+`resolve_resource_id()`: numeric string → Key (int); text string → search by name via SDK. Returns single match or raises `ResourceNotFoundError` (exit 6) / `MultipleMatchesError` (exit 7).
 
-## Security
+### Error Handling (`errors.py`)
 
-- **Never disclose internal infrastructure details** in PRs, commit messages, or any content pushed to GitHub. This includes IP addresses, hostnames, system names, and profile names. Use generic references ("dev instance", "prod") instead.
+Exit codes: 0=success, 1=general, 2=usage, 3=config, 4=auth, 5=forbidden, 6=not found, 7=conflict, 8=validation, 9=timeout, 10=connection.
 
-## Development Workflow
+### Template Pipeline (`src/verge_cli/template/`)
 
-- **Branches**: `feature/<name>`, `fix/<name>`, `refactor/<name>`
-- **Commits**: Conventional format with emoji (e.g., `feat: ✨ add vm snapshot restore`)
-- **PRs**: Summary + test plan, one feature/fix per PR
+`.vrg.yaml` files processed through: `loader.py` (YAML + `${VAR}` substitution) → `schema.py` (jsonschema validation) → `units.py` ("4GB" → 4096 MB) → `resolver.py` (names → keys) → `builder.py` (VM + drives + NICs creation).
 
-Details: [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)
-
-## Configuration Precedence
+### Credential Precedence
 
 1. CLI arguments (`--token`, `--host`, etc.)
 2. Environment variables (`VERGE_HOST`, `VERGE_TOKEN`, etc.)
 3. Named profile in `~/.vrg/config.toml`
 4. Default profile
+5. Interactive prompt (if TTY)
+
+### Multi-Profile (`multi.py`)
+
+`--all-profiles` / `-A` runs list commands across all configured profiles concurrently, merging results with a profile column.
+
+## Testing
+
+**Fixtures** (`tests/conftest.py`): `cli_runner` (CliRunner), `mock_client` (patches `get_client`), 50+ pre-configured mock resource objects (`mock_vm`, `mock_network`, etc.).
+
+**Test pattern**:
+```python
+def test_vm_list(cli_runner, mock_client):
+    mock_client.vms.list.return_value = [mock_vm]
+    result = cli_runner.invoke(app, ["vm", "list"])
+    assert result.exit_code == 0
+```
+
+Markers: `@pytest.mark.integration` for tests hitting real API (skip with `-m "not integration"`).
+
+## Development Workflow
+
+- **Branches**: `feature/<name>`, `fix/<name>`, `refactor/<name>` — branched from `dev`
+- **Flow**: feature/fix branch → PR to `dev` → when ready for release, PR `dev` to `main`
+- **Commits**: Conventional format with emoji (e.g., `feat: ✨ add vm snapshot restore`)
+- **PRs**: Summary + test plan, one feature/fix per PR
+
+## Security
+
+**Never disclose internal infrastructure details** in PRs, commit messages, or any content pushed to GitHub. This includes IP addresses, hostnames, system names, and profile names. Use generic references ("dev instance", "prod") instead.
 
 ## External References
 
@@ -130,3 +161,4 @@ Details: [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)
 - **Config**: TOML (`~/.vrg/config.toml`)
 - **Testing**: pytest, pytest-mock, pytest-cov
 - **Linting**: ruff | **Type Checking**: mypy (strict)
+- **Pre-commit**: ruff check, ruff format, mypy, trailing-whitespace
