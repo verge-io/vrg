@@ -152,7 +152,7 @@ def node_list(
 
         vrg node list
         vrg node list --cluster default
-        vrg -o json node list --query "[?status!='online']"
+        vrg -o json node list | jq '.[] | select(.status != "online")'
 
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     """
@@ -298,7 +298,7 @@ def node_pci_list(
     Examples:
 
         vrg node pci-list node1
-        vrg -o json node pci-list node1 --query "[?contains(device, 'Ethernet')]"
+        vrg -o json node pci-list node1 | jq '.[] | select(.device | contains("Ethernet"))'
 
     Shows every PCI function VergeOS enumerates on the node — useful for
     confirming NICs, HBAs, and accelerator cards before setting up
@@ -329,7 +329,7 @@ def node_gpu_list(
     Examples:
 
         vrg node gpu-list node1
-        vrg -o json node gpu-list node1 --query "[?max_instances>`1`]"
+        vrg -o json node gpu-list node1 | jq '.[] | select(.max_instances > 1)'
 
     Lists physical GPUs plus their mdev / vGPU instance limits. Use this
     to confirm a node has GPUs available before assigning one to a VM or

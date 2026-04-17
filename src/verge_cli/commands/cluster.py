@@ -40,8 +40,8 @@ app = typer.Typer(
         "    # vSAN health and capacity across clusters\n"
         "    vrg cluster vsan-status\n"
         "    vrg cluster vsan-status --name default --include-tiers\n\n"
-        "    # Filter vSAN status with JMESPath\n"
-        "    vrg -o json cluster vsan-status --query \"[?health_status!='healthy']\"\n\n"
+        "    # Filter unhealthy vSAN status with jq\n"
+        "    vrg -o json cluster vsan-status | jq '.[] | select(.health_status != \"healthy\")'\n\n"
         "    # Create a new cluster (admin)\n"
         "    vrg cluster create --name edge-west --compute\n\n"
         "    # Toggle compute scheduling on an existing cluster\n"
@@ -106,7 +106,7 @@ def cluster_list(
 
         vrg cluster list
         vrg -o json cluster list
-        vrg -o json cluster list --query "[?status!='online']"
+        vrg -o json cluster list | jq '.[] | select(.status != "online")'
 
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     """
@@ -356,7 +356,7 @@ def cluster_vsan_status(
         vrg cluster vsan-status --name default --include-tiers
 
         # Flag clusters whose vSAN is not healthy
-        vrg -o json cluster vsan-status --query "[?health_status!='healthy']"
+        vrg -o json cluster vsan-status | jq '.[] | select(.health_status != "healthy")'
 
     `health_status` reflects vSAN data redundancy state. Anything other
     than `healthy` warrants investigation — `reduced` or `at_risk` means

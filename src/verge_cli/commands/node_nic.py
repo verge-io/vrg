@@ -46,7 +46,7 @@ app = typer.Typer(
         "    vrg node nic fabric node1\n\n"
         "    # JSON output for scripting or agent parsing\n"
         "    vrg -o json node nic stats node1\n"
-        "    vrg -o json node nic fabric node1 --query '[?status!=`confirmed`]'\n\n"
+        "    vrg -o json node nic fabric node1 | jq '.[] | select(.status != \"confirmed\")'\n\n"
         "---\n\n"
         "**Notes:**\n\n"
         "The node argument is resolved by name or numeric key. If a name"
@@ -97,7 +97,7 @@ def nic_stats(
         vrg node nic stats node1 --nic 2
 
         # Find hot NICs (> 100k pps out)
-        vrg -o json node nic stats node1 --query "[?txpps>`100000`]"
+        vrg -o json node nic stats node1 | jq '.[] | select(.txpps > 100000)'
 
     Read-only. NICs with no cached stats are skipped silently.
     """
@@ -138,7 +138,7 @@ def nic_status(
 
         vrg node nic status node1
         vrg node nic status node1 --nic 2
-        vrg -o json node nic status node1 --query "[?status=='down']"
+        vrg -o json node nic status node1 | jq '.[] | select(.status == "down")'
 
     Reports kernel-level link state (up/down), negotiated speed, and
     duplex. First check when a node looks isolated.
@@ -180,7 +180,7 @@ def nic_fabric(
 
         vrg node nic fabric node1
         vrg node nic fabric node1 --nic 2
-        vrg -o json node nic fabric node1 --query "[?status!='confirmed']"
+        vrg -o json node nic fabric node1 | jq '.[] | select(.status != "confirmed")'
 
     Reports vSAN fabric reachability per NIC: `confirmed` (full path),
     `degraded` (partial), or `no_path` (isolated from peers). Combine
