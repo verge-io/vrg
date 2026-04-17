@@ -15,7 +15,52 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="shared-object",
-    help="Manage shared objects between tenants.",
+    rich_markup_mode="markdown",
+    help=(
+        "Share VM snapshots from a parent system into a tenant system.\n\n"
+        "A shared object is a record created by the **parent** system"
+        " that makes one of its VM snapshots visible to a specific"
+        " tenant. The current schema supports only `type = vm`. If"
+        " `inbox` is true, the object is held in the tenant's inbox"
+        " until the tenant explicitly accepts it with `import`; the"
+        " `refresh` action re-fetches metadata to see whether the"
+        " source snapshot has changed. Tenants cannot create shared"
+        " objects for themselves — only a parent can grant them.\n\n"
+        "Use `-o json` for structured output and `--query` to pluck"
+        ' fields (e.g., `--query "[?is_inbox].name"`). Shared objects'
+        " resolve by `$key` (numeric) or `name`; an ambiguous name"
+        " yields exit code 7 (multiple matches). `list` honors"
+        " `--all-profiles` / `-A` to fan out across every configured"
+        " CLI profile.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Inventory, filtered by tenant or pending-accept inbox\n"
+        "    vrg shared-object list\n"
+        "    vrg shared-object list --tenant 42\n"
+        "    vrg shared-object list --inbox\n"
+        "    vrg -o json shared-object list\n\n"
+        "    # Inspect a specific shared object\n"
+        "    vrg shared-object get golden-web-01\n\n"
+        "    # Parent shares a VM snapshot with a tenant\n"
+        "    vrg shared-object create --tenant-key 42 \\\n"
+        "        --vm-name web-01 --snapshot-name nightly-2026-04-16 \\\n"
+        "        --name golden-web-01 --description 'Golden web image'\n\n"
+        "    # Tenant-side workflow: check for updates, then accept\n"
+        "    vrg shared-object refresh golden-web-01\n"
+        "    vrg shared-object import golden-web-01\n\n"
+        "    # Revoke a share (parent side)\n"
+        "    vrg shared-object delete golden-web-01 --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`import` runs the full VM import pipeline on the tenant side"
+        " and creates a local VM from the shared snapshot — track"
+        " progress with `vrg task list`. Each tenant is capped at"
+        " 1,000 shared objects, and `(recipient, type, name, inbox)`"
+        " is a unique constraint, so re-sharing requires a distinct"
+        " `name`. Only one action (`refresh` or `import`) can be"
+        " in-flight per shared object at a time. `delete` removes the"
+        " share record and cascade-deletes any associated import jobs."
+    ),
     no_args_is_help=True,
 )
 
