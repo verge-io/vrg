@@ -15,8 +15,63 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="cluster",
-    help="Manage clusters.",
+    help=(
+        "Manage VergeOS clusters — the top-level logical grouping of"
+        " [[node]]s that defines compute scheduling, storage pooling, and"
+        " availability boundaries.\n\n"
+        "A **cluster** is the unit of resource pooling. Each cluster"
+        " aggregates CPU, RAM, and (on hyperconverged deployments) vSAN"
+        " storage tiers contributed by its member nodes. Cluster-level"
+        " settings (CPU type, temperature thresholds, power policy,"
+        " overcommit, scaling governor) flow down to every member node"
+        " unless a node defines its own override. Failover, live"
+        " migration, and vSAN redundancy all operate within cluster"
+        " boundaries.\n\n"
+        "The first two nodes installed are typically **controllers** that"
+        " host the management plane (API, UI, PXE); additional nodes join"
+        " as compute or hyperconverged members and expand capacity. See"
+        " `vrg node --help` for node-level operations.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List clusters with aggregate capacity and node counts\n"
+        "    vrg cluster list\n\n"
+        "    # Full cluster details as JSON\n"
+        "    vrg -o json cluster get default\n\n"
+        "    # vSAN health and capacity across clusters\n"
+        "    vrg cluster vsan-status\n"
+        "    vrg cluster vsan-status --name default --include-tiers\n\n"
+        "    # Filter vSAN status with JMESPath\n"
+        '    vrg -o json cluster vsan-status --query "[?health_status!=\'healthy\']"\n\n'
+        "    # Create a new cluster (admin)\n"
+        "    vrg cluster create --name edge-west --compute\n\n"
+        "    # Toggle compute scheduling on an existing cluster\n"
+        "    vrg cluster update default --no-compute\n\n"
+        "    # Delete a cluster (must be empty)\n"
+        "    vrg cluster delete edge-west -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Clusters are addressed by name or numeric key (`$key`). When a"
+        " name matches multiple clusters, vrg prints all matches and"
+        " exits with code 7 — use the numeric key to disambiguate.\n\n"
+        "Cluster status aggregates the state of every member node:"
+        " `online` (full capacity), `reduced` (one or more nodes"
+        " offline), `noredundant` (vSAN redundancy lost — data at risk),"
+        " `maintenance`, `updating`, `insufficient` (too few nodes to"
+        " operate), or `error`. Anything other than `online` warrants"
+        " investigation.\n\n"
+        "The `storage` flag on a cluster is read-only — it reflects"
+        " whether any member node contributes vSAN storage tiers, not a"
+        " setting you toggle directly. Adjust storage participation by"
+        " changing node types, not cluster flags.\n\n"
+        "Use `-o json` (or `-o wide` for extra columns) for"
+        " machine-readable output. Useful fields for `--query`:"
+        " `status`, `total_nodes`, `online_nodes`, `ram_used_percent`,"
+        " `running_machines`, `is_compute`, `is_storage`. For"
+        " `vsan-status`: `health_status`, `core_used_percent`,"
+        " `online_ram_gb`, `tiers`."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
