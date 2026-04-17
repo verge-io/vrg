@@ -105,7 +105,18 @@ def event_list(
         typer.Option("--filter", help="OData filter expression."),
     ] = None,
 ) -> None:
-    """List task events."""
+    """List task events.
+
+    **Examples:**
+
+        vrg task event list
+
+        vrg task event list --table vms --event powered_on
+
+        vrg task event list --task nightly-snapshot
+
+        vrg -o json task event list
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if task is not None:
@@ -134,7 +145,14 @@ def event_get(
     ctx: typer.Context,
     event_id: Annotated[int, typer.Argument(help="Event key (numeric).")],
 ) -> None:
-    """Get a task event by key."""
+    """Get a task event by key.
+
+    **Examples:**
+
+        vrg task event get 42
+
+        vrg -o json task event get 42
+    """
     vctx = get_context(ctx)
     event = vctx.client.task_events.get(event_id)
     output_result(
@@ -170,7 +188,17 @@ def event_create(
         typer.Option("--context-json", help="Event context as JSON string."),
     ] = None,
 ) -> None:
-    """Create a task event."""
+    """Create a task event.
+
+    **Examples:**
+
+        vrg task event create --task alert-ops --table alarms \\
+            --event raised --event-name 'Alarm raised'
+
+        vrg task event create --task alert-ops --table alarms \\
+            --event raised \\
+            --filters-json '{"severity": "critical"}'
+    """
     vctx = get_context(ctx)
     task_key = resolve_resource_id(vctx.client.tasks, task, "Task")
     kwargs: dict[str, Any] = {
@@ -202,7 +230,14 @@ def event_update(
         typer.Option("--context-json", help="Updated event context as JSON string."),
     ] = None,
 ) -> None:
-    """Update a task event."""
+    """Update a task event.
+
+    **Examples:**
+
+        vrg task event update 42 --filters-json '{"severity": "critical"}'
+
+        vrg task event update 42 --context-json '{"notify": true}'
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filters_json is not None:
@@ -223,7 +258,14 @@ def event_delete(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Delete a task event."""
+    """Delete a task event.
+
+    **Examples:**
+
+        vrg task event delete 42
+
+        vrg task event delete 42 --yes
+    """
     vctx = get_context(ctx)
     if not confirm_action(f"Delete task event {event_id}?", yes=yes):
         raise typer.Exit(0)
@@ -241,7 +283,17 @@ def event_trigger(
         typer.Option("--context-json", help="Context data as JSON string."),
     ] = None,
 ) -> None:
-    """Manually trigger a task event."""
+    """Manually trigger a task event.
+
+    Fires the linked task immediately, bypassing the normal event
+    condition. Useful for testing a newly created event binding.
+
+    **Examples:**
+
+        vrg task event trigger 42
+
+        vrg task event trigger 42 --context-json '{"test": true}'
+    """
     vctx = get_context(ctx)
     context: dict[str, Any] | None = None
     if context_json is not None:
