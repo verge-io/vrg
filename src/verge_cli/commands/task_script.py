@@ -16,8 +16,60 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="script",
-    help="Manage task scripts (GCS automation).",
+    help=(
+        "Manage task scripts — reusable GCS (Greg Campbell Script) automation"
+        " snippets stored on the cluster and invoked by tasks, events, or"
+        " schedules.\n\n"
+        "A **task script** is a fragment of GCS code, VergeOS's native"
+        " C/JavaScript-inspired scripting language with built-in support for"
+        " JSON, database queries, HTTP requests, and file I/O. Scripts run"
+        " inside the appserver's embedded engine with direct access to the"
+        " platform database and REST API, and can be triggered by events,"
+        " schedules, or fired on demand via `vrg task script run`. Pair with"
+        " `vrg task`, `vrg task schedule`, and `vrg task event` to wire a"
+        " script into the broader task engine.\n\n"
+        "Pass `--script @path/to/file.gcs` to create or update from a local"
+        " file instead of pasting code on the command line. `--settings-json`"
+        " stores default task settings with the script; `--params-json` on"
+        " `run` passes execution parameters for a single invocation. Use"
+        " `-o json` to retrieve full script bodies and metadata for tooling.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List task scripts\n"
+        "    vrg task script list\n\n"
+        "    # Get script details as JSON (includes the full GCS body)\n"
+        "    vrg -o json task script get cleanup-old-snapshots\n\n"
+        "    # Create a script from a local .gcs file\n"
+        "    vrg task script create --name cleanup-old-snapshots \\\n"
+        "        --script @scripts/cleanup.gcs \\\n"
+        "        --description 'Prune snapshots older than 30 days'\n\n"
+        "    # Create a script with inline GCS code\n"
+        "    vrg task script create --name hello \\\n"
+        '        --script \'print("hello from gcs");\'\n\n'
+        "    # Replace the code from a file\n"
+        "    vrg task script update cleanup-old-snapshots \\\n"
+        "        --script @scripts/cleanup.gcs\n\n"
+        "    # Run a script on demand with parameters\n"
+        "    vrg task script run cleanup-old-snapshots \\\n"
+        '        --params-json \'{"days": 30}\'\n\n'
+        "    # Delete a script\n"
+        "    vrg task script delete cleanup-old-snapshots --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Scripts are referenced by name or numeric `$key`. Ambiguous names"
+        " exit with code 7 — use the key to disambiguate.\n\n"
+        "GCS is VergeOS's platform-internal automation language (150+ built-in"
+        " functions). Scripts execute with direct access to the database and"
+        " REST API, so treat them as privileged code. The Scripts feature"
+        " landed in VergeOS 26 and is primarily reserved for system-level"
+        " automation, with broader administrator-defined workflows on the"
+        " roadmap.\n\n"
+        "`vrg task script run` starts the script and returns immediately — it"
+        " does not wait for completion. Use `vrg task list` and `vrg task get"
+        " <id>` to track execution status and output."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
