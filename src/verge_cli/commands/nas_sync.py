@@ -144,7 +144,15 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled state"),
     ] = None,
 ) -> None:
-    """List all NAS volume sync jobs."""
+    """List all NAS volume sync jobs.
+
+    **Examples:**
+
+        vrg nas sync list
+        vrg nas sync list --service my-nas
+        vrg nas sync list --enabled
+        vrg -o json nas sync list
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if service is not None:
@@ -171,7 +179,13 @@ def get_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync job name or hex key")],
 ) -> None:
-    """Get details of a NAS volume sync job."""
+    """Get details of a NAS volume sync job.
+
+    **Examples:**
+
+        vrg nas sync get nightly-backup
+        vrg -o json nas sync get nightly-backup
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.volume_syncs, sync, "volume sync")
     item = vctx.client.volume_syncs.get(key=key)
@@ -278,7 +292,25 @@ def create_cmd(
         typer.Option("--freeze-filesystem", help="Freeze filesystem before snapshot"),
     ] = False,
 ) -> None:
-    """Create a new NAS volume sync job."""
+    """Create a new NAS volume sync job.
+
+    Copies data from a source volume to a destination volume on the same
+    or remote NAS service. `--sync-method ysync` (default) uses VergeOS's
+    native parallel transport; `rsync` falls back to classic rsync.
+    `--dest-delete` controls whether files removed from source are
+    deleted at the destination.
+
+    **Examples:**
+
+        vrg nas sync create --service my-nas --name nightly-backup \\
+            --source-volume shared-data --dest-volume backup
+        vrg nas sync create --service my-nas --name mirror \\
+            --source-volume shared-data --dest-volume dr-mirror \\
+            --dest-delete delete --workers 16
+        vrg nas sync create --service my-nas --name partial \\
+            --source-volume shared-data --dest-volume archive \\
+            --include "*.log,*.txt" --exclude "tmp/*"
+    """
     vctx = get_context(ctx)
 
     # Resolve service name to key
@@ -414,7 +446,17 @@ def update_cmd(
         ),
     ] = None,
 ) -> None:
-    """Update a NAS volume sync job."""
+    """Update a NAS volume sync job.
+
+    Tunes an existing sync without recreating it. Changing preservation
+    flags or patterns applies to the next run.
+
+    **Examples:**
+
+        vrg nas sync update nightly-backup --workers 16
+        vrg nas sync update nightly-backup --dest-delete delete-after
+        vrg nas sync update nightly-backup --exclude "tmp/*,cache/*"
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.volume_syncs, sync, "volume sync")
 
@@ -467,7 +509,16 @@ def delete_cmd(
     sync: Annotated[str, typer.Argument(help="Sync job name or hex key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a NAS volume sync job."""
+    """Delete a NAS volume sync job.
+
+    Removes the sync definition. Source and destination volumes are
+    untouched.
+
+    **Examples:**
+
+        vrg nas sync delete nightly-backup
+        vrg nas sync delete nightly-backup --yes
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.volume_syncs, sync, "volume sync")
 
@@ -485,7 +536,12 @@ def enable_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync job name or hex key")],
 ) -> None:
-    """Enable a NAS volume sync job."""
+    """Enable a NAS volume sync job.
+
+    **Examples:**
+
+        vrg nas sync enable nightly-backup
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.volume_syncs, sync, "volume sync")
     vctx.client.volume_syncs.enable(key)
@@ -498,7 +554,15 @@ def disable_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync job name or hex key")],
 ) -> None:
-    """Disable a NAS volume sync job."""
+    """Disable a NAS volume sync job.
+
+    Prevents the sync from running on its schedule without deleting the
+    definition.
+
+    **Examples:**
+
+        vrg nas sync disable nightly-backup
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.volume_syncs, sync, "volume sync")
     vctx.client.volume_syncs.disable(key)
@@ -511,7 +575,14 @@ def start_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync job name or hex key")],
 ) -> None:
-    """Start a NAS volume sync job."""
+    """Start a NAS volume sync job.
+
+    Kicks off a run immediately rather than waiting for the schedule.
+
+    **Examples:**
+
+        vrg nas sync start nightly-backup
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.volume_syncs, sync, "volume sync")
     vctx.client.volume_syncs.start(key)
@@ -524,7 +595,15 @@ def stop_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync job name or hex key")],
 ) -> None:
-    """Stop a running NAS volume sync job."""
+    """Stop a running NAS volume sync job.
+
+    Aborts an in-progress run. Partially-synced data at the destination
+    is left in place.
+
+    **Examples:**
+
+        vrg nas sync stop nightly-backup
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.volume_syncs, sync, "volume sync")
     vctx.client.volume_syncs.stop(key)

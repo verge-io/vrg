@@ -139,7 +139,15 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled state"),
     ] = None,
 ) -> None:
-    """List all NFS shares."""
+    """List all NFS shares.
+
+    **Examples:**
+
+        vrg nas nfs list
+        vrg nas nfs list --volume shared-data
+        vrg nas nfs list --enabled
+        vrg -o json nas nfs list
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if volume is not None:
@@ -166,7 +174,13 @@ def get_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="NFS share name or hex key")],
 ) -> None:
-    """Get details of an NFS share."""
+    """Get details of an NFS share.
+
+    **Examples:**
+
+        vrg nas nfs get nfs-export
+        vrg -o json nas nfs get nfs-export
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nfs_shares, share, "NFS share")
     item = vctx.client.nfs_shares.get(key=key)
@@ -234,7 +248,20 @@ def create_cmd(
         typer.Option("--filesystem-id", help="Custom filesystem ID (fsid)"),
     ] = None,
 ) -> None:
-    """Create a new NFS share."""
+    """Create a new NFS share.
+
+    Exports a directory on a NAS volume over NFSv3/v4. Either
+    `--allowed-hosts` (CIDR list) or `--allow-all` is required — an
+    export with no clients permitted is refused. Squash modes:
+    `root_squash`, `all_squash`, `no_root_squash`.
+
+    **Examples:**
+
+        vrg nas nfs create --volume shared-data --name nfs-export --allowed-hosts 10.0.0.0/24
+        vrg nas nfs create --volume shared-data --name read-only --allow-all --data-access ro
+        vrg nas nfs create --volume shared-data --name k8s-pv \\
+            --allowed-hosts 10.0.10.0/24 --squash no_root_squash --async
+    """
     vctx = get_context(ctx)
 
     # Validate: require either --allowed-hosts or --allow-all
@@ -334,7 +361,17 @@ def update_cmd(
         typer.Option("--filesystem-id", help="Custom filesystem ID (fsid)"),
     ] = None,
 ) -> None:
-    """Update an NFS share."""
+    """Update an NFS share.
+
+    `--allowed-hosts` replaces the full host list. Toggle `--allow-all`
+    / `--no-allow-all` to open or close to the world.
+
+    **Examples:**
+
+        vrg nas nfs update nfs-export --allowed-hosts 10.0.0.0/24,10.0.1.0/24
+        vrg nas nfs update nfs-export --data-access ro
+        vrg nas nfs update nfs-export --squash root_squash --no-async
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nfs_shares, share, "NFS share")
 
@@ -373,7 +410,16 @@ def delete_cmd(
     share: Annotated[str, typer.Argument(help="NFS share name or hex key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete an NFS share (data is retained on volume)."""
+    """Delete an NFS share (data is retained on volume).
+
+    Removes the NFS export only — the underlying directory and files on
+    the volume are kept.
+
+    **Examples:**
+
+        vrg nas nfs delete nfs-export
+        vrg nas nfs delete nfs-export --yes
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nfs_shares, share, "NFS share")
 
@@ -391,7 +437,12 @@ def enable_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="NFS share name or hex key")],
 ) -> None:
-    """Enable an NFS share."""
+    """Enable an NFS share.
+
+    **Examples:**
+
+        vrg nas nfs enable nfs-export
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nfs_shares, share, "NFS share")
     vctx.client.nfs_shares.enable(key)
@@ -404,7 +455,15 @@ def disable_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="NFS share name or hex key")],
 ) -> None:
-    """Disable an NFS share."""
+    """Disable an NFS share.
+
+    Stops serving the export without deleting it. Data remains on the
+    volume.
+
+    **Examples:**
+
+        vrg nas nfs disable nfs-export
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nfs_shares, share, "NFS share")
     vctx.client.nfs_shares.disable(key)

@@ -130,7 +130,13 @@ def snapshot_list(
     ctx: typer.Context,
     volume: Annotated[str, typer.Argument(help="NAS volume name or hex key")],
 ) -> None:
-    """List snapshots for a NAS volume."""
+    """List snapshots for a NAS volume.
+
+    **Examples:**
+
+        vrg nas volume snapshot list shared-data
+        vrg -o json nas volume snapshot list shared-data
+    """
     vctx, volume_key = _resolve_volume(ctx, volume)
     snap_mgr = vctx.client.nas_volumes.snapshots(volume_key)
     snapshots = snap_mgr.list()
@@ -152,7 +158,13 @@ def snapshot_get(
     volume: Annotated[str, typer.Argument(help="NAS volume name or hex key")],
     snapshot: Annotated[str, typer.Argument(help="Snapshot name or key")],
 ) -> None:
-    """Get details of a NAS volume snapshot."""
+    """Get details of a NAS volume snapshot.
+
+    **Examples:**
+
+        vrg nas volume snapshot get shared-data nightly
+        vrg -o json nas volume snapshot get shared-data 42
+    """
     vctx, volume_key = _resolve_volume(ctx, volume)
     snap_key = _resolve_snapshot(vctx, volume_key, snapshot)
     snap_mgr = vctx.client.nas_volumes.snapshots(volume_key)
@@ -189,7 +201,18 @@ def snapshot_create(
         typer.Option("--description", "-d", help="Snapshot description"),
     ] = None,
 ) -> None:
-    """Create a snapshot of a NAS volume."""
+    """Create a snapshot of a NAS volume.
+
+    Snapshots are copy-on-write and near-instant. Default retention is
+    3 days; use `--never-expires` for manual management. `--quiesce`
+    attempts a filesystem sync for application-consistent captures.
+
+    **Examples:**
+
+        vrg nas volume snapshot create shared-data --name nightly
+        vrg nas volume snapshot create shared-data --name pre-upgrade --never-expires
+        vrg nas volume snapshot create shared-data --name app-consistent --quiesce
+    """
     # Mutual exclusion check
     if never_expires and expires_days != 3:
         typer.echo("Error: --never-expires and --expires-days are mutually exclusive.", err=True)
@@ -227,7 +250,13 @@ def snapshot_delete(
     snapshot: Annotated[str, typer.Argument(help="Snapshot name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a NAS volume snapshot."""
+    """Delete a NAS volume snapshot.
+
+    **Examples:**
+
+        vrg nas volume snapshot delete shared-data nightly
+        vrg nas volume snapshot delete shared-data nightly --yes
+    """
     vctx, volume_key = _resolve_volume(ctx, volume)
     snap_key = _resolve_snapshot(vctx, volume_key, snapshot)
 

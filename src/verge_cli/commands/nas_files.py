@@ -131,7 +131,18 @@ def list_cmd(
         typer.Option("--sort", help="Sort field (e.g., name, size, date)"),
     ] = None,
 ) -> None:
-    """List files and directories in a NAS volume."""
+    """List files and directories in a NAS volume.
+
+    Read-only browser for files on a NAS volume. Uses the NAS service's
+    mounted view, so the service VM must be running.
+
+    **Examples:**
+
+        vrg nas files list shared-data
+        vrg nas files list shared-data --path /reports
+        vrg nas files list shared-data --extensions txt,log,csv
+        vrg -o json nas files list shared-data --path /backups --sort date
+    """
     vctx = get_context(ctx)
     vol_key = resolve_nas_resource(vctx.client.nas_volumes, volume, "NAS volume")
     file_mgr = vctx.client.nas_volumes.files(vol_key)
@@ -161,7 +172,16 @@ def get_cmd(
     volume: Annotated[str, typer.Argument(help="NAS volume name or hex key")],
     path: Annotated[str, typer.Argument(help="File or directory path")],
 ) -> None:
-    """Get details of a specific file or directory."""
+    """Get details of a specific file or directory.
+
+    Returns metadata (size, owner, permissions, mtime) for a single
+    path on a NAS volume.
+
+    **Examples:**
+
+        vrg nas files get shared-data /reports/2026-q1.pdf
+        vrg -o json nas files get shared-data /
+    """
     vctx = get_context(ctx)
     vol_key = resolve_nas_resource(vctx.client.nas_volumes, volume, "NAS volume")
     file_mgr = vctx.client.nas_volumes.files(vol_key)
