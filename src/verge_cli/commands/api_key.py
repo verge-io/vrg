@@ -109,7 +109,18 @@ def api_key_list(
         typer.Option("--filter", help="OData filter expression."),
     ] = None,
 ) -> None:
-    """List API keys."""
+    """List API keys.
+
+    Examples:
+
+        vrg api-key list
+        vrg api-key list --user deploy-bot
+        vrg -o json api-key list --query "[?is_expired].name"
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    Useful `--query` fields: `name`, `user_name`, `is_expired`, `expires`,
+    `last_login`, `last_login_ip`, `ip_allow_list`.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.api_keys.list(), _api_key_to_dict, API_KEY_COLUMNS)
         return
@@ -147,7 +158,18 @@ def api_key_get(
         typer.Option("--user", help="User (required when looking up by name)."),
     ] = None,
 ) -> None:
-    """Get an API key by key or name."""
+    """Get an API key by key or name.
+
+    Examples:
+
+        vrg api-key get 42
+        vrg api-key get ci-pipeline --user deploy-bot
+        vrg -o json api-key get 42 --query "{exp: expires, ips: ip_allow_list}"
+
+    Looking up by name requires `--user` because the same key name can
+    exist under different users. Omitting `--user` for a name lookup
+    exits 2.
+    """
     vctx = get_context(ctx)
 
     if api_key.isdigit():
@@ -209,7 +231,16 @@ def api_key_create(
 ) -> None:
     """Create a new API key.
 
-    The secret is only shown once at creation time.
+    Examples:
+
+        vrg api-key create --user deploy-bot --name ci-pipeline
+        vrg api-key create --user deploy-bot --name ci-pipeline \\
+            --expires-in 90d --ip-allow 10.0.0.0/8,192.168.1.5
+        vrg api-key create --user alice --name laptop --expires-in never
+
+    **Secret shown once.** Capture the `secret` field from the output
+    immediately — VergeOS does not store it in a retrievable form and
+    there is no recovery path. Re-issue a new key if the secret is lost.
     """
     vctx = get_context(ctx)
 
@@ -266,7 +297,15 @@ def api_key_delete(
 ) -> None:
     """Delete an API key.
 
-    Warning: this is permanent and the key will no longer be usable.
+    Examples:
+
+        vrg api-key delete 42
+        vrg api-key delete 42 -y
+        vrg api-key delete ci-pipeline -y
+
+    **Destructive.** Every client using the key stops authenticating
+    immediately. Name resolution uses the same rules as `api-key get`;
+    ambiguous names exit 7.
     """
     vctx = get_context(ctx)
 

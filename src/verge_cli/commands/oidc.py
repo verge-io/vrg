@@ -149,7 +149,19 @@ def oidc_list(
         typer.Option("--disabled", help="Show only disabled applications."),
     ] = False,
 ) -> None:
-    """List OIDC applications."""
+    """List OIDC applications.
+
+    Examples:
+
+        vrg oidc list
+        vrg oidc list --enabled
+        vrg -o json oidc list --query "[?restrict_access].name"
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    `--enabled` and `--disabled` are mutually exclusive (exits 2 together).
+    Useful `--query` fields: `name`, `client_id`, `enabled`,
+    `restrict_access`, `redirect_uris`.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(
             ctx, lambda c: c.oidc_applications.list(), _oidc_app_to_dict, OIDC_APP_COLUMNS
@@ -195,7 +207,20 @@ def oidc_get(
         typer.Option("--show-well-known", help="Include well-known configuration URL."),
     ] = False,
 ) -> None:
-    """Get OIDC application details."""
+    """Get OIDC application details.
+
+    Examples:
+
+        vrg oidc get partner-portal
+        vrg -o json oidc get partner-portal --show-secret
+        vrg -o json oidc get partner-portal --show-well-known \\
+            --query "well_known_configuration"
+
+    `client_secret` is hidden by default — pass `--show-secret` to
+    reveal it. `--show-well-known` adds the
+    `.well-known/openid-configuration` discovery URL that external
+    clients auto-configure from. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
 
     if oidc_app.isdigit():
@@ -269,8 +294,19 @@ def oidc_create(
 ) -> None:
     """Create a new OIDC application.
 
-    The client_secret is generated automatically and shown once at creation time.
-    Unlike API keys, the secret CAN be retrieved later with 'vrg oidc get --show-secret'.
+    Examples:
+
+        vrg oidc create --name partner-portal \\
+            --redirect-uri https://portal.example.com/callback
+        vrg oidc create --name internal-app --restrict-access \\
+            --redirect-uri https://app.example.com/oidc/cb,https://*.example.com/cb
+        vrg oidc create --name service-hook --map-user svc-account \\
+            --redirect-uri https://svc.example.com/oauth
+
+    `client_id` and `client_secret` are generated automatically. The
+    secret is shown once at creation time but (unlike API keys) can be
+    retrieved later with `vrg oidc get --show-secret`. `client_id` never
+    changes; to rotate the secret, delete and recreate the application.
     """
     vctx = get_context(ctx)
 
@@ -382,8 +418,17 @@ def oidc_update(
 ) -> None:
     """Update an OIDC application.
 
-    Note: client_id and client_secret cannot be changed. To get a new secret,
-    delete and recreate the application.
+    Examples:
+
+        vrg oidc update partner-portal --restrict-access
+        vrg oidc update partner-portal \\
+            --redirect-uri https://portal.example.com/callback,https://staging.example.com/callback
+        vrg oidc update internal-app --force-auth-source corporate-sso
+
+    Pass at least one field to change; calling without any option exits 2.
+    `client_id` and `client_secret` are locked — delete and recreate to
+    rotate. Redirect URIs support wildcards like
+    `https://*.example.com/callback`.
     """
     vctx = get_context(ctx)
 
@@ -448,7 +493,18 @@ def oidc_delete(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete an OIDC application."""
+    """Delete an OIDC application.
+
+    Examples:
+
+        vrg oidc delete partner-portal
+        vrg oidc delete partner-portal -y
+        vrg oidc delete 7 -y
+
+    **Destructive.** External clients using this application stop
+    authenticating immediately. All user/group ACL entries and audit log
+    history for the application are also removed.
+    """
     vctx = get_context(ctx)
 
     key = _resolve_oidc_app(vctx.client, oidc_app)
@@ -471,7 +527,16 @@ def oidc_enable(
     ctx: typer.Context,
     oidc_app: Annotated[str, typer.Argument(help="OIDC application name or key.")],
 ) -> None:
-    """Enable an OIDC application."""
+    """Enable an OIDC application.
+
+    Examples:
+
+        vrg oidc enable partner-portal
+        vrg oidc enable 7
+
+    Re-activates an application so external clients can authenticate
+    through it again.
+    """
     vctx = get_context(ctx)
 
     key = _resolve_oidc_app(vctx.client, oidc_app)
@@ -487,7 +552,17 @@ def oidc_disable(
     ctx: typer.Context,
     oidc_app: Annotated[str, typer.Argument(help="OIDC application name or key.")],
 ) -> None:
-    """Disable an OIDC application."""
+    """Disable an OIDC application.
+
+    Examples:
+
+        vrg oidc disable partner-portal
+        vrg oidc disable 7
+
+    External clients stop authenticating through the application until
+    it is re-enabled. Configuration, ACLs, and client credentials are
+    preserved.
+    """
     vctx = get_context(ctx)
 
     key = _resolve_oidc_app(vctx.client, oidc_app)

@@ -118,7 +118,20 @@ def permission_list(
         typer.Option("--filter", help="OData filter expression."),
     ] = None,
 ) -> None:
-    """List permissions."""
+    """List permissions.
+
+    Examples:
+
+        vrg permission list
+        vrg permission list --user alice
+        vrg permission list --group engineering --table vms
+        vrg -o json permission list --table vms --query "[?has_full_control].identity_name"
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    Useful `--query` fields: `identity_name`, `table`, `row_key`,
+    `is_table_level`, `can_list`, `can_read`, `can_create`, `can_modify`,
+    `can_delete`, `has_full_control`.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(
             ctx, lambda c: c.permissions.list(), _permission_to_dict, PERMISSION_COLUMNS
@@ -158,7 +171,17 @@ def permission_get(
     ctx: typer.Context,
     id: Annotated[int, typer.Argument(help="Permission key (numeric).")],
 ) -> None:
-    """Get a permission by key."""
+    """Get a permission by key.
+
+    Examples:
+
+        vrg permission get 42
+        vrg -o json permission get 42
+        vrg -o json permission get 42 --query "{table: table, rights: has_full_control}"
+
+    Takes the numeric permission key only — use `vrg permission list` to
+    find the key, then `get` for details.
+    """
     vctx = get_context(ctx)
 
     perm = vctx.client.permissions.get(id)
@@ -217,7 +240,19 @@ def permission_grant(
         typer.Option("--full-control", help="Grant all permissions."),
     ] = False,
 ) -> None:
-    """Grant a permission to a user or group."""
+    """Grant a permission to a user or group.
+
+    Examples:
+
+        vrg permission grant --group engineering --table vms --list --read
+        vrg permission grant --user alice --table vms --row 17 --full-control
+        vrg permission grant --group ops --table / --full-control
+
+    Pass exactly one of `--user` or `--group`; neither or both exits 2.
+    `--row 0` (the default) grants at the table level and applies to
+    every row; any non-zero `--row` scopes to that single resource key.
+    If no permission flag is passed, defaults to `--list` only.
+    """
     vctx = get_context(ctx)
 
     # Validate: must specify exactly one of user or group
@@ -274,7 +309,16 @@ def permission_revoke(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Revoke (delete) a permission."""
+    """Revoke (delete) a permission.
+
+    Examples:
+
+        vrg permission revoke 42
+        vrg permission revoke 42 -y
+
+    Takes a single permission key. Use `vrg permission revoke-all` to
+    clear every permission for a user or group in one call.
+    """
     vctx = get_context(ctx)
 
     if not confirm_action(f"Revoke permission {id}?", yes=yes):
@@ -306,7 +350,18 @@ def permission_revoke_all(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Revoke all permissions for a user or group."""
+    """Revoke all permissions for a user or group.
+
+    Examples:
+
+        vrg permission revoke-all --user alice -y
+        vrg permission revoke-all --group engineering --table vms -y
+        vrg permission revoke-all --group contractors -y
+
+    Pass exactly one of `--user` or `--group`; neither or both exits 2.
+    Scope to a single resource table with `--table`, or omit to revoke
+    every permission held by the identity.
+    """
     vctx = get_context(ctx)
 
     # Validate: must specify exactly one of user or group

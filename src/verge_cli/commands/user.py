@@ -111,7 +111,18 @@ def user_list(
         typer.Option("--type", help="Filter by user type (normal, api, vdi)."),
     ] = None,
 ) -> None:
-    """List users."""
+    """List users.
+
+    Examples:
+
+        vrg user list
+        vrg user list --enabled --type api
+        vrg -o json user list --query "[?two_factor_enabled].name"
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    Useful `--query` fields include `name`, `user_type`, `enabled`, `email`,
+    `auth_source_name`, `is_locked`, and `two_factor_enabled`.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.users.list(), _user_to_dict, USER_COLUMNS)
         return
@@ -143,7 +154,16 @@ def user_get(
     ctx: typer.Context,
     user: Annotated[str, typer.Argument(help="User name or key.")],
 ) -> None:
-    """Get details of a user."""
+    """Get details of a user.
+
+    Examples:
+
+        vrg user get alice
+        vrg -o json user get 17
+        vrg -o json user get deploy-bot --query "{email: email, locked: is_locked}"
+
+    Resolves `user` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.users, user, "User")
@@ -186,7 +206,21 @@ def user_create(
         str | None, typer.Option("--ssh-keys", help="SSH public keys (newline or comma separated).")
     ] = None,
 ) -> None:
-    """Create a new user."""
+    """Create a new user.
+
+    Examples:
+
+        vrg user create --name alice --password 's3cret!' \\
+            --displayname 'Alice Example' --email alice@example.com
+        vrg user create --name deploy-bot --password 'pw' --type api \\
+            --email bot@example.com
+        vrg user create --name alice --password 'pw' --two-factor \\
+            --two-factor-type authenticator --email alice@example.com
+
+    `--two-factor` requires `--email` to be set (email OTP delivery
+    channel). Switch delivery via `--two-factor-type authenticator` for
+    TOTP. Exits 8 if `--two-factor` is passed without `--email`.
+    """
     vctx = get_context(ctx)
 
     # Validate 2FA requirements
@@ -252,7 +286,17 @@ def user_update(
     ] = None,
     ssh_keys: Annotated[str | None, typer.Option("--ssh-keys", help="SSH public keys.")] = None,
 ) -> None:
-    """Update a user."""
+    """Update a user.
+
+    Examples:
+
+        vrg user update alice --email alice@example.com --displayname 'Alice E.'
+        vrg user update alice --two-factor --change-password
+        vrg user update deploy-bot --no-physical-access
+
+    Pass at least one field to change; calling without any option exits 2.
+    Resolves `user` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.users, user, "User")
@@ -299,7 +343,18 @@ def user_delete(
     user: Annotated[str, typer.Argument(help="User name or key.")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation.")] = False,
 ) -> None:
-    """Delete a user."""
+    """Delete a user.
+
+    Examples:
+
+        vrg user delete alice
+        vrg user delete deploy-bot -y
+        vrg user delete 42 -y
+
+    **Destructive.** Deletion cascades: group memberships, permissions,
+    sessions, API keys, owned VMs, scheduled tasks, OIDC grants, and audit
+    logs are removed. Reassign critical VMs before running.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.users, user, "User")
@@ -319,7 +374,16 @@ def user_enable(
     ctx: typer.Context,
     user: Annotated[str, typer.Argument(help="User name or key.")],
 ) -> None:
-    """Enable a user account."""
+    """Enable a user account.
+
+    Examples:
+
+        vrg user enable alice
+        vrg user enable deploy-bot
+
+    Also used to clear a locked account after investigation — locked
+    accounts (`is_locked: true`) never auto-unlock.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.users, user, "User")
@@ -334,7 +398,16 @@ def user_disable(
     ctx: typer.Context,
     user: Annotated[str, typer.Argument(help="User name or key.")],
 ) -> None:
-    """Disable a user account."""
+    """Disable a user account.
+
+    Examples:
+
+        vrg user disable alice
+        vrg user disable deploy-bot
+
+    Disabling preserves the account, its permissions, and its API keys;
+    the user simply cannot authenticate until re-enabled.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.users, user, "User")
