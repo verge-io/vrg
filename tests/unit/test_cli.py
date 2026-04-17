@@ -23,7 +23,7 @@ class TestCliBasic:
         result = cli_runner.invoke(app, ["--help"])
 
         assert result.exit_code == 0
-        assert "Command-line interface for VergeOS" in result.stdout
+        assert "CLI for managing VergeOS infrastructure" in result.stdout
         assert "configure" in result.stdout
         assert "vm" in result.stdout
         assert "network" in result.stdout
