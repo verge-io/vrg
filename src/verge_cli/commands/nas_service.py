@@ -14,8 +14,60 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="service",
-    help="Manage NAS services.",
+    help=(
+        "Manage NAS service VMs — the runtime host for VergeOS NAS storage.\n\n"
+        "A NAS service is a dedicated VM deployed from the standard NAS VM"
+        " recipe. It mounts block devices from the vSAN, runs the filesystem"
+        " drivers (ext4, YBFSv2, remote CIFS/NFS), and hosts the kernel NFS"
+        " server and Samba daemons that serve shares. Volumes, shares, users,"
+        " and syncs are all scoped to a single NAS service.\n\n"
+        "Default sizing is 4 cores and 4 GB RAM; adjust based on concurrent"
+        " client count, volume I/O, sync job parallelism, and antivirus"
+        " workload. `--cpu-cores` / `--memory-gb` changes require a restart"
+        " to take effect.\n\n"
+        "Use `-o json` for machine-readable output. Services are referenced"
+        " by name or numeric key (`$key`); ambiguous names exit with code 7.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List services, optionally filtered by status\n"
+        "    vrg nas service list\n"
+        "    vrg nas service list --status running\n\n"
+        "    # Get one service, as JSON for scripting / agents\n"
+        "    vrg -o json nas service get my-nas\n\n"
+        "    # Deploy a new service (creates the VM from the NAS recipe)\n"
+        "    vrg nas service create --name my-nas --network internal-net \\\n"
+        "        --cores 4 --memory-gb 8\n\n"
+        "    # Tune concurrency and performance knobs\n"
+        "    vrg nas service update my-nas --max-imports 4 --max-syncs 4\n\n"
+        "    # Power control — shares are unavailable while stopped\n"
+        "    vrg nas service power-on my-nas\n"
+        "    vrg nas service power-off my-nas\n"
+        "    vrg nas service restart my-nas\n\n"
+        "    # View and tune CIFS/SMB settings (workgroup, min protocol, guest map)\n"
+        "    vrg nas service cifs-settings my-nas\n"
+        "    vrg nas service set-cifs-settings my-nas \\\n"
+        "        --workgroup CORP --min-protocol SMB3\n\n"
+        "    # View and tune NFS settings (NFSv4, allowed hosts, squash)\n"
+        "    vrg nas service nfs-settings my-nas\n"
+        "    vrg nas service set-nfs-settings my-nas \\\n"
+        "        --enable-nfsv4 --squash root_squash\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "A NAS service is a VM. It **must be powered on** before any of its"
+        " volumes will mount or its shares serve traffic. Use `power-on` /"
+        " `power-off` / `restart` to control the service VM; `--force` on"
+        " `power-off` performs a hard shutdown.\n\n"
+        "Volumes are bound to a NAS service at creation and **cannot be"
+        " migrated** to another service. Deleting a service with existing"
+        " volumes requires `--force` and is destructive.\n\n"
+        "CIFS/SMB settings (`set-cifs-settings`) are server-wide for this"
+        " service — they apply to all CIFS shares it hosts. NFS settings"
+        " (`set-nfs-settings`) are defaults applied to NFS exports on this"
+        " service. For per-share configuration, see `vrg nas cifs` and"
+        " `vrg nas nfs`."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
