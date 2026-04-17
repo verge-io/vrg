@@ -33,7 +33,9 @@ def _make_result(
     return mock
 
 
-def _make_manager(result: MagicMock | None = None, side_effect: Exception | None = None) -> MagicMock:
+def _make_manager(
+    result: MagicMock | None = None, side_effect: Exception | None = None
+) -> MagicMock:
     """Build a mock QueryManager."""
     mgr = MagicMock()
     if side_effect:

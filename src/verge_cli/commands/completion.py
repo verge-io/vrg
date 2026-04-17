@@ -22,7 +22,7 @@ app = typer.Typer(
         "---\n\n"
         "**Examples:**\n\n"
         "    # bash\n"
-        '    vrg completion show bash >> ~/.bashrc\n\n'
+        "    vrg completion show bash >> ~/.bashrc\n\n"
         "    # zsh (into your fpath)\n"
         '    vrg completion show zsh > "${fpath[1]}/_vrg"\n\n'
         "    # fish\n"

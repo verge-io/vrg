@@ -166,9 +166,7 @@ def cert_list(
     shows certificates that expire within N days.
     """
     if ctx.obj.get("all_profiles"):
-        list_all_profiles(
-            ctx, lambda c: c.certificates.list(), _cert_to_dict, CERTIFICATE_COLUMNS
-        )
+        list_all_profiles(ctx, lambda c: c.certificates.list(), _cert_to_dict, CERTIFICATE_COLUMNS)
         return
     vctx = get_context(ctx)
 

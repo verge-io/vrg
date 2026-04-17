@@ -212,9 +212,7 @@ def test_rule_update_description(cli_runner, mock_client):
     assert call_kwargs["description"] == "New description"
 
 
-def test_rule_list_wide_includes_stats(
-    cli_runner, mock_client, mock_network_for_rules, mock_rule
-):
+def test_rule_list_wide_includes_stats(cli_runner, mock_client, mock_network_for_rules, mock_rule):
     """Wide output shows packets/bytes/statistics/trace columns."""
     mock_client.networks.list.return_value = [mock_network_for_rules]
     mock_client.networks.get.return_value = mock_network_for_rules
@@ -229,9 +227,7 @@ def test_rule_list_wide_includes_stats(
     assert "12" in result.output  # 12345 packets value
 
 
-def test_rule_json_includes_stats(
-    cli_runner, mock_client, mock_network_for_rules, mock_rule
-):
+def test_rule_json_includes_stats(cli_runner, mock_client, mock_network_for_rules, mock_rule):
     """JSON output includes statistics, trace, packets, bytes."""
     import json
 

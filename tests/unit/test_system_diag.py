@@ -63,13 +63,13 @@ def test_diag_create_no_wait(cli_runner, mock_client, mock_diag):
     mock_diag.status = "initializing"
     mock_client.system_diagnostics.create.return_value = mock_diag
 
-    result = cli_runner.invoke(
-        app, ["system", "diag", "create", "test-diag", "--no-wait"]
-    )
+    result = cli_runner.invoke(app, ["system", "diag", "create", "test-diag", "--no-wait"])
 
     assert result.exit_code == 0
     mock_client.system_diagnostics.create.assert_called_once_with(
-        name="test-diag", description="", send2support=False,
+        name="test-diag",
+        description="",
+        send2support=False,
     )
 
 
@@ -84,7 +84,9 @@ def test_diag_create_send_to_support(cli_runner, mock_client, mock_diag):
 
     assert result.exit_code == 0
     mock_client.system_diagnostics.create.assert_called_once_with(
-        name="test-diag", description="", send2support=True,
+        name="test-diag",
+        description="",
+        send2support=True,
     )
 
 

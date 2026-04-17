@@ -45,13 +45,13 @@ app = typer.Typer(
         "        --description 'Prune snapshots older than 30 days'\n\n"
         "    # Create a script with inline GCS code\n"
         "    vrg task script create --name hello \\\n"
-        '        --script \'print("hello from gcs");\'\n\n'
+        "        --script 'print(\"hello from gcs\");'\n\n"
         "    # Replace the code from a file\n"
         "    vrg task script update cleanup-old-snapshots \\\n"
         "        --script @scripts/cleanup.gcs\n\n"
         "    # Run a script on demand with parameters\n"
         "    vrg task script run cleanup-old-snapshots \\\n"
-        '        --params-json \'{"days": 30}\'\n\n'
+        "        --params-json '{\"days\": 30}'\n\n"
         "    # Delete a script\n"
         "    vrg task script delete cleanup-old-snapshots --yes\n\n"
         "---\n\n"

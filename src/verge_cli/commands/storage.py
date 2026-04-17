@@ -91,9 +91,7 @@ def storage_list(
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     """
     if ctx.obj.get("all_profiles"):
-        list_all_profiles(
-            ctx, lambda c: c.storage_tiers.list(), _tier_to_dict, STORAGE_COLUMNS
-        )
+        list_all_profiles(ctx, lambda c: c.storage_tiers.list(), _tier_to_dict, STORAGE_COLUMNS)
         return
     vctx = get_context(ctx)
 

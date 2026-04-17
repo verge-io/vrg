@@ -27,6 +27,7 @@ def mock_node_for_nic():
 
 class DictLike(dict):
     """Dict subclass that mimics SDK ResourceObject for testing."""
+
     pass
 
 
@@ -38,41 +39,47 @@ def mock_nic():
     nic.get.return_value = None
 
     # Stats
-    stats = DictLike({
-        "$key": 13,
-        "parent_nic": 13,
-        "txpps": 320,
-        "rxpps": 204,
-        "txbps": 2287335,
-        "rxbps": 916639,
-        "totalxbps": 3203974,
-        "tx_pckts": 100000,
-        "rx_pckts": 80000,
-        "tx_bytes": 500000000,
-        "rx_bytes": 400000000,
-    })
+    stats = DictLike(
+        {
+            "$key": 13,
+            "parent_nic": 13,
+            "txpps": 320,
+            "rxpps": 204,
+            "txbps": 2287335,
+            "rxbps": 916639,
+            "totalxbps": 3203974,
+            "tx_pckts": 100000,
+            "rx_pckts": 80000,
+            "tx_bytes": 500000000,
+            "rx_bytes": 400000000,
+        }
+    )
     nic.nic_stats.get.return_value = stats
 
     # Status
-    status = DictLike({
-        "$key": 13,
-        "parent_nic": 13,
-        "status": "up",
-        "state": "online",
-        "speed": 25000,
-        "last_update": 1774203406,
-    })
+    status = DictLike(
+        {
+            "$key": 13,
+            "parent_nic": 13,
+            "status": "up",
+            "state": "online",
+            "speed": 25000,
+            "last_update": 1774203406,
+        }
+    )
     nic.link_status.get.return_value = status
 
     # Fabric
-    fabric = DictLike({
-        "$key": 13,
-        "parent_nic": 13,
-        "status": "confirmed",
-        "state": "online",
-        "max_score": 50,
-        "min_score": 50,
-    })
+    fabric = DictLike(
+        {
+            "$key": 13,
+            "parent_nic": 13,
+            "status": "confirmed",
+            "state": "online",
+            "max_score": 50,
+            "min_score": 50,
+        }
+    )
     nic.fabric_status.get.return_value = fabric
 
     return nic

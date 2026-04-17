@@ -14,7 +14,9 @@ from verge_cli.cli import app
 def mock_query_result():
     """Create a mock QueryResult."""
     result = MagicMock()
-    result.result = "PING 8.8.8.8 (8.8.8.8) 56 data bytes\n64 bytes from 8.8.8.8: icmp_seq=1 ttl=118"
+    result.result = (
+        "PING 8.8.8.8 (8.8.8.8) 56 data bytes\n64 bytes from 8.8.8.8: icmp_seq=1 ttl=118"
+    )
     result.status = "complete"
     result.is_error = False
     result.is_complete = True
@@ -48,7 +50,9 @@ def test_ping(cli_runner, mock_client, mock_network_for_query, mock_query_result
 
     assert result.exit_code == 0
     mock_network_for_query.queries.run.assert_called_once_with(
-        "ping", {"host": "8.8.8.8"}, timeout=30,
+        "ping",
+        {"host": "8.8.8.8"},
+        timeout=30,
     )
     assert "8.8.8.8" in result.output
 
@@ -65,7 +69,9 @@ def test_ping_custom_timeout(cli_runner, mock_client, mock_network_for_query, mo
 
     assert result.exit_code == 0
     mock_network_for_query.queries.run.assert_called_once_with(
-        "ping", {"host": "8.8.8.8"}, timeout=10.0,
+        "ping",
+        {"host": "8.8.8.8"},
+        timeout=10.0,
     )
 
 
@@ -81,7 +87,9 @@ def test_dns(cli_runner, mock_client, mock_network_for_query, mock_query_result)
 
     assert result.exit_code == 0
     mock_network_for_query.queries.run.assert_called_once_with(
-        "dns", {"name": "example.com"}, timeout=30,
+        "dns",
+        {"name": "example.com"},
+        timeout=30,
     )
     assert "93.184.216.34" in result.output
 
@@ -94,13 +102,13 @@ def test_traceroute(cli_runner, mock_client, mock_network_for_query, mock_query_
     mock_query_result.result = " 1  10.0.0.1  1.234 ms"
     mock_network_for_query.queries.run.return_value = mock_query_result
 
-    result = cli_runner.invoke(
-        app, ["network", "query", "traceroute", "test-network", "8.8.8.8"]
-    )
+    result = cli_runner.invoke(app, ["network", "query", "traceroute", "test-network", "8.8.8.8"])
 
     assert result.exit_code == 0
     mock_network_for_query.queries.run.assert_called_once_with(
-        "traceroute", {"host": "8.8.8.8"}, timeout=60,
+        "traceroute",
+        {"host": "8.8.8.8"},
+        timeout=60,
     )
     assert "10.0.0.1" in result.output
 
@@ -117,7 +125,9 @@ def test_tcpdump_defaults(cli_runner, mock_client, mock_network_for_query, mock_
 
     assert result.exit_code == 0
     mock_network_for_query.queries.run.assert_called_once_with(
-        "tcpdump", None, timeout=120,
+        "tcpdump",
+        None,
+        timeout=120,
     )
 
 
@@ -132,10 +142,16 @@ def test_tcpdump_with_options(cli_runner, mock_client, mock_network_for_query, m
     result = cli_runner.invoke(
         app,
         [
-            "network", "query", "tcpdump", "test-network",
-            "--interface", "eth0",
-            "--count", "10",
-            "--filter", "icmp",
+            "network",
+            "query",
+            "tcpdump",
+            "test-network",
+            "--interface",
+            "eth0",
+            "--count",
+            "10",
+            "--filter",
+            "icmp",
         ],
     )
 
@@ -250,13 +266,13 @@ def test_nmap(cli_runner, mock_client, mock_network_for_query, mock_query_result
     mock_query_result.result = "Host: 10.0.0.1 () Ports: 22/open/tcp//ssh///"
     mock_network_for_query.queries.run.return_value = mock_query_result
 
-    result = cli_runner.invoke(
-        app, ["network", "query", "nmap", "test-network", "10.0.0.0/24"]
-    )
+    result = cli_runner.invoke(app, ["network", "query", "nmap", "test-network", "10.0.0.0/24"])
 
     assert result.exit_code == 0
     mock_network_for_query.queries.run.assert_called_once_with(
-        "nmap", {"host": "10.0.0.0/24"}, timeout=120,
+        "nmap",
+        {"host": "10.0.0.0/24"},
+        timeout=120,
     )
 
 
@@ -274,7 +290,9 @@ def test_tcp_connect(cli_runner, mock_client, mock_network_for_query, mock_query
 
     assert result.exit_code == 0
     mock_network_for_query.queries.run.assert_called_once_with(
-        "tcp_connect", {"host": "10.0.0.1", "port": 443}, timeout=30,
+        "tcp_connect",
+        {"host": "10.0.0.1", "port": 443},
+        timeout=30,
     )
 
 
@@ -293,7 +311,9 @@ def test_run_generic(cli_runner, mock_client, mock_network_for_query, mock_query
 
     assert result.exit_code == 0
     mock_network_for_query.queries.run.assert_called_once_with(
-        "ip", {"cmd": "addr"}, timeout=120,
+        "ip",
+        {"cmd": "addr"},
+        timeout=120,
     )
 
 
@@ -305,11 +325,11 @@ def test_run_generic_no_params(cli_runner, mock_client, mock_network_for_query, 
     mock_query_result.result = "203.0.113.1"
     mock_network_for_query.queries.run.return_value = mock_query_result
 
-    result = cli_runner.invoke(
-        app, ["network", "query", "run", "test-network", "whatsmyip"]
-    )
+    result = cli_runner.invoke(app, ["network", "query", "run", "test-network", "whatsmyip"])
 
     assert result.exit_code == 0
     mock_network_for_query.queries.run.assert_called_once_with(
-        "whatsmyip", None, timeout=120,
+        "whatsmyip",
+        None,
+        timeout=120,
     )

@@ -11,7 +11,10 @@ from verge_cli.errors import CliError
 from verge_cli.output import output_result
 
 if TYPE_CHECKING:
-    from pyvergeos.resources.queries import QueryManager, QueryResult  # type: ignore[import-not-found]
+    from pyvergeos.resources.queries import (
+        QueryManager,
+        QueryResult,
+    )
 
 
 def run_query(

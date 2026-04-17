@@ -121,9 +121,7 @@ def test_history_limit(cli_runner, mock_client, mock_network_for_monitor, mock_h
     mock_client.networks.get.return_value = mock_network_for_monitor
     mock_network_for_monitor.stats.history_short.return_value = [mock_history_point]
 
-    result = cli_runner.invoke(
-        app, ["network", "diag", "history", "External", "--limit", "50"]
-    )
+    result = cli_runner.invoke(app, ["network", "diag", "history", "External", "--limit", "50"])
 
     assert result.exit_code == 0
     mock_network_for_monitor.stats.history_short.assert_called_once_with(limit=50)

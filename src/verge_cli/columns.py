@@ -219,8 +219,16 @@ RULE_COLUMNS = [
     # wide-only
     ColumnDef("description", wide_only=True),
     ColumnDef("dest_ip", header="Dest IP", wide_only=True),
-    ColumnDef("statistics", header="Stats", style_map=BOOL_STYLES, format_fn=format_bool_yn, wide_only=True),
-    ColumnDef("trace", header="Trace", style_map=BOOL_STYLES, format_fn=format_bool_yn, wide_only=True),
+    ColumnDef(
+        "statistics",
+        header="Stats",
+        style_map=BOOL_STYLES,
+        format_fn=format_bool_yn,
+        wide_only=True,
+    ),
+    ColumnDef(
+        "trace", header="Trace", style_map=BOOL_STYLES, format_fn=format_bool_yn, wide_only=True
+    ),
     ColumnDef("packets", header="Packets", wide_only=True),
     ColumnDef("bytes", header="Bytes", wide_only=True),
 ]

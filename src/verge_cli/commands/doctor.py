@@ -21,8 +21,8 @@ app = typer.Typer(
     name="doctor",
     help=(
         "Run a scripted health audit against the current cloud.\n\n"
-        "`vrg doctor` is the fastest way to answer *\"is this VergeOS cloud"
-        " OK right now?\"*. It sweeps the core subsystems — connectivity,"
+        '`vrg doctor` is the fastest way to answer *"is this VergeOS cloud'
+        ' OK right now?"*. It sweeps the core subsystems — connectivity,'
         " clusters, nodes, storage tiers, active alarms, update state,"
         " version consistency across nodes, fabric links, network"
         " dashboard, certificates, licenses, physical drive SMART and vSAN"
@@ -532,9 +532,7 @@ def check_dimm_health(client: VergeClient) -> CheckResult:
 
     unhealthy = [d for d in dimms if not d.is_healthy]
     if unhealthy:
-        details_list = [
-            f"{d.locator}: {d.status}" for d in unhealthy
-        ]
+        details_list = [f"{d.locator}: {d.status}" for d in unhealthy]
         return CheckResult(
             name="dimm_health",
             status=WARN,
@@ -603,9 +601,7 @@ def check_admin_users(client: VergeClient) -> CheckResult:
 def check_mfa(client: VergeClient) -> CheckResult:
     """Check that non-break-glass admin accounts have MFA enabled."""
     users = client.users.list()
-    non_breakglass = [
-        u for u in users if u.physical_access and u.name.lower() != "admin"
-    ]
+    non_breakglass = [u for u in users if u.physical_access and u.name.lower() != "admin"]
     if not non_breakglass:
         return CheckResult(name="mfa", status=PASS, message="No non-break-glass admin accounts")
 
@@ -695,9 +691,7 @@ def check_fabric_speed(client: VergeClient) -> CheckResult:
     degraded: list[str] = []
     for s in statuses:
         if s.max_score > 0 and s.min_score < s.max_score:
-            degraded.append(
-                f"NIC {s.nic_key}: score {s.min_score}/{s.max_score}"
-            )
+            degraded.append(f"NIC {s.nic_key}: score {s.min_score}/{s.max_score}")
 
     if degraded:
         return CheckResult(
@@ -746,7 +740,11 @@ def check_mtu(client: VergeClient) -> CheckResult:
     """Check core and core-physical network MTU configuration."""
     # Request vxlan_multicast to identify physical networks carrying core traffic
     extra_fields = [
-        "$key", "name", "type", "mtu", "vxlan_multicast",
+        "$key",
+        "name",
+        "type",
+        "mtu",
+        "vxlan_multicast",
     ]
     nets = client.networks.list(fields=extra_fields)
 
@@ -763,8 +761,7 @@ def check_mtu(client: VergeClient) -> CheckResult:
 
     # Physical networks that carry core traffic share the same vxlan_multicast
     physical_core = [
-        n for n in nets
-        if n.type == "physical" and n.get("vxlan_multicast") in core_mcasts
+        n for n in nets if n.type == "physical" and n.get("vxlan_multicast") in core_mcasts
     ]
 
     problems: list[str] = []

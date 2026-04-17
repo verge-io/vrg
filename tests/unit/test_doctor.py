@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
-import pytest
 from typer.testing import CliRunner
 
 from verge_cli.cli import app
-
 
 # ---------------------------------------------------------------------------
 # Helpers to build mock objects
@@ -976,7 +973,9 @@ class TestMtu:
         _setup_healthy_client(mock_client)
         mock_client.networks.list.return_value = [
             _mock_network("core", 1, net_type="core", mtu=9000, vxlan_multicast="239.0.0.1"),
-            _mock_network("Core Switch", 2, net_type="physical", mtu=9192, vxlan_multicast="239.0.0.1"),
+            _mock_network(
+                "Core Switch", 2, net_type="physical", mtu=9192, vxlan_multicast="239.0.0.1"
+            ),
         ]
         result = cli_runner.invoke(app, ["doctor", "--check", "mtu"])
         assert result.exit_code == 0
@@ -995,7 +994,9 @@ class TestMtu:
         _setup_healthy_client(mock_client)
         mock_client.networks.list.return_value = [
             _mock_network("core", 1, net_type="core", mtu=9000, vxlan_multicast="239.0.0.1"),
-            _mock_network("Core Switch", 2, net_type="physical", mtu=9000, vxlan_multicast="239.0.0.1"),
+            _mock_network(
+                "Core Switch", 2, net_type="physical", mtu=9000, vxlan_multicast="239.0.0.1"
+            ),
         ]
         result = cli_runner.invoke(app, ["doctor", "--check", "mtu"])
         assert result.exit_code == 0
@@ -1121,7 +1122,9 @@ class TestFabricSpeed:
     def test_fabric_speed_low(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
         _setup_healthy_client(mock_client)
         mock_client.machine_nic_fabric_status.list.return_value = [
-            _mock_fabric_status(is_healthy=True, fabric_status="confirmed", max_score=50, min_score=25),
+            _mock_fabric_status(
+                is_healthy=True, fabric_status="confirmed", max_score=50, min_score=25
+            ),
         ]
         result = cli_runner.invoke(app, ["doctor", "--check", "fabric_speed"])
         assert result.exit_code == 0

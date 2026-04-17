@@ -14,7 +14,9 @@ from verge_cli.cli import app
 def mock_query_result():
     """Create a mock QueryResult."""
     result = MagicMock()
-    result.result = "PING 8.8.8.8 (8.8.8.8) 56 data bytes\n64 bytes from 8.8.8.8: icmp_seq=1 ttl=118"
+    result.result = (
+        "PING 8.8.8.8 (8.8.8.8) 56 data bytes\n64 bytes from 8.8.8.8: icmp_seq=1 ttl=118"
+    )
     result.status = "complete"
     result.is_error = False
     result.is_complete = True
@@ -48,7 +50,9 @@ def test_ping(cli_runner, mock_client, mock_node_for_query, mock_query_result):
 
     assert result.exit_code == 0
     mock_node_for_query.queries.run.assert_called_once_with(
-        "ping", {"host": "8.8.8.8"}, timeout=30,
+        "ping",
+        {"host": "8.8.8.8"},
+        timeout=30,
     )
 
 
@@ -64,7 +68,9 @@ def test_dns(cli_runner, mock_client, mock_node_for_query, mock_query_result):
 
     assert result.exit_code == 0
     mock_node_for_query.queries.run.assert_called_once_with(
-        "dns", {"name": "example.com"}, timeout=30,
+        "dns",
+        {"name": "example.com"},
+        timeout=30,
     )
 
 
@@ -80,7 +86,9 @@ def test_traceroute(cli_runner, mock_client, mock_node_for_query, mock_query_res
 
     assert result.exit_code == 0
     mock_node_for_query.queries.run.assert_called_once_with(
-        "traceroute", {"host": "8.8.8.8"}, timeout=60,
+        "traceroute",
+        {"host": "8.8.8.8"},
+        timeout=60,
     )
 
 
@@ -113,7 +121,9 @@ def test_tcpdump_with_options(cli_runner, mock_client, mock_node_for_query, mock
 
     assert result.exit_code == 0
     mock_node_for_query.queries.run.assert_called_once_with(
-        "tcpdump", {"interface": "eth0", "count": 5}, timeout=120,
+        "tcpdump",
+        {"interface": "eth0", "count": 5},
+        timeout=120,
     )
 
 
@@ -160,9 +170,7 @@ def test_json_output(cli_runner, mock_client, mock_node_for_query, mock_query_re
     mock_client.nodes.get.return_value = mock_node_for_query
     mock_node_for_query.queries.run.return_value = mock_query_result
 
-    result = cli_runner.invoke(
-        app, ["-o", "json", "node", "query", "ping", "node1", "8.8.8.8"]
-    )
+    result = cli_runner.invoke(app, ["-o", "json", "node", "query", "ping", "node1", "8.8.8.8"])
 
     assert result.exit_code == 0
     data = json.loads(result.output)
@@ -179,13 +187,13 @@ def test_smartctl(cli_runner, mock_client, mock_node_for_query, mock_query_resul
     mock_query_result.result = "SMART overall-health self-assessment test result: PASSED"
     mock_node_for_query.queries.run.return_value = mock_query_result
 
-    result = cli_runner.invoke(
-        app, ["node", "query", "smartctl", "node1", "/dev/sda"]
-    )
+    result = cli_runner.invoke(app, ["node", "query", "smartctl", "node1", "/dev/sda"])
 
     assert result.exit_code == 0
     mock_node_for_query.queries.run.assert_called_once_with(
-        "smartctl", {"path": "/dev/sda"}, timeout=60,
+        "smartctl",
+        {"path": "/dev/sda"},
+        timeout=60,
     )
     assert "PASSED" in result.output
 
@@ -198,13 +206,13 @@ def test_smartctl_test(cli_runner, mock_client, mock_node_for_query, mock_query_
     mock_query_result.result = "Self-test execution started"
     mock_node_for_query.queries.run.return_value = mock_query_result
 
-    result = cli_runner.invoke(
-        app, ["node", "query", "smartctl-test", "node1", "/dev/sda"]
-    )
+    result = cli_runner.invoke(app, ["node", "query", "smartctl-test", "node1", "/dev/sda"])
 
     assert result.exit_code == 0
     mock_node_for_query.queries.run.assert_called_once_with(
-        "smartctl-test", {"path": "/dev/sda"}, timeout=60,
+        "smartctl-test",
+        {"path": "/dev/sda"},
+        timeout=60,
     )
 
 
@@ -323,7 +331,9 @@ def test_run_generic(cli_runner, mock_client, mock_node_for_query, mock_query_re
 
     assert result.exit_code == 0
     mock_node_for_query.queries.run.assert_called_once_with(
-        "ip", {"cmd": "addr"}, timeout=120,
+        "ip",
+        {"cmd": "addr"},
+        timeout=120,
     )
 
 
@@ -346,9 +356,7 @@ def test_run_invalid_json(cli_runner, mock_client, mock_node_for_query):
     mock_client.nodes.list.return_value = [mock_node_for_query]
     mock_client.nodes.get.return_value = mock_node_for_query
 
-    result = cli_runner.invoke(
-        app, ["node", "query", "run", "node1", "ip", "--params", "not-json"]
-    )
+    result = cli_runner.invoke(app, ["node", "query", "run", "node1", "ip", "--params", "not-json"])
 
     assert result.exit_code == 1
     assert "Invalid JSON" in result.output
