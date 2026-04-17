@@ -98,7 +98,7 @@ def list_cmd(
 
         vrg site sync incoming list
         vrg site sync incoming list --site dr-east --enabled
-        vrg -o json site sync incoming list --query "[?status!='Syncing'].name"
+        vrg -o json site sync incoming list | jq '.[] | select(.status != "Syncing") | .name'
 
     Useful `--query` fields include `status`, `enabled`, `state`,
     `last_sync`, and `min_snapshots`.

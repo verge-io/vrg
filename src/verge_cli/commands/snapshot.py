@@ -117,7 +117,7 @@ def list_cmd(
 
         vrg snapshot list
         vrg snapshot list --include-expired
-        vrg -o json snapshot list --query "[?immutable]"
+        vrg -o json snapshot list | jq '.[] | select(.immutable)'
 
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     Expired snapshots are hidden by default — pass `--include-expired` to
@@ -280,7 +280,7 @@ def vms_cmd(
 
         vrg snapshot vms before-upgrade
         vrg -o json snapshot vms 42
-        vrg -o json snapshot vms before-upgrade --query "[?status=='running'].name"
+        vrg -o json snapshot vms before-upgrade | jq '.[] | select(.status == "running") | .name'
 
     Resolves `snapshot` by name or numeric key. Ambiguous names exit 7.
     """

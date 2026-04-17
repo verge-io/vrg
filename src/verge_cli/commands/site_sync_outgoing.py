@@ -111,7 +111,7 @@ def list_cmd(
 
         vrg site sync outgoing list
         vrg site sync outgoing list --site dr-east --enabled
-        vrg -o json site sync outgoing list --query "[?status=='Error'].name"
+        vrg -o json site sync outgoing list | jq '.[] | select(.status == "Error") | .name'
 
     Useful `--query` fields include `status`, `enabled`, `state`,
     `last_run`, `destination_tier`, `threads`, `encryption`, and

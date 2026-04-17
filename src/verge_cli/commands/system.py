@@ -379,7 +379,7 @@ def settings_list_cmd(
 
         vrg system settings list
         vrg system settings list --modified
-        vrg -o json system settings list --query "[?modified==`true`]"
+        vrg -o json system settings list | jq '.[] | select(.modified == true)'
 
     Settings are cloud-wide key/value knobs. `--modified` / `-m`
     restricts output to settings changed from their default — the
@@ -485,7 +485,7 @@ def license_list_cmd(ctx: typer.Context) -> None:
 
         vrg system license list
         vrg -o json system license list
-        vrg -o json system license list --query "[?is_valid==`false`]"
+        vrg -o json system license list | jq '.[] | select(.is_valid == false)'
 
     Shows every installed license with `is_valid`, `valid_until`,
     `features`, and `auto_renewal`. Use `--query` to surface expired
