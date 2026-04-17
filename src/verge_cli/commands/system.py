@@ -182,7 +182,19 @@ def _license_to_dict(lic: Any) -> dict[str, Any]:
 @app.command("info")
 @handle_errors()
 def system_info(ctx: typer.Context) -> None:
-    """Display system information and statistics."""
+    """Display system information and statistics.
+
+    Examples:
+
+        vrg system info
+        vrg -o json system info
+        vrg -o json system info --query "vms_online"
+
+    Reports version, cloud name, and dashboard-style counts for the
+    cloud the current profile is connected to. When a tenant scope
+    is active, counts reflect that tenant — run against the provider
+    cloud for system-wide numbers.
+    """
     vctx = get_context(ctx)
 
     client = vctx.client
@@ -223,7 +235,17 @@ def system_info(ctx: typer.Context) -> None:
 @app.command("version")
 @handle_errors()
 def system_version(ctx: typer.Context) -> None:
-    """Display VergeOS version."""
+    """Display VergeOS version.
+
+    Examples:
+
+        vrg system version
+        vrg -o json system version
+
+    Reports VergeOS platform version plus the underlying OS version.
+    Useful for agent pre-flight checks that need to verify API
+    compatibility before issuing calls.
+    """
     vctx = get_context(ctx)
 
     client = vctx.client
@@ -298,7 +320,19 @@ def inventory_cmd(
         typer.Option("--tenants/--no-tenants", help="Include tenants"),
     ] = None,
 ) -> None:
-    """Display system inventory."""
+    """Display system inventory.
+
+    Examples:
+
+        vrg system inventory
+        vrg system inventory --vms --networks --no-tenants
+        vrg -o json system inventory --nodes
+
+    Each category flag is tri-state (enabled / disabled / unset) —
+    omit to use server defaults, pass `--vms` to force-include, or
+    `--no-vms` to force-exclude. Expensive categories (storage,
+    nodes) may add noticeable latency on large clouds.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, bool] = {}
     if vms is not None:
@@ -339,7 +373,18 @@ def settings_list_cmd(
         typer.Option("--modified", "-m", help="Show only modified settings"),
     ] = False,
 ) -> None:
-    """List system settings."""
+    """List system settings.
+
+    Examples:
+
+        vrg system settings list
+        vrg system settings list --modified
+        vrg -o json system settings list --query "[?modified==`true`]"
+
+    Settings are cloud-wide key/value knobs. `--modified` / `-m`
+    restricts output to settings changed from their default — the
+    quickest way to audit what has been tuned on a cloud.
+    """
     vctx = get_context(ctx)
     if modified:
         settings = vctx.client.system.settings.list_modified()
@@ -362,7 +407,16 @@ def settings_get_cmd(
     ctx: typer.Context,
     key: Annotated[str, typer.Argument(help="Setting key")],
 ) -> None:
-    """Get a specific system setting."""
+    """Get a specific system setting.
+
+    Examples:
+
+        vrg system settings get ui.theme
+        vrg -o json system settings get ui.theme
+
+    Settings are addressed by string key, not numeric key. Use
+    `vrg system settings list` to discover valid keys.
+    """
     vctx = get_context(ctx)
     setting = vctx.client.system.settings.get(key)
     output_result(
@@ -381,7 +435,17 @@ def settings_set_cmd(
     key: Annotated[str, typer.Argument(help="Setting key")],
     value: Annotated[str, typer.Argument(help="New value")],
 ) -> None:
-    """Set a system setting value."""
+    """Set a system setting value.
+
+    Examples:
+
+        vrg system settings set ui.theme dark
+        vrg system settings set max.vm_cpus 64
+
+    Applies cloud-wide. Most settings take effect immediately; a few
+    require a service restart — the setting description (visible in
+    `get`) notes this when applicable.
+    """
     vctx = get_context(ctx)
     vctx.client.system.settings.update(key, value)
     output_success(f"Set '{key}' to '{value}'", quiet=vctx.quiet)
@@ -393,7 +457,15 @@ def settings_reset_cmd(
     ctx: typer.Context,
     key: Annotated[str, typer.Argument(help="Setting key")],
 ) -> None:
-    """Reset a system setting to its default value."""
+    """Reset a system setting to its default value.
+
+    Examples:
+
+        vrg system settings reset ui.theme
+
+    Reverts `key` back to `default_value`. Pair with
+    `vrg system settings list --modified` to find candidates.
+    """
     vctx = get_context(ctx)
     vctx.client.system.settings.reset(key)
     output_success(f"Reset '{key}' to default", quiet=vctx.quiet)
@@ -407,7 +479,18 @@ def settings_reset_cmd(
 @license_app.command("list")
 @handle_errors()
 def license_list_cmd(ctx: typer.Context) -> None:
-    """List system licenses."""
+    """List system licenses.
+
+    Examples:
+
+        vrg system license list
+        vrg -o json system license list
+        vrg -o json system license list --query "[?is_valid==`false`]"
+
+    Shows every installed license with `is_valid`, `valid_until`,
+    `features`, and `auto_renewal`. Use `--query` to surface expired
+    or soon-to-expire entries.
+    """
     vctx = get_context(ctx)
     licenses = vctx.client.system.licenses.list()
     data = [_license_to_dict(lic) for lic in licenses]
@@ -427,7 +510,17 @@ def license_get_cmd(
     ctx: typer.Context,
     license_id: Annotated[str, typer.Argument(help="License name or key")],
 ) -> None:
-    """Get details of a license."""
+    """Get details of a license.
+
+    Examples:
+
+        vrg system license get 1
+        vrg system license get enterprise
+        vrg -o json system license get enterprise
+
+    Accepts either numeric `$key` or license `name`. Ambiguous name
+    matches exit with code 7.
+    """
     vctx = get_context(ctx)
     if license_id.isdigit():
         lic = vctx.client.system.licenses.get(int(license_id))
@@ -450,7 +543,17 @@ def license_add_cmd(
         str, typer.Option("--license-text", help="License key text to install")
     ],
 ) -> None:
-    """Install a license key (for air-gap systems)."""
+    """Install a license key (for air-gap systems).
+
+    Examples:
+
+        vrg system license add --license-text "$(cat license.key)"
+
+    Installs the license text returned by Verge.io support after an
+    air-gap exchange. Cloud-connected systems provision licenses
+    automatically — manual `add` there usually indicates broken
+    outbound connectivity to licensing.
+    """
     vctx = get_context(ctx)
     result = vctx.client.system.licenses.add(license_text)
     output_success(f"Added license (key: {result.key})", quiet=vctx.quiet)
@@ -461,8 +564,14 @@ def license_add_cmd(
 def license_generate_payload_cmd(ctx: typer.Context) -> None:
     """Generate air-gap license request payload.
 
-    For systems without internet access. Send the output to
-    Verge.io support to receive a license key.
+    Examples:
+
+        vrg system license generate-payload > request.txt
+        vrg -o json system license generate-payload
+
+    For systems without internet access. Send the output to Verge.io
+    support to receive a license key, then install with
+    `vrg system license add --license-text ...`.
     """
     vctx = get_context(ctx)
     payload = vctx.client.system.licenses.generate_payload()

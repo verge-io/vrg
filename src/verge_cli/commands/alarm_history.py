@@ -122,7 +122,20 @@ def list_cmd(
         ),
     ] = None,
 ) -> None:
-    """List alarm history (resolved/lowered alarms)."""
+    """List alarm history (resolved/lowered alarms).
+
+    Examples:
+
+        vrg alarm history list
+        vrg alarm history list --level critical --limit 50
+        vrg alarm history list --filter "alarm_type eq 'disk_full'"
+        vrg -o json alarm history list
+
+    Useful `--query` fields: `level`, `alarm_type`, `status`,
+    `owner`, `raised_at`, `lowered_at`, `archived_by`. The archive
+    is capped at 100,000 records — export via `-o json` if longer
+    retention is needed.
+    """
     vctx = get_context(ctx)
     entries = vctx.client.alarms.list_history(
         filter=filter,
@@ -148,7 +161,17 @@ def get(
         typer.Argument(help="Alarm history key (numeric ID)."),
     ],
 ) -> None:
-    """Get alarm history entry by key."""
+    """Get alarm history entry by key.
+
+    Examples:
+
+        vrg alarm history get 1842
+        vrg -o json alarm history get 1842
+
+    History entry `$key` is distinct from the `$key` of the original
+    active alarm — use the 8-character `alarm_id` field to correlate
+    an archived entry back to the event that raised it.
+    """
     vctx = get_context(ctx)
     entry = vctx.client.alarms.get_history(key)
     output_result(
