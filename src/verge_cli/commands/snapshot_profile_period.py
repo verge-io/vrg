@@ -116,7 +116,16 @@ def period_list(
     ctx: typer.Context,
     profile: Annotated[str, typer.Argument(help="Profile name or key")],
 ) -> None:
-    """List periods for a snapshot profile."""
+    """List periods for a snapshot profile.
+
+    Examples:
+
+        vrg snapshot profile period list webservers
+        vrg -o json snapshot profile period list System\\ Snapshots
+        vrg -o json snapshot profile period list webservers --query "[].{name: name, freq: frequency}"
+
+    Resolves `profile` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx, profile_key = _get_profile(ctx, profile)
     periods = vctx.client.snapshot_profiles.periods(profile_key).list()
     data = [_period_to_dict(p) for p in periods]
@@ -137,7 +146,18 @@ def period_get(
     profile: Annotated[str, typer.Argument(help="Profile name or key")],
     period: Annotated[str, typer.Argument(help="Period name or key")],
 ) -> None:
-    """Get details of a snapshot profile period."""
+    """Get details of a snapshot profile period.
+
+    Examples:
+
+        vrg snapshot profile period get webservers Hourly
+        vrg -o json snapshot profile period get webservers Weekly
+        vrg -o json snapshot profile period get webservers 12 --query "retention"
+
+    Both `profile` and `period` resolve by name or numeric key. If a
+    period name matches more than one entry, the command exits 7 — pass
+    the numeric `$key` to disambiguate.
+    """
     vctx, profile_key = _get_profile(ctx, profile)
     period_mgr = vctx.client.snapshot_profiles.periods(profile_key)
     period_key = _resolve_period(period_mgr, period)
@@ -199,7 +219,29 @@ def period_create(
         typer.Option("--skip-missed", help="Skip missed snapshot windows"),
     ] = False,
 ) -> None:
-    """Create a period in a snapshot profile."""
+    """Create a period in a snapshot profile.
+
+    Examples:
+
+        # Hourly firing at :00, retained 24h, keep at least 2
+        vrg snapshot profile period create webservers \\
+          --name Hourly --frequency hourly --retention 86400 --min-snapshots 2
+
+        # Weekly Sunday at 03:00, retained 30 days
+        vrg snapshot profile period create webservers \\
+          --name Weekly --frequency weekly --retention 2592000 \\
+          --day-of-week sun --hour 3 --minute 0
+
+        # Monthly immutable period on the 1st at 04:00
+        vrg snapshot profile period create compliance \\
+          --name Monthly --frequency monthly --retention 31536000 \\
+          --day-of-month 1 --hour 4 --immutable
+
+    `retention` is in seconds (0 = never expires). `quiesce` and
+    `max_tier` apply only to VM / NAS volume snapshot profiles;
+    `immutable` applies only to system snapshot profiles. Fields that
+    don't apply to the chosen frequency are forced to defaults.
+    """
     vctx, profile_key = _get_profile(ctx, profile)
     period_mgr = vctx.client.snapshot_profiles.periods(profile_key)
 
@@ -274,7 +316,24 @@ def period_update(
         typer.Option("--skip-missed/--no-skip-missed", help="Skip missed windows"),
     ] = None,
 ) -> None:
-    """Update a snapshot profile period."""
+    """Update a snapshot profile period.
+
+    Examples:
+
+        # Enable quiesce on an existing daily period
+        vrg snapshot profile period update webservers Daily --quiesce
+
+        # Extend retention to 60 days
+        vrg snapshot profile period update webservers Weekly --retention 5184000
+
+        # Move the weekly period to Saturday at 02:30
+        vrg snapshot profile period update webservers Weekly \\
+          --day-of-week sat --hour 2 --minute 30
+
+    Only fields supplied are updated. If no options are given the command
+    exits 2. Period name collisions exit 7 — use the numeric `$key` to
+    disambiguate.
+    """
     vctx, profile_key = _get_profile(ctx, profile)
     period_mgr = vctx.client.snapshot_profiles.periods(profile_key)
     period_key = _resolve_period(period_mgr, period)
@@ -321,7 +380,17 @@ def period_delete(
     period: Annotated[str, typer.Argument(help="Period name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a snapshot profile period."""
+    """Delete a snapshot profile period.
+
+    Examples:
+
+        vrg snapshot profile period delete webservers Hourly --yes
+        vrg snapshot profile period delete webservers 12
+
+    This is a destructive operation. Deleting a period stops future
+    firings but does not delete snapshots already captured by it.
+    Ambiguous period names exit 7.
+    """
     vctx, profile_key = _get_profile(ctx, profile)
     period_mgr = vctx.client.snapshot_profiles.periods(profile_key)
     period_key = _resolve_period(period_mgr, period)
