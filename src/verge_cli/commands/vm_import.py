@@ -15,8 +15,29 @@ from verge_cli.utils import confirm_action, resolve_nas_resource
 
 app = typer.Typer(
     name="import",
-    help="Manage VM imports.",
+    help=(
+        "Manage VM import jobs from OVA/OVF and other formats.\n\n"
+        "VM imports convert external virtual machine packages (OVA, OVF, VMDK)"
+        " into native VergeOS VMs. An import job defines the source, conversion"
+        " options (drive interface, NIC interface, MAC preservation), and"
+        " preferred storage tier. Use `start` to begin the conversion and"
+        " `log` to monitor progress.\n\n"
+        "Use `-o json` for structured output.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg vm import list\n\n"
+        "    vrg vm import create --name migrate-web --file 42\n\n"
+        "    vrg vm import start migrate-web\n\n"
+        "    vrg vm import cancel migrate-web\n\n"
+        "    vrg vm import delete migrate-web --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Import jobs run asynchronously. Use `vrg vm import log` to view"
+        " conversion progress and errors. By default, MAC addresses are"
+        " preserved and drive formats are converted to native vSAN format."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 app.add_typer(vm_import_log.app, name="log")
@@ -63,7 +84,13 @@ def _resolve_import(vctx: Any, identifier: str) -> str:
 def list_cmd(
     ctx: typer.Context,
 ) -> None:
-    """List VM imports."""
+    """List VM import jobs.
+
+    **Examples:**
+
+        vrg vm import list
+        vrg -o json vm import list
+    """
     vctx = get_context(ctx)
     imports = vctx.client.vm_imports.list()
     data = [_import_to_dict(i) for i in imports]
@@ -83,7 +110,13 @@ def get_cmd(
     ctx: typer.Context,
     vm_import: Annotated[str, typer.Argument(help="VM import name or key.")],
 ) -> None:
-    """Get a VM import by name or key."""
+    """Get a VM import job by name or key.
+
+    **Examples:**
+
+        vrg vm import get migrate-web
+        vrg -o json vm import get 42
+    """
     vctx = get_context(ctx)
     key = _resolve_import(vctx, vm_import)
     item = vctx.client.vm_imports.get(key)
@@ -153,7 +186,17 @@ def create_cmd(
         ),
     ] = True,
 ) -> None:
-    """Create a new VM import job."""
+    """Create a new VM import job.
+
+    Provide a source via `--file` (media catalog key) or `--volume` + `--volume-path`.
+    The job is created but not started — use `vrg vm import start` to begin.
+
+    **Examples:**
+
+        vrg vm import create --name migrate-web --file 42
+        vrg vm import create --name migrate-db --volume backups --volume-path db-server.ova
+        vrg vm import create --name migrate-win --file 42 --override-drive-interface virtio-scsi
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {
         "name": name,
@@ -194,7 +237,14 @@ def start_cmd(
     ctx: typer.Context,
     vm_import: Annotated[str, typer.Argument(help="VM import name or key.")],
 ) -> None:
-    """Start a VM import job."""
+    """Start a VM import job.
+
+    Runs asynchronously. Use `vrg vm import log` to monitor progress.
+
+    **Examples:**
+
+        vrg vm import start migrate-web
+    """
     vctx = get_context(ctx)
     key = _resolve_import(vctx, vm_import)
     vctx.client.vm_imports.start_import(key)
@@ -207,7 +257,12 @@ def cancel_cmd(
     ctx: typer.Context,
     vm_import: Annotated[str, typer.Argument(help="VM import name or key.")],
 ) -> None:
-    """Cancel a running VM import job."""
+    """Cancel a running VM import job.
+
+    **Examples:**
+
+        vrg vm import cancel migrate-web
+    """
     vctx = get_context(ctx)
     key = _resolve_import(vctx, vm_import)
     vctx.client.vm_imports.abort_import(key)
@@ -224,7 +279,13 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a VM import job."""
+    """Delete a VM import job.
+
+    **Examples:**
+
+        vrg vm import delete migrate-web
+        vrg vm import delete migrate-web --yes
+    """
     vctx = get_context(ctx)
     key = _resolve_import(vctx, vm_import)
     if not confirm_action(f"Delete VM import '{vm_import}'?", yes=yes):

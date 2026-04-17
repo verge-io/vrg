@@ -14,8 +14,32 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="snapshot",
-    help="Manage VM snapshots.",
+    help=(
+        "Manage point-in-time snapshots of a VM.\n\n"
+        "VM snapshots capture the VM's drive state at a moment in time."
+        " They are copy-on-write and space-efficient — only changed blocks"
+        " consume additional storage. Snapshots can be restored in-place"
+        " (`--replace`) or to a new VM (`--name`). Use `--quiesce` with a"
+        " guest agent for filesystem-consistent snapshots.\n\n"
+        "Use `-o json` for structured output. The first argument to every"
+        " command is the parent VM (name or key).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg vm snapshot list web-01\n\n"
+        "    vrg vm snapshot create web-01 --name before-upgrade\n\n"
+        "    vrg vm snapshot create web-01 --quiesce --retention 604800\n\n"
+        "    vrg vm snapshot restore web-01 before-upgrade --replace --yes\n\n"
+        "    vrg vm snapshot restore web-01 before-upgrade --name web-01-rollback\n\n"
+        "    vrg vm snapshot delete web-01 before-upgrade --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Retention is in seconds (default 86400 = 24 hours, 0 = never expires)."
+        " The `restore --replace` operation is destructive — all changes since"
+        " the snapshot are lost. These are VM-level snapshots; for system-wide"
+        " cloud snapshots see `vrg snapshot`."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
@@ -63,7 +87,13 @@ def snapshot_list(
     ctx: typer.Context,
     vm: Annotated[str, typer.Argument(help="VM name or key")],
 ) -> None:
-    """List snapshots for a VM."""
+    """List snapshots for a VM.
+
+    **Examples:**
+
+        vrg vm snapshot list web-01
+        vrg -o json vm snapshot list web-01
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     snapshots = vm_obj.snapshots.list()
     data = [_snapshot_to_dict(s) for s in snapshots]
@@ -84,7 +114,13 @@ def snapshot_get(
     vm: Annotated[str, typer.Argument(help="VM name or key")],
     snapshot: Annotated[str, typer.Argument(help="Snapshot name or key")],
 ) -> None:
-    """Get details of a VM snapshot."""
+    """Get details of a VM snapshot.
+
+    **Examples:**
+
+        vrg vm snapshot get web-01 before-upgrade
+        vrg -o json vm snapshot get web-01 42
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     snap_key = _resolve_snapshot(vm_obj, snapshot)
     snap_obj = vm_obj.snapshots.get(snap_key)
@@ -119,7 +155,17 @@ def snapshot_create(
         typer.Option("--description", "-d", help="Snapshot description"),
     ] = "",
 ) -> None:
-    """Create a snapshot of a VM."""
+    """Create a snapshot of a VM.
+
+    Name is auto-generated if omitted. Use `--quiesce` for filesystem
+    consistency (requires a guest agent). Retention defaults to 24 hours.
+
+    **Examples:**
+
+        vrg vm snapshot create web-01 --name before-upgrade
+        vrg vm snapshot create web-01 --quiesce --retention 604800
+        vrg vm snapshot create web-01 --retention 0
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
 
     result = vm_obj.snapshots.create(
@@ -149,7 +195,15 @@ def snapshot_delete(
     snapshot: Annotated[str, typer.Argument(help="Snapshot name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a VM snapshot."""
+    """Delete a VM snapshot.
+
+    Prompts for confirmation unless `--yes` is passed.
+
+    **Examples:**
+
+        vrg vm snapshot delete web-01 before-upgrade
+        vrg vm snapshot delete web-01 before-upgrade --yes
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     snap_key = _resolve_snapshot(vm_obj, snapshot)
 
@@ -181,7 +235,18 @@ def snapshot_restore(
     ] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Restore a VM from a snapshot."""
+    """Restore a VM from a snapshot.
+
+    Use `--replace` to overwrite the original VM (destructive — all changes
+    since the snapshot are lost). Use `--name` to create a new VM from the
+    snapshot instead. These options are mutually exclusive.
+
+    **Examples:**
+
+        vrg vm snapshot restore web-01 before-upgrade --replace --yes
+        vrg vm snapshot restore web-01 before-upgrade --name web-01-rollback
+        vrg vm snapshot restore web-01 before-upgrade --name web-01-v2 --power-on
+    """
     # Mutual exclusion check
     if replace and name:
         typer.echo("Error: --replace and --name are mutually exclusive.", err=True)
