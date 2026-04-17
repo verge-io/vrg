@@ -80,7 +80,16 @@ def _tier_to_dict(tier: Any) -> dict[str, Any]:
 def storage_list(
     ctx: typer.Context,
 ) -> None:
-    """List all storage tiers."""
+    """List all storage tiers.
+
+    Examples:
+
+        vrg storage list
+        vrg -o json storage list
+        vrg -o json storage list --query "[].{tier: tier, free_gb: free_gb}"
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(
             ctx, lambda c: c.storage_tiers.list(), _tier_to_dict, STORAGE_COLUMNS
@@ -107,7 +116,17 @@ def storage_get(
     ctx: typer.Context,
     tier: Annotated[str, typer.Argument(help="Storage tier number or key")],
 ) -> None:
-    """Get details of a storage tier."""
+    """Get details of a storage tier.
+
+    Examples:
+
+        vrg storage get 1
+        vrg -o json storage get 2
+        vrg -o json storage get 1 --query "{used: used_percent, free: free_gb}"
+
+    Numeric arguments are treated as tier numbers (0-5); non-numeric values
+    are resolved by name and exit 7 on ambiguous matches.
+    """
     vctx = get_context(ctx)
 
     # Storage tiers are identified by tier number (0-5).
@@ -132,7 +151,16 @@ def storage_get(
 def storage_summary(
     ctx: typer.Context,
 ) -> None:
-    """Show aggregate storage summary across all tiers."""
+    """Show aggregate storage summary across all tiers.
+
+    Examples:
+
+        vrg storage summary
+        vrg -o json storage summary
+        vrg -o json storage summary --query "{total: capacity_gb, free: free_gb}"
+
+    Totals capacity, usage, and dedupe figures across every tier in the vSAN.
+    """
     vctx = get_context(ctx)
 
     summary = vctx.client.storage_tiers.get_summary()

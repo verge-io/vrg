@@ -74,7 +74,16 @@ def _profile_to_dict(profile: Any) -> dict[str, Any]:
 @app.command("list")
 @handle_errors()
 def profile_list(ctx: typer.Context) -> None:
-    """List all snapshot profiles."""
+    """List all snapshot profiles.
+
+    Examples:
+
+        vrg snapshot profile list
+        vrg -o json snapshot profile list
+        vrg -o json snapshot profile list --query "[].name"
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(
             ctx,
@@ -102,7 +111,17 @@ def profile_get(
     ctx: typer.Context,
     profile: Annotated[str, typer.Argument(help="Profile name or key")],
 ) -> None:
-    """Get details of a snapshot profile."""
+    """Get details of a snapshot profile.
+
+    Examples:
+
+        vrg snapshot profile get webservers
+        vrg -o json snapshot profile get 3
+        vrg -o json snapshot profile get webservers --query "description"
+
+    Resolves `profile` by name or numeric key. Ambiguous names exit 7.
+    The profile's schedule entries live under `vrg snapshot profile period`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.snapshot_profiles, profile, "Snapshot profile")
     profile_obj = vctx.client.snapshot_profiles.get(key)
@@ -125,7 +144,17 @@ def profile_create(
         typer.Option("--description", "-d", help="Profile description"),
     ] = None,
 ) -> None:
-    """Create a new snapshot profile."""
+    """Create a new snapshot profile.
+
+    Examples:
+
+        vrg snapshot profile create --name webservers
+        vrg snapshot profile create --name webservers --description "Web tier DR"
+
+    The new profile has no periods — add them with
+    `vrg snapshot profile period create <profile> ...` before attaching
+    the profile to a workload, or it will never fire a snapshot.
+    """
     vctx = get_context(ctx)
 
     kwargs: dict[str, Any] = {"name": name}
@@ -153,7 +182,17 @@ def profile_update(
         typer.Option("--description", "-d", help="New description"),
     ] = None,
 ) -> None:
-    """Update a snapshot profile."""
+    """Update a snapshot profile.
+
+    Examples:
+
+        vrg snapshot profile update webservers --name web-tier
+        vrg snapshot profile update webservers --description "Web tier DR"
+        vrg snapshot profile update 3 --name web-tier --description "Web tier DR"
+
+    Resolves `profile` by name or numeric key. At least one of `--name` or
+    `--description` must be supplied, otherwise the command exits 2.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.snapshot_profiles, profile, "Snapshot profile")
 
@@ -178,7 +217,18 @@ def profile_delete(
     profile: Annotated[str, typer.Argument(help="Profile name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a snapshot profile."""
+    """Delete a snapshot profile.
+
+    Examples:
+
+        vrg snapshot profile delete webservers --yes
+        vrg snapshot profile delete 3
+
+    This is a destructive operation. Deleting a profile detaches it from
+    any resources (VMs, NAS volumes, outgoing syncs) that reference it,
+    but does not delete snapshots already captured by its periods.
+    Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.snapshot_profiles, profile, "Snapshot profile")
 
