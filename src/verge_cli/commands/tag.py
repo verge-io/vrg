@@ -16,8 +16,60 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="tag",
-    help="Manage tags and tag categories.",
+    help=(
+        "Manage tags and tag categories on VergeOS.\n\n"
+        "**Tags** are metadata labels attached to platform objects (VMs,"
+        " networks, tenants, nodes, users, volumes, etc.) for classification,"
+        " search, and filtering. Every tag belongs to a **category** that"
+        " controls which object types the tag is allowed to be applied to"
+        " (e.g., a category with `taggable_vms=true` may tag VMs). A category"
+        " with `single_tag_selection=true` enforces mutual exclusivity —"
+        " only one tag from that category may be attached to a given object"
+        " at a time.\n\n"
+        "This group manages tag **definitions** (categories, tags) and"
+        " membership assignments. Use `vrg tag category` for category"
+        " management. Tag attachment is also exposed on individual resource"
+        " commands (e.g., `vrg vm tag <vm> <tag>`).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every tag and its category\n"
+        "    vrg tag list\n\n"
+        "    # Machine-readable output for agents\n"
+        "    vrg -o json tag list\n\n"
+        "    # Narrow to one category\n"
+        "    vrg tag list --category Environment\n\n"
+        "    # Inspect a single tag (name or numeric $key)\n"
+        "    vrg tag get production\n"
+        "    vrg tag get production --category Environment\n\n"
+        "    # Create a tag inside an existing category\n"
+        "    vrg tag create --name production --category Environment \\\n"
+        "        --description 'Production workloads'\n\n"
+        "    # Attach / detach a tag on any taggable resource\n"
+        "    vrg tag assign production vm web-01\n"
+        "    vrg tag unassign production vm web-01\n\n"
+        "    # List every object currently carrying a tag\n"
+        "    vrg tag members production\n"
+        "    vrg tag members production --type vm\n\n"
+        "    # Manage categories\n"
+        "    vrg tag category list\n"
+        "    vrg tag category create --name Owner --taggable-vms\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Tags and categories are referenced by **name** or **numeric key**"
+        " (`$key`). Tag names are unique only within a category — pass"
+        " `--category` on `get` when the same tag name is reused across"
+        " categories. Ambiguous name resolution exits with code 7.\n\n"
+        "Valid resource types for `assign` / `unassign` / `members --type`:"
+        " `vm`, `network`, `node`, `tenant`, `user`, `cluster`, `site`,"
+        " `group`, `volume`. The target category must have the corresponding"
+        " `taggable_*` flag enabled or the assignment will be rejected.\n\n"
+        "Deleting a tag cascades to its membership rows (objects stop"
+        " carrying the tag). Deleting a category cascades to its tags and"
+        " their members. There is no soft-delete — run `vrg tag members"
+        " <tag>` first if you need a reference of what will be affected."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Register tag category as a sub-command
@@ -141,7 +193,16 @@ def list_cmd(
         typer.Option("--category", help="Filter by category name or key."),
     ] = None,
 ) -> None:
-    """List tags."""
+    """List tags.
+
+    Examples:
+
+        vrg tag list
+        vrg tag list --category Environment
+        vrg -o json tag list | jq '.[] | select(.category_name == "Environment") | .name'
+
+    Useful `--query` fields: `name`, `category_name`, `description`.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.tags.list(), _tag_to_dict, TAG_COLUMNS)
         return
@@ -176,7 +237,18 @@ def get_cmd(
         typer.Option("--category", help="Category name or key (for name lookup)."),
     ] = None,
 ) -> None:
-    """Get a tag by name or key."""
+    """Get a tag by name or key.
+
+    Examples:
+
+        vrg tag get production
+        vrg tag get production --category Environment
+        vrg -o json tag get 42
+
+    Tag names are unique only within a category. Pass `--category` when
+    the same tag name is reused across categories — otherwise ambiguous
+    matches exit with code 7.
+    """
     vctx = get_context(ctx)
     if tag.isdigit():
         item = vctx.client.tags.get(int(tag))
@@ -213,7 +285,18 @@ def create_cmd(
         typer.Option("--description", "-d", help="Tag description."),
     ] = None,
 ) -> None:
-    """Create a new tag."""
+    """Create a new tag.
+
+    Examples:
+
+        vrg tag create --name production --category Environment
+        vrg tag create -n staging -c Environment \\
+            -d "Pre-production workloads"
+
+    The category must already exist (`vrg tag category create`) and
+    have the relevant `taggable_*` flag set for whatever resource type
+    you intend to tag.
+    """
     vctx = get_context(ctx)
     cat_key = resolve_resource_id(vctx.client.tag_categories, category, "Tag category")
     kwargs: dict[str, Any] = {"name": name, "category_key": cat_key}
@@ -245,7 +328,16 @@ def update_cmd(
         typer.Option("--description", "-d", help="New description."),
     ] = None,
 ) -> None:
-    """Update a tag."""
+    """Update a tag.
+
+    Examples:
+
+        vrg tag update production --description "Production workloads only"
+        vrg tag update staging --name pre-prod
+
+    Only `--name` and `--description` are editable here. To move a tag
+    between categories, delete and recreate it.
+    """
     vctx = get_context(ctx)
     key = _resolve_tag(vctx, tag)
     kwargs: dict[str, Any] = {}
@@ -275,7 +367,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a tag."""
+    """Delete a tag.
+
+    Examples:
+
+        vrg tag delete production
+        vrg tag delete production --yes
+
+    Destructive: cascades to every membership row — objects currently
+    carrying this tag will stop carrying it. Run `vrg tag members
+    <tag>` first to see what will be affected.
+    """
     vctx = get_context(ctx)
     key = _resolve_tag(vctx, tag)
     if not confirm_action(f"Delete tag '{tag}'?", yes=yes):
@@ -297,7 +399,20 @@ def assign_cmd(
     ],
     resource_id: Annotated[str, typer.Argument(help="Resource name or key.")],
 ) -> None:
-    """Assign a tag to a resource."""
+    """Assign a tag to a resource.
+
+    Examples:
+
+        vrg tag assign production vm web-01
+        vrg tag assign tier-2 network internal-net
+        vrg tag assign owned-by-platform tenant acme
+
+    Valid resource types: `vm`, `network`, `node`, `tenant`, `user`,
+    `cluster`, `site`, `group`, `volume`. The tag's category must have
+    the corresponding `taggable_*` flag enabled or the assignment is
+    rejected. If the category is `single_tag_selection`, an existing
+    tag from that category on the same object is replaced.
+    """
     vctx = get_context(ctx)
     tag_key = _resolve_tag(vctx, tag)
     sdk_type, res_key = _resolve_target_resource(vctx, resource_type, resource_id)
@@ -319,7 +434,16 @@ def unassign_cmd(
     ],
     resource_id: Annotated[str, typer.Argument(help="Resource name or key.")],
 ) -> None:
-    """Unassign a tag from a resource."""
+    """Unassign a tag from a resource.
+
+    Examples:
+
+        vrg tag unassign production vm web-01
+        vrg tag unassign tier-2 network internal-net
+
+    Idempotent per call — removing a tag that isn't currently attached
+    still exits 0. Valid resource types match `assign`.
+    """
     vctx = get_context(ctx)
     tag_key = _resolve_tag(vctx, tag)
     sdk_type, res_key = _resolve_target_resource(vctx, resource_type, resource_id)
@@ -338,7 +462,18 @@ def members_cmd(
         typer.Option("--type", help="Filter by resource type."),
     ] = None,
 ) -> None:
-    """List resources tagged with a tag."""
+    """List resources tagged with a tag.
+
+    Examples:
+
+        vrg tag members production
+        vrg tag members production --type vm
+        vrg -o json tag members production --query "[].resource_name"
+
+    Useful `--query` fields: `resource_type`, `resource_key`,
+    `resource_name`. Filter with `--type` to narrow to a single object
+    type.
+    """
     vctx = get_context(ctx)
     tag_key = _resolve_tag(vctx, tag)
     members_mgr = vctx.client.tags.members(tag_key)

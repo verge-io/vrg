@@ -15,8 +15,52 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="source",
-    help="Manage update sources.",
+    help=(
+        "Manage update sources — remote servers that publish VergeOS"
+        " `ybpkg` packages.\n\n"
+        "An *update source* is a row in `update_sources`: a URL pointing"
+        " at a VergeOS update server, optionally protected by a user and"
+        " password. Multiple sources can be configured, but only one is"
+        " *active* at a time — the active source is named in"
+        " `update_settings.source` and determines which branches and"
+        " packages `vrg update check` sees. Authoring a source does not"
+        " activate it; use `vrg update configure --source <key>` to"
+        " switch.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `name`, `url`, `enabled`, `last_refreshed`, `last_updated`."
+        " Looking up by name returns exit 6 (not found) or exit 7 (multiple"
+        " matches) when ambiguous — pass the numeric `$key` to disambiguate.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List configured sources\n"
+        "    vrg update source list\n\n"
+        "    # Scope to enabled sources only\n"
+        "    vrg update source list --enabled\n\n"
+        "    # Inspect one source as JSON\n"
+        "    vrg -o json update source get verge-updates\n\n"
+        "    # Check refresh/download/install status for a source\n"
+        "    vrg update source status verge-updates\n\n"
+        "    # Add a new authenticated mirror\n"
+        "    vrg update source create --name internal-mirror \\\n"
+        "        --url https://updates.internal.example.com \\\n"
+        "        --user deploy --password $UPDATE_TOKEN\n\n"
+        "    # Disable a source without deleting it\n"
+        "    vrg update source update verge-updates --disabled\n\n"
+        "    # Remove a source (requires confirmation)\n"
+        "    vrg update source delete legacy-mirror\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Creating or editing a source does not change which source is"
+        " active. Run `vrg update configure --source <key>` to switch,"
+        " then `vrg update check` to repopulate the candidate package list"
+        " against the new source.\n\n"
+        "`vrg update source status` reports the current pipeline stage"
+        " for a source: `idle`, `refreshing`, `downloading`, `installing`,"
+        " `applying`, or `error`. Wait for `idle` before starting another"
+        " operation against the same source."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 SOURCE_COLUMNS: list[ColumnDef] = [
@@ -85,11 +129,22 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled state."),
     ] = None,
 ) -> None:
-    """List update sources."""
+    """List update sources.
+
+    Examples:
+
+        vrg update source list
+        vrg update source list --enabled
+        vrg update source list --disabled
+        vrg -o json update source list | jq '.[] | select(.enabled == "Y") | .name'
+        vrg -A update source list
+
+    Useful `--query` fields: `name`, `url`, `enabled`,
+    `last_refreshed`, `last_updated`. `-A` lists sources across every
+    configured profile in parallel.
+    """
     if ctx.obj.get("all_profiles"):
-        list_all_profiles(
-            ctx, lambda c: c.update_sources.list(), _source_to_dict, SOURCE_COLUMNS
-        )
+        list_all_profiles(ctx, lambda c: c.update_sources.list(), _source_to_dict, SOURCE_COLUMNS)
         return
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
@@ -115,7 +170,17 @@ def get_cmd(
     ctx: typer.Context,
     source: Annotated[str, typer.Argument(help="Update source ID or name.")],
 ) -> None:
-    """Get an update source by ID or name."""
+    """Get an update source by ID or name.
+
+    Examples:
+
+        vrg update source get verge-updates
+        vrg update source get 1
+        vrg -o json update source get verge-updates
+
+    Name lookups exit 6 (not found) or exit 7 (multiple matches) —
+    pass the numeric `$key` to disambiguate.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.update_sources, source, "Update source")
     item = vctx.client.update_sources.get(key)
@@ -152,7 +217,24 @@ def create_cmd(
         typer.Option("--enabled/--no-enabled", help="Enable the source."),
     ] = True,
 ) -> None:
-    """Create a new update source."""
+    """Create a new update source.
+
+    Examples:
+
+        vrg update source create --name verge-updates \\
+            --url https://updates.verge.io
+
+        vrg update source create --name internal-mirror \\
+            --url https://updates.internal.example.com \\
+            --user deploy --password $UPDATE_TOKEN
+
+        vrg update source create --name legacy --url https://old.example.com \\
+            --no-enabled
+
+    Creating a source does not activate it. Switch the active source
+    with `vrg update configure --source <key>`, then run
+    `vrg update check` to repopulate the candidate package list.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {
         "name": name,
@@ -207,7 +289,19 @@ def update_cmd(
         typer.Option("--enabled/--disabled", help="Enable or disable source."),
     ] = None,
 ) -> None:
-    """Update an update source."""
+    """Update an update source.
+
+    Examples:
+
+        vrg update source update verge-updates --description "Primary mirror"
+        vrg update source update internal-mirror --url https://new.example.com
+        vrg update source update legacy --disabled
+        vrg update source update internal-mirror --user deploy --password $TOKEN
+
+    Only flags you pass are changed. Disabling the active source does
+    not switch to a different one — pair with
+    `vrg update configure --source <key>` when migrating mirrors.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.update_sources, source, "Update source")
     kwargs: dict[str, Any] = {}
@@ -245,7 +339,18 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Delete an update source."""
+    """Delete an update source.
+
+    Examples:
+
+        vrg update source delete legacy-mirror
+        vrg update source delete legacy-mirror --yes
+
+    Destructive. Deleting the currently active source leaves
+    `update_settings.source` dangling — switch to another source via
+    `vrg update configure --source <key>` before deleting the one in
+    use.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.update_sources, source, "Update source")
     if not confirm_action(f"Delete update source '{source}'?", yes=yes):
@@ -260,7 +365,20 @@ def status_cmd(
     ctx: typer.Context,
     source: Annotated[str, typer.Argument(help="Update source ID or name.")],
 ) -> None:
-    """Show update source status."""
+    """Show update source status.
+
+    Examples:
+
+        vrg update source status verge-updates
+        vrg update source status 1
+        vrg -o json update source status verge-updates
+
+    Reports the source's current pipeline stage: `idle`, `refreshing`,
+    `downloading`, `installing`, `applying`, or `error`. Useful
+    `--query` fields: `status`, `info`, `nodes_updated`,
+    `last_update`. Wait for `idle` before starting another operation
+    against the same source.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.update_sources, source, "Update source")
     status = vctx.client.update_sources.get_status(key)

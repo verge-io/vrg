@@ -14,8 +14,26 @@ from verge_cli.utils import resolve_resource_id
 
 app = typer.Typer(
     name="log",
-    help="View catalog repository logs.",
+    help=(
+        "View catalog repository logs — refresh, sync, and connection"
+        " activity.\n\n"
+        "Repository logs record events from remote repository refreshes,"
+        " connectivity checks, and recipe sync operations. Each entry has"
+        " a **level** (`message`, `warning`, `error`, `critical`) and a"
+        " timestamp. Useful for diagnosing failed refreshes against remote"
+        " repositories.\n\n"
+        "Use `-o json` for machine-readable output. Filter with `--repo`"
+        " (name or key) and `--level`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg catalog repo log list\n"
+        "    vrg catalog repo log list --repo MarketPlace\n"
+        "    vrg catalog repo log list --level error\n"
+        "    vrg -o json catalog repo log list\n\n"
+        "---"
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 REPO_LOG_COLUMNS: list[ColumnDef] = [
@@ -58,7 +76,19 @@ def list_cmd(
         typer.Option("--level", help="Filter by log level (message/warning/error/critical)."),
     ] = None,
 ) -> None:
-    """List catalog repository logs."""
+    """List catalog repository logs.
+
+    Examples:
+
+        vrg catalog repo log list
+        vrg catalog repo log list --repo MarketPlace
+        vrg catalog repo log list --level error
+        vrg -o json catalog repo log list | jq '.[] | select(.level != "message")'
+
+    Log levels: `message`, `warning`, `error`, `critical`. `--repo`
+    accepts a name or integer key. Useful for diagnosing failed
+    refreshes against remote repositories.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if repo is not None:
@@ -88,7 +118,16 @@ def get_cmd(
     ctx: typer.Context,
     log_key: Annotated[str, typer.Argument(help="Log entry key.")],
 ) -> None:
-    """Get a catalog repository log entry by key."""
+    """Get a catalog repository log entry by key.
+
+    Examples:
+
+        vrg catalog repo log get 4217
+        vrg -o json catalog repo log get 4217
+
+    `log_key` must be a numeric key (found via `vrg catalog repo log
+    list`).
+    """
     vctx = get_context(ctx)
     key = int(log_key)
     item = vctx.client.catalog_repository_logs.get(key=key)

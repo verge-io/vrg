@@ -18,8 +18,63 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="task",
-    help="Manage tasks.",
+    help=(
+        "Manage tasks — VergeOS's built-in automation engine.\n\n"
+        "A **task** is an automated operation that runs against a VergeOS"
+        " resource (a VM, tenant, network, system, etc.). Tasks can be invoked"
+        " manually, run on a recurring **schedule** (cron-like), or fire in"
+        " response to system **events** (alarms raised, logs written, resources"
+        " created/modified/deleted). Common actions include snapshot"
+        " creation, power operations, notification delivery (email/webhook),"
+        " and custom **script** execution.\n\n"
+        "Every task has an `owner` (the target resource), a `table` (resource"
+        " type, e.g., `vms`, `tenants`), and an `action` (e.g., `poweron`,"
+        " `snapshot`). Task status is `Idle` or `Running`; a stuck `Running`"
+        " task usually indicates an error — check task logs.\n\n"
+        "Subresources have their own groups: `vrg task schedule` (recurring"
+        " triggers), `vrg task trigger` (event-driven triggers), `vrg task"
+        " event` (execution history), and `vrg task script` (reusable code"
+        " blocks).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List recent tasks\n"
+        "    vrg task list\n\n"
+        "    # List only running tasks\n"
+        "    vrg task list --running\n\n"
+        "    # Filter by enabled status\n"
+        "    vrg task list --enabled\n\n"
+        "    # Get task details as JSON\n"
+        "    vrg -o json task get nightly-snapshot\n\n"
+        "    # Run a task immediately and wait for completion\n"
+        "    vrg task run nightly-snapshot --wait\n\n"
+        "    # Enable / disable a task\n"
+        "    vrg task enable nightly-snapshot\n"
+        "    vrg task disable nightly-snapshot\n\n"
+        "    # Cancel a running task\n"
+        "    vrg task cancel 1234\n\n"
+        "    # List recurring schedules\n"
+        "    vrg task schedule list\n\n"
+        "    # List event triggers for a task\n"
+        "    vrg task trigger list nightly-snapshot\n\n"
+        "    # Inspect execution history\n"
+        "    vrg task event list\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Tasks are referenced by name or numeric key (`$key`). When a name"
+        " matches multiple tasks, vrg prints all matches and exits with code 7."
+        " Use the numeric key to disambiguate.\n\n"
+        "`vrg task run` dispatches execution and returns immediately unless"
+        " `--wait` is passed. With `--wait`, vrg polls until the task returns"
+        " to `Idle` or `--timeout` (default 300s) elapses; a non-zero exit code"
+        " reflects task failure.\n\n"
+        "A task's behavior is defined by its `action` plus any settings passed"
+        " via `--settings-json` (on create/update) or `--params-json` (on"
+        " run). `delete_after_run` is useful for one-shot maintenance tasks."
+        " To see configured recurring work, use `vrg task schedule list`; for"
+        " event-driven automation, use `vrg task trigger list`."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Register sub-command groups
@@ -78,7 +133,18 @@ def task_list(
         ),
     ] = None,
 ) -> None:
-    """List tasks."""
+    """List tasks.
+
+    **Examples:**
+
+        vrg task list
+
+        vrg task list --running
+
+        vrg task list --enabled
+
+        vrg -o json task list --filter "table eq 'vms'"
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.tasks.list(), _task_to_dict, TASK_COLUMNS)
         return
@@ -109,7 +175,14 @@ def task_get(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Task ID or name.")],
 ) -> None:
-    """Get a task by ID or name."""
+    """Get a task by ID or name.
+
+    **Examples:**
+
+        vrg task get nightly-snapshot
+
+        vrg -o json task get 1234
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     task = vctx.client.tasks.get(key)
@@ -153,7 +226,15 @@ def task_create(
         typer.Option("--settings-json", help="Task settings as JSON string."),
     ] = None,
 ) -> None:
-    """Create a new task."""
+    """Create a new task.
+
+    **Examples:**
+
+        vrg task create --name daily-snap --owner 42 --action snapshot --table vms
+
+        vrg task create --name cleanup --owner 1 --action poweron --table vms \\
+            --delete-after-run
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {
         "name": name,
@@ -201,7 +282,14 @@ def task_update(
         typer.Option("--settings-json", help="Task settings as JSON string."),
     ] = None,
 ) -> None:
-    """Update a task."""
+    """Update a task.
+
+    **Examples:**
+
+        vrg task update nightly-snapshot --description "Nightly VM snapshots"
+
+        vrg task update 1234 --name weekly-snap --enabled
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     kwargs: dict[str, Any] = {}
@@ -233,7 +321,14 @@ def task_delete(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Delete a task."""
+    """Delete a task.
+
+    **Examples:**
+
+        vrg task delete nightly-snapshot
+
+        vrg task delete 1234 --yes
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     if not confirm_action(f"Delete task '{identifier}'?", yes=yes):
@@ -248,7 +343,12 @@ def task_enable(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Task ID or name.")],
 ) -> None:
-    """Enable a task."""
+    """Enable a task.
+
+    **Examples:**
+
+        vrg task enable nightly-snapshot
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     vctx.client.tasks.enable(key)
@@ -261,7 +361,12 @@ def task_disable(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Task ID or name.")],
 ) -> None:
-    """Disable a task."""
+    """Disable a task.
+
+    **Examples:**
+
+        vrg task disable nightly-snapshot
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     vctx.client.tasks.disable(key)
@@ -286,7 +391,19 @@ def task_run(
         typer.Option("--params-json", help="Execution parameters as JSON string."),
     ] = None,
 ) -> None:
-    """Execute a task immediately."""
+    """Execute a task immediately.
+
+    Dispatches the task and returns. Use `--wait` to block until the
+    task finishes or `--timeout` elapses.
+
+    **Examples:**
+
+        vrg task run nightly-snapshot
+
+        vrg task run nightly-snapshot --wait
+
+        vrg task run 1234 --wait --timeout 600
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     params: dict[str, Any] = {}
@@ -310,7 +427,14 @@ def task_cancel(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Task ID or name.")],
 ) -> None:
-    """Cancel a running task."""
+    """Cancel a running task.
+
+    **Examples:**
+
+        vrg task cancel nightly-snapshot
+
+        vrg task cancel 1234
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     vctx.client.tasks.cancel(key)

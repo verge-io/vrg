@@ -14,8 +14,76 @@ from verge_cli.utils import resolve_resource_id
 
 app = typer.Typer(
     name="query",
-    help="Run diagnostic queries on a node.",
+    help=(
+        "Run live diagnostic queries **on** a node — network probes, drive"
+        " SMART, hardware inventory, IPMI/BMC readings, and an escape hatch"
+        " for anything else the node agent exposes.\n\n"
+        "Each subcommand tells the target node to execute a specific probe"
+        " (`ping`, `smartctl`, `ipmi-sensor`, etc.) and streams the result"
+        " back. The work happens on the node itself, so answers reflect"
+        " that node's real kernel, NICs, drives, and baseboard — not the"
+        " controller running `vrg`. Use this when a node is misbehaving"
+        " and you want to reach into it without SSH.\n\n"
+        "Queries are grouped by purpose:\n\n"
+        "- **Network** — `ping`, `dns`, `traceroute`, `arp`, `arp-scan`,"
+        " `tcpdump`. Run these from a node's perspective to prove where"
+        " isolation starts.\n"
+        "- **Storage** — `smartctl` (read SMART attributes), `smartctl-test`"
+        " (start a self-test), `lsblk` (enumerate block devices).\n"
+        "- **Hardware** — `dmidecode` for SMBIOS/DMI inventory (DIMM slots,"
+        " board, chassis serials).\n"
+        "- **IPMI / BMC** — `ipmi-sensor` (temps, fans, voltages), `ipmi-sel`"
+        " (System Event Log), `ipmi-fru` (Field Replaceable Unit data),"
+        " `ipmi-lan` (BMC network config), `ipmi-chassis` (power/intrusion"
+        " state).\n"
+        "- **Escape hatch** — `run <query_type>` for query types without a"
+        " dedicated subcommand (e.g. `ip`, `bridge`, `top`, `top_if`,"
+        " `logs`, `whatsmyip`, `eth-tool`, `fabric`, `bonding`).\n\n"
+        "Every query takes a **node** (name or numeric key) as its first"
+        " argument and a `--timeout` in seconds. Default timeouts vary by"
+        " query type (30s for quick reads, 60s for SMART, 120s for"
+        " tcpdump).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Network: prove node1 can reach a gateway\n"
+        "    vrg node query ping node1 10.0.0.1\n"
+        "    vrg node query traceroute node1 8.8.8.8\n"
+        "    vrg node query dns node1 example.com\n\n"
+        "    # Capture 50 packets on a specific interface with a BPF filter\n"
+        "    vrg node query tcpdump node1 -i eth0 -c 50 -f 'port 443'\n\n"
+        "    # Storage: SMART health for a specific drive\n"
+        "    vrg node query smartctl node1 /dev/sda\n"
+        "    vrg node query smartctl-test node1 /dev/sda\n"
+        "    vrg node query lsblk node1\n\n"
+        "    # Hardware and BMC\n"
+        "    vrg node query dmidecode node1\n"
+        "    vrg node query ipmi-sensor node1\n"
+        "    vrg node query ipmi-sel node1\n\n"
+        "    # Escape hatch with structured params\n"
+        '    vrg node query run node1 ip --params \'{"cmd": "addr"}\'\n\n'
+        "    # JSON output for scripts and agents\n"
+        "    vrg -o json node query ipmi-sensor node1\n"
+        "    vrg -o json node query smartctl node1 /dev/sda --query 'smart_status'\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The node argument is resolved by name or numeric key. Ambiguous"
+        " names exit 7 — pass the numeric key to disambiguate.\n\n"
+        "Queries are synchronous: `vrg` blocks until the node returns a"
+        " result or `--timeout` elapses. Raise `--timeout` for slow"
+        " hardware (long SMART extended tests, large packet captures)."
+        " A timed-out query exits 9.\n\n"
+        "Result shape varies by query type — most return a JSON object"
+        " that `--query` (JMESPath) and `-o json` can pick apart. Use"
+        " `run` to reach query types that do not have a dedicated"
+        " subcommand; pass query-specific parameters as a JSON object via"
+        " `--params`.\n\n"
+        "IPMI subcommands only return data on nodes with a reachable BMC"
+        " and correctly configured IPMI credentials. A blank `ipmi-lan`"
+        " result usually means the node has no BMC or the BMC is on a"
+        " segregated management network the node cannot reach."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
@@ -30,7 +98,17 @@ def query_ping(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Ping a host from a node."""
+    """Ping a host from a node.
+
+    Examples:
+
+        vrg node query ping node1 10.0.0.1
+        vrg node query ping node1 example.com --timeout 10
+        vrg -o json node query ping node1 8.8.8.8
+
+    Proves reachability from the node's own network stack — not the
+    controller. Exits 9 on timeout.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -64,7 +142,16 @@ def query_dns(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Resolve a DNS name from a node."""
+    """Resolve a DNS name from a node.
+
+    Examples:
+
+        vrg node query dns node1 example.com
+        vrg -o json node query dns node1 my-tenant.internal
+
+    Uses the node's configured resolver — useful when confirming whether
+    a tenant vNet's DNS is reaching the right nameserver.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -98,7 +185,15 @@ def query_traceroute(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 60,
 ) -> None:
-    """Trace route to a host from a node."""
+    """Trace route to a host from a node.
+
+    Examples:
+
+        vrg node query traceroute node1 8.8.8.8
+        vrg node query traceroute node1 my-vm.tenant --timeout 90
+
+    Default timeout 60s — raise for long paths or slow intermediate hops.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -143,7 +238,22 @@ def query_tcpdump(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 120,
 ) -> None:
-    """Capture packets on a node."""
+    """Capture packets on a node.
+
+    Examples:
+
+        # Capture 50 HTTPS packets on eth0
+        vrg node query tcpdump node1 -i eth0 -c 50 -f 'port 443'
+
+        # Watch broadcast storms on the vSAN fabric
+        vrg node query tcpdump node1 -i fabric0 -f 'broadcast' --timeout 30
+
+        # JSON for automated diff
+        vrg -o json node query tcpdump node1 -c 100
+
+    Synchronous — `vrg` blocks until the capture completes or `--timeout`
+    (default 120s) elapses. Exits 9 on timeout.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -184,7 +294,16 @@ def query_arp(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Show ARP table for a node."""
+    """Show ARP table for a node.
+
+    Examples:
+
+        vrg node query arp node1
+        vrg -o json node query arp node1 | jq '.[] | select(.state == "REACHABLE")'
+
+    Snapshot of the node's L2 neighbor table. Use `arp-scan` to actively
+    probe for unknown peers.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -216,7 +335,17 @@ def query_arp_scan(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Scan for hosts via ARP from a node."""
+    """Scan for hosts via ARP from a node.
+
+    Examples:
+
+        vrg node query arp-scan node1
+        vrg -o json node query arp-scan node1
+
+    Active probe — sends ARP requests on the node's connected segments and
+    reports responding IPs/MACs. Useful for finding unknown devices or
+    confirming a VM's NIC is answering ARP.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -249,7 +378,16 @@ def query_smartctl(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 60,
 ) -> None:
-    """Show SMART health and attributes for a drive."""
+    """Show SMART health and attributes for a drive.
+
+    Examples:
+
+        vrg node query smartctl node1 /dev/sda
+        vrg -o json node query smartctl node1 /dev/sda --query smart_status
+
+    Reads the drive's SMART attributes from the node. Non-SMART-capable
+    devices (some NVMe namespaces, USB-attached disks) may return empty.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -283,7 +421,16 @@ def query_smartctl_test(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 60,
 ) -> None:
-    """Initiate a SMART self-test on a drive."""
+    """Initiate a SMART self-test on a drive.
+
+    Examples:
+
+        vrg node query smartctl-test node1 /dev/sda
+
+    Starts the self-test in the background on the node — the command
+    returns once the test is launched. Poll with `smartctl` to read
+    progress and final status.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -316,7 +463,17 @@ def query_lsblk(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """List block devices on a node."""
+    """List block devices on a node.
+
+    Examples:
+
+        vrg node query lsblk node1
+        vrg -o json node query lsblk node1
+
+    Enumerates drives, partitions, and mountpoints from the node's
+    perspective — the canonical way to discover device paths before
+    running `smartctl`.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -348,7 +505,17 @@ def query_dmidecode(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Show DMI/SMBIOS hardware information for a node."""
+    """Show DMI/SMBIOS hardware information for a node.
+
+    Examples:
+
+        vrg node query dmidecode node1
+        vrg -o json node query dmidecode node1 --query baseboard
+
+    Reads SMBIOS tables: chassis serial, motherboard, DIMM slots and
+    populations, BIOS version. Useful for hardware audits and RMA
+    paperwork without SSH access.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -380,7 +547,16 @@ def query_ipmi_sensor(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Show IPMI sensor readings for a node."""
+    """Show IPMI sensor readings for a node.
+
+    Examples:
+
+        vrg node query ipmi-sensor node1
+        vrg -o json node query ipmi-sensor node1 | jq '.[] | select(.name | contains("Temp"))'
+
+    Live temperatures, fan speeds, and voltages from the BMC. Empty
+    output usually means no reachable BMC or missing IPMI credentials.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -412,7 +588,16 @@ def query_ipmi_sel(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Show IPMI System Event Log for a node."""
+    """Show IPMI System Event Log for a node.
+
+    Examples:
+
+        vrg node query ipmi-sel node1
+        vrg -o json node query ipmi-sel node1 | jq '.[] | select(.severity == "critical")'
+
+    BMC-persisted event history: thermal events, ECC errors, power
+    transitions. Clear it through the BMC interface, not this CLI.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -444,7 +629,17 @@ def query_ipmi_fru(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Show IPMI FRU (Field Replaceable Unit) data for a node."""
+    """Show IPMI FRU (Field Replaceable Unit) data for a node.
+
+    Examples:
+
+        vrg node query ipmi-fru node1
+        vrg -o json node query ipmi-fru node1
+
+    Chassis, product, and board serial/part numbers from the BMC's FRU
+    inventory. Cross-reference with `dmidecode` when diagnosing labeling
+    mismatches.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -476,7 +671,17 @@ def query_ipmi_lan(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Show IPMI LAN configuration for a node."""
+    """Show IPMI LAN configuration for a node.
+
+    Examples:
+
+        vrg node query ipmi-lan node1
+        vrg -o json node query ipmi-lan node1 --query ip_address
+
+    BMC network settings (IP, netmask, gateway, VLAN). A blank result
+    usually means the BMC is on a segregated management network the node
+    cannot reach from its own OS.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -508,7 +713,16 @@ def query_ipmi_chassis(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Show IPMI chassis status for a node."""
+    """Show IPMI chassis status for a node.
+
+    Examples:
+
+        vrg node query ipmi-chassis node1
+        vrg -o json node query ipmi-chassis node1 --query power_state
+
+    Power state, front panel LEDs, chassis intrusion, and restore policy
+    as reported by the BMC.
+    """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
     node_obj = vctx.client.nodes.get(node_key)
@@ -549,6 +763,23 @@ def query_run(
 
     Escape hatch for query types without dedicated commands (ip, bridge,
     top, top_if, logs, whatsmyip, eth-tool, fabric, bonding, etc.).
+
+    Examples:
+
+        # Show IP addresses via `ip addr`
+        vrg node query run node1 ip --params '{"cmd": "addr"}'
+
+        # Live top view of the node's userspace
+        vrg node query run node1 top --timeout 60
+
+        # Bond status for vSAN fabric
+        vrg node query run node1 bonding
+
+        # Tail node logs
+        vrg node query run node1 logs --params '{"service": "vsand"}'
+
+    Pass query-specific parameters as a JSON object via `--params`.
+    Invalid JSON exits 8. Timed-out queries exit 9.
     """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")

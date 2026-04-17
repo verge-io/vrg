@@ -15,8 +15,61 @@ from verge_cli.output import output_result, output_success
 
 app = typer.Typer(
     name="alarm",
-    help="Manage alarms.",
+    help=(
+        "View and manage VergeOS alarms.\n\n"
+        "Alarms are real-time alerts raised automatically when a monitored"
+        " resource enters an abnormal state — hardware failures, missing or"
+        " vulnerable configuration, security concerns, capacity thresholds,"
+        " sync failures, and similar conditions. They are not created or"
+        " deleted manually; the platform raises them when a condition trips"
+        " and lowers them when the condition clears. Each alarm is bound to"
+        " an `owner` resource (`VM`, `Network`, `Node`, `Tenant`, `User`,"
+        " `System`, or `CloudSnapshot`) and has a severity `level`"
+        " (`critical`, `error`, `warning`, `message`).\n\n"
+        "Active alarms are listed here. Use `vrg alarm history` for the"
+        " archive of resolved/lowered alarms. Use `-o json` for structured"
+        " output. Useful fields to `--query`: `level`, `alarm_type`,"
+        " `status`, `owner_type`, `owner_name`, `is_resolvable`,"
+        " `is_snoozed`, `created_at`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List active alarms\n"
+        "    vrg alarm list\n\n"
+        "    # Only critical or error-level alarms\n"
+        "    vrg alarm list --level critical\n"
+        "    vrg alarm list --level error\n\n"
+        "    # Alarms against a specific owner type\n"
+        "    vrg alarm list --owner-type Node\n"
+        "    vrg alarm list --owner-type VM\n\n"
+        "    # Include snoozed alarms (hidden by default)\n"
+        "    vrg alarm list --include-snoozed\n\n"
+        "    # Counts by severity and state\n"
+        "    vrg alarm summary\n\n"
+        "    # Inspect one alarm by key\n"
+        "    vrg -o json alarm get 412\n\n"
+        "    # Snooze for 4 hours, then unsnooze\n"
+        "    vrg alarm snooze 412 --hours 4\n"
+        "    vrg alarm unsnooze 412\n\n"
+        "    # Run the alarm's built-in resolve action (if resolvable)\n"
+        "    vrg alarm resolve 412\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Snoozing is suppression, not acknowledgment — the alarm reappears"
+        " in the active view when the snooze timestamp passes. Default"
+        " snooze is 24 hours; alarm types may cap the duration and repeat"
+        " count.\n\n"
+        "Only alarms with `is_resolvable = true` accept `resolve` — it"
+        " triggers the alarm type's built-in corrective action (e.g."
+        " restart a VM after a config change, apply pending firewall"
+        " rules). Non-resolvable alarms clear automatically once the"
+        " underlying condition is addressed.\n\n"
+        "Alarms are identified by numeric key, not by name. Active alarms"
+        " live in `/v4/alarms`; archived alarms live in `/v4/alarm_archives`"
+        " (capped at 100,000 records). Use `vrg doctor` for a quick health"
+        " audit that includes active alarm state."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Register sub-commands
@@ -123,7 +176,20 @@ def list_cmd(
         ),
     ] = None,
 ) -> None:
-    """List active alarms."""
+    """List active alarms.
+
+    Examples:
+
+        vrg alarm list
+        vrg alarm list --level critical
+        vrg alarm list --owner-type Node --include-snoozed
+        vrg -o json alarm list | jq '.[] | select(.level == "error") | .alarm_type'
+
+    Useful `--query` fields: `level`, `alarm_type`, `status`,
+    `owner_type`, `owner_name`, `is_snoozed`, `is_resolvable`.
+    Snoozed alarms are hidden by default — pass `--include-snoozed`
+    to see them.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.alarms.list(), _alarm_to_dict, ALARM_COLUMNS)
         return
@@ -169,7 +235,16 @@ def get(
         typer.Argument(help="Alarm key (numeric ID)."),
     ],
 ) -> None:
-    """Get alarm details by key."""
+    """Get alarm details by key.
+
+    Examples:
+
+        vrg alarm get 412
+        vrg -o json alarm get 412
+
+    Alarms are addressed by numeric key only. Use `vrg alarm list`
+    to discover active keys.
+    """
     vctx = get_context(ctx)
     item = vctx.client.alarms.get(key=alarm)
     output_result(
@@ -199,7 +274,19 @@ def snooze(
         ),
     ] = 24,
 ) -> None:
-    """Snooze an alarm for a specified duration."""
+    """Snooze an alarm for a specified duration.
+
+    Examples:
+
+        vrg alarm snooze 412
+        vrg alarm snooze 412 --hours 4
+        vrg alarm snooze 412 -h 72
+
+    Snoozing suppresses the alarm in the active view until the
+    snooze window passes — it does not resolve the underlying
+    condition. Default is 24 hours; alarm types may cap the maximum
+    duration.
+    """
     vctx = get_context(ctx)
     vctx.client.alarms.snooze(alarm, hours=hours)
     output_success(
@@ -217,7 +304,15 @@ def unsnooze(
         typer.Argument(help="Alarm key (numeric ID)."),
     ],
 ) -> None:
-    """Remove snooze from an alarm."""
+    """Remove snooze from an alarm.
+
+    Examples:
+
+        vrg alarm unsnooze 412
+
+    Returns the alarm to the active view immediately, regardless of
+    remaining snooze time.
+    """
     vctx = get_context(ctx)
     vctx.client.alarms.unsnooze(alarm)
     output_success(
@@ -235,7 +330,18 @@ def resolve(
         typer.Argument(help="Alarm key (numeric ID)."),
     ],
 ) -> None:
-    """Resolve a resolvable alarm."""
+    """Resolve a resolvable alarm.
+
+    Examples:
+
+        vrg alarm resolve 412
+
+    Triggers the alarm type's built-in corrective action (e.g.
+    restart a VM after a config change, apply pending firewall
+    rules). Only alarms with `is_resolvable = true` accept this —
+    non-resolvable alarms clear automatically when their underlying
+    condition is addressed.
+    """
     vctx = get_context(ctx)
     vctx.client.alarms.resolve(alarm)
     output_success(
@@ -249,7 +355,17 @@ def resolve(
 def summary(
     ctx: typer.Context,
 ) -> None:
-    """Show alarm summary with counts by level."""
+    """Show alarm summary with counts by level.
+
+    Examples:
+
+        vrg alarm summary
+        vrg -o json alarm summary
+
+    Returns counts for `critical`, `error`, `warning`, `message`,
+    plus aggregate `active`, `snoozed`, `resolvable`, and `total`.
+    Useful as a one-liner for dashboards or agent pre-flight checks.
+    """
     vctx = get_context(ctx)
     data = vctx.client.alarms.get_summary()
 

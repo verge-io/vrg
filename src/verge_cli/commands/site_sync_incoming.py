@@ -14,8 +14,50 @@ from verge_cli.utils import resolve_resource_id
 
 app = typer.Typer(
     name="incoming",
-    help="Manage incoming site syncs.",
+    help=(
+        "Manage **incoming site syncs** — the receiving end of a"
+        " replication pair.\n\n"
+        "An incoming sync lives on the destination VergeOS system and"
+        " accepts cloud snapshots pushed by a paired outgoing sync on a"
+        " remote source. Creating an incoming sync generates a one-time"
+        " **registration code** that is entered on the source side to"
+        " authenticate the pairing; the system also provisions a dedicated"
+        " vSAN user for the remote source to use during transfers.\n\n"
+        "The most important safety field is `min_snapshots`: the"
+        " destination always retains at least this many snapshots even if"
+        " every snapshot has technically expired. Without it, an extended"
+        " source outage can cause all remote recovery points to age out,"
+        " leaving nothing to fail over to. `force_tier` optionally pins"
+        " received data to a specific storage tier (1–5).\n\n"
+        "Status values include `Generating Reg`, `Offline`, `Syncing`,"
+        " `Error`, and `Regeneration Needed` — the last means the"
+        " registration code has been invalidated and must be regenerated"
+        " (via the API) before the pairing will reconnect.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all incoming syncs on this (destination) system\n"
+        "    vrg site sync incoming list\n\n"
+        "    # Filter to a specific paired site\n"
+        "    vrg site sync incoming list --site dr-east\n\n"
+        "    # Show only disabled receivers\n"
+        "    vrg site sync incoming list --disabled\n\n"
+        "    # Full details for scripting / agents\n"
+        "    vrg -o json site sync incoming get offsite-backup\n\n"
+        "    # Pause accepting new data without deleting the pairing\n"
+        "    vrg site sync incoming disable offsite-backup\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "System limit: **100,000 incoming syncs** per system. Syncs are"
+        " referenced by name or numeric `$key`; when a name matches"
+        " multiple records, vrg exits with code 7 — use the key to"
+        " disambiguate. `disable` stops the receiver from accepting new"
+        " transfers but preserves the pairing and existing snapshots."
+        " Use `-o json` for machine-readable output; useful `--query`"
+        " fields include `status`, `enabled`, `state`, `last_sync`, and"
+        " `min_snapshots`."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
@@ -50,7 +92,17 @@ def list_cmd(
         ),
     ] = None,
 ) -> None:
-    """List all incoming site syncs."""
+    """List all incoming site syncs.
+
+    Examples:
+
+        vrg site sync incoming list
+        vrg site sync incoming list --site dr-east --enabled
+        vrg -o json site sync incoming list | jq '.[] | select(.status != "Syncing") | .name'
+
+    Useful `--query` fields include `status`, `enabled`, `state`,
+    `last_sync`, and `min_snapshots`.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
 
@@ -82,7 +134,17 @@ def get_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Get details of an incoming site sync."""
+    """Get details of an incoming site sync.
+
+    Examples:
+
+        vrg site sync incoming get offsite-backup
+        vrg -o json site sync incoming get 7
+        vrg -o json site sync incoming get offsite-backup \\
+            --query "{status: status, min_snapshots: min_snapshots}"
+
+    Resolves `sync` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs_incoming, sync, "Incoming Sync")
     item = vctx.client.site_syncs_incoming.get(key)
@@ -101,7 +163,16 @@ def enable_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Enable an incoming site sync."""
+    """Enable an incoming site sync.
+
+    Examples:
+
+        vrg site sync incoming enable offsite-backup
+        vrg site sync incoming enable 7
+
+    Resumes accepting transfers from the paired outgoing sync on the
+    source. Previously received snapshots are untouched.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs_incoming, sync, "Incoming Sync")
     vctx.client.site_syncs_incoming.enable(key)
@@ -114,7 +185,17 @@ def disable_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Disable an incoming site sync."""
+    """Disable an incoming site sync.
+
+    Examples:
+
+        vrg site sync incoming disable offsite-backup
+        vrg site sync incoming disable 7
+
+    Stops the receiver from accepting new transfers but preserves the
+    pairing and existing snapshots. Re-enable with
+    `vrg site sync incoming enable`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs_incoming, sync, "Incoming Sync")
     vctx.client.site_syncs_incoming.disable(key)

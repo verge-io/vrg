@@ -15,7 +15,56 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="webhook",
-    help="Manage webhook integrations.",
+    rich_markup_mode="markdown",
+    help=(
+        "Manage webhook integrations that push HTTP POST messages to"
+        " external systems.\n\n"
+        "A webhook defines the target URL, authorization, custom headers,"
+        " timeout, and retry count. On its own a webhook does nothing —"
+        " it is the delivery channel for a *task*, which supplies the"
+        " JSON payload, and an *event*, which decides when that task"
+        " fires. One webhook can back many tasks, and one task can be"
+        " triggered by many events. Supported auth types are `bearer`,"
+        " `api_key`, `basic`, and `none`; payloads may interpolate"
+        " `${DATE}`, `${TIMESTAMP}`, `${RANDOM}`, and `${NAME}`. Use the"
+        " `send` action to push a one-off test message, and `history`"
+        " to inspect prior delivery attempts.\n\n"
+        "Use `-o json` for structured output and `--query` to pluck"
+        " fields (e.g., `--query [].name`), or pipe through jq for filtering."
+        " Webhooks resolve by `$key` (numeric) or `name`; an ambiguous"
+        " name yields exit code 7 (multiple matches). `list` honors"
+        " `--all-profiles` / `-A` to fan out across every configured"
+        " CLI profile.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Inventory, filtered by auth type\n"
+        "    vrg webhook list\n"
+        "    vrg webhook list --auth-type bearer\n"
+        "    vrg -o json webhook list\n\n"
+        "    # Inspect a specific webhook\n"
+        "    vrg webhook get slack-alerts\n\n"
+        "    # Create a bearer-auth webhook to Slack with a custom header\n"
+        "    vrg webhook create --name slack-alerts \\\n"
+        "        --url https://hooks.slack.com/services/T00/B00/XYZ \\\n"
+        "        --auth-type bearer --auth-value $SLACK_TOKEN \\\n"
+        "        --header 'X-Env:prod' --timeout 10 --retries 3\n\n"
+        "    # Update an existing webhook\n"
+        "    vrg webhook update slack-alerts --url https://hooks.slack.com/services/T00/B01/NEW\n\n"
+        "    # Send a test payload and review deliveries\n"
+        '    vrg webhook send slack-alerts -m \'{"text":"ping from vrg"}\'\n'
+        "    vrg webhook history --webhook slack-alerts --failed\n\n"
+        "    # Revoke\n"
+        "    vrg webhook delete slack-alerts --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Webhook delivery is defined by the task/event chain — wire the"
+        " webhook to a task (`vrg task create` with object type `webhook`"
+        " and action `send`), then bind that task to an event via"
+        " `vrg task event create`. `--allow-insecure` disables TLS"
+        " verification and is intended for self-signed endpoints in"
+        " test/dev only. `timeout` must be 3 seconds or greater. The"
+        " webhook feature requires VergeOS 26.0 or later."
+    ),
     no_args_is_help=True,
 )
 

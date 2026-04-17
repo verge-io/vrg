@@ -14,7 +14,37 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="user",
-    help="Manage OIDC application allowed users (ACL).",
+    help=(
+        "Manage the allowed-users ACL on an OIDC application.\n\n"
+        "When an OIDC application has `restrict_access` enabled, only users"
+        " on this whitelist (or members of an allowed group) may authenticate"
+        " through it. The ACL has no effect while `restrict_access` is off.\n\n"
+        "Use `-o json` for machine-readable output. `--query` on fields like"
+        " `user_key`, `user_display`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List allowed users on an application\n"
+        "    vrg oidc user list partner-portal\n\n"
+        "    # Add a user by name or key\n"
+        "    vrg oidc user add partner-portal deploy-bot\n"
+        "    vrg oidc user add partner-portal 42\n\n"
+        "    # Remove a user (prompts for confirmation)\n"
+        "    vrg oidc user remove partner-portal deploy-bot\n\n"
+        "    # Dump the ACL as JSON\n"
+        "    vrg -o json oidc user list partner-portal\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "**Turn on `restrict_access` first.** Adding a user to the ACL while"
+        " `restrict_access` is off has no gating effect — the whitelist is"
+        " only consulted when restriction is enabled. Enable it with"
+        " `vrg oidc update <app> --restrict-access`.\n\n"
+        "**`remove` accepts user name, user key, or ACL entry key.** The"
+        " command resolves whichever form you provide to the underlying ACL"
+        " entry and deletes it.\n\n"
+        "**Name resolution**: the `<oidc-app>` and `<user>` arguments accept"
+        " names or numeric keys. Ambiguous names exit with code 7.\n"
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
@@ -51,7 +81,18 @@ def oidc_user_list(
     ctx: typer.Context,
     oidc_app: Annotated[str, typer.Argument(help="OIDC application name or key.")],
 ) -> None:
-    """List allowed users for an OIDC application."""
+    """List allowed users for an OIDC application.
+
+    Examples:
+
+        vrg oidc user list partner-portal
+        vrg -o json oidc user list partner-portal
+        vrg -o json oidc user list partner-portal --query "[].user_display"
+
+    Shows only explicit user ACL entries — group membership grants are
+    managed through `vrg oidc group list`. ACL has no effect until
+    `restrict_access` is enabled on the application.
+    """
     vctx = get_context(ctx)
     app_key = _resolve_oidc_app(vctx.client, oidc_app)
     users_mgr = vctx.client.oidc_applications.allowed_users(app_key)
@@ -74,7 +115,19 @@ def oidc_user_add(
     oidc_app: Annotated[str, typer.Argument(help="OIDC application name or key.")],
     user: Annotated[str, typer.Argument(help="User name or key to add.")],
 ) -> None:
-    """Add a user to the OIDC application's allowed list."""
+    """Add a user to the OIDC application's allowed list.
+
+    Examples:
+
+        vrg oidc user add partner-portal deploy-bot
+        vrg oidc user add partner-portal 17
+        vrg oidc user add 7 alice
+
+    Entries take effect only when the application has `restrict_access`
+    enabled. Enable it with
+    `vrg oidc update <app> --restrict-access` first. Ambiguous names
+    exit 7.
+    """
     vctx = get_context(ctx)
     app_key = _resolve_oidc_app(vctx.client, oidc_app)
     user_key = resolve_resource_id(vctx.client.users, user, "User")
@@ -93,7 +146,17 @@ def oidc_user_remove(
     user_or_key: Annotated[str, typer.Argument(help="User name/key or ACL entry key.")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation.")] = False,
 ) -> None:
-    """Remove a user from the OIDC application's allowed list."""
+    """Remove a user from the OIDC application's allowed list.
+
+    Examples:
+
+        vrg oidc user remove partner-portal deploy-bot
+        vrg oidc user remove partner-portal 17 -y
+        vrg oidc user remove 7 alice -y
+
+    Accepts user name, user key, or ACL entry key — all three resolve
+    to the same underlying entry. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     app_key = _resolve_oidc_app(vctx.client, oidc_app)
     users_mgr = vctx.client.oidc_applications.allowed_users(app_key)

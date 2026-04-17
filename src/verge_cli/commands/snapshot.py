@@ -20,8 +20,51 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="snapshot",
-    help="Manage cloud snapshots.",
+    help=(
+        "Manage VergeOS cloud snapshots (system-wide point-in-time captures).\n\n"
+        "A **cloud snapshot** (also called a *system snapshot*) captures the"
+        " entire VergeOS system state — every VM, tenant, and storage volume —"
+        " at a single point in time. Cloud snapshots are the unit of data"
+        " transported by site syncs and the basis for disaster recovery. They"
+        " also support local recovery without any sync involvement. System"
+        " limit: **2,048 snapshots** at any time.\n\n"
+        "For structured output, pair any `list` or `get` with `-o json`. Useful"
+        " fields to `--query`: `name`, `status`, `created`, `expires`,"
+        " `immutable`, `private`. Name resolution applies to `get`, `delete`,"
+        " `vms`, `tenants`, `restore-vm`, and `restore-tenant` — ambiguous"
+        " names raise exit code 7 (multiple matches).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List current cloud snapshots\n"
+        "    vrg snapshot list\n\n"
+        "    # Include expired snapshots in the list\n"
+        "    vrg snapshot list --include-expired\n\n"
+        "    # Take a manual snapshot before a risky change\n"
+        "    vrg snapshot create --name before-upgrade --immutable\n\n"
+        "    # Get snapshot details as JSON\n"
+        "    vrg -o json snapshot get before-upgrade\n\n"
+        "    # Inspect which VMs a snapshot captured\n"
+        "    vrg snapshot vms before-upgrade\n\n"
+        "    # Restore a single VM from a snapshot with a new name\n"
+        "    vrg snapshot restore-vm before-upgrade --vm web-01 --new-name web-01-restored\n\n"
+        "    # Delete a snapshot (non-immutable) without confirmation\n"
+        "    vrg snapshot delete 42 --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Cloud snapshots capture the entire system. For per-VM snapshots use"
+        " `vrg vm snapshot`; for NAS volume snapshots use"
+        " `vrg nas volume-snapshot`; for tenant-scoped snapshots use"
+        " `vrg tenant snapshot`.\n\n"
+        "Snapshot names must be unique system-wide. Without `--name`, VergeOS"
+        " auto-generates one using the `Snapshot_%Y%m%d_%H%M` pattern.\n\n"
+        "`--retention` (seconds) and `--never-expire` are mutually exclusive."
+        " `--immutable` locks the snapshot against deletion until its immutable"
+        " lock expires; deletion is blocked while locked.\n\n"
+        "Automated snapshot scheduling lives under `vrg snapshot profile`"
+        " (with periods defining cadence and retention)."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 app.add_typer(snapshot_profile.app, name="profile")
@@ -68,7 +111,19 @@ def list_cmd(
         typer.Option("--include-expired", help="Include expired snapshots"),
     ] = False,
 ) -> None:
-    """List all cloud snapshots."""
+    """List all cloud snapshots.
+
+    Examples:
+
+        vrg snapshot list
+        vrg snapshot list --include-expired
+        vrg -o json snapshot list | jq '.[] | select(.immutable)'
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    Expired snapshots are hidden by default — pass `--include-expired` to
+    surface snapshots past their retention window that have not yet been
+    reaped.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(
             ctx, lambda c: c.cloud_snapshots.list(), _snapshot_to_dict, CLOUD_SNAPSHOT_COLUMNS
@@ -93,7 +148,16 @@ def get_cmd(
     ctx: typer.Context,
     snapshot: Annotated[str, typer.Argument(help="Snapshot name or key")],
 ) -> None:
-    """Get details of a cloud snapshot."""
+    """Get details of a cloud snapshot.
+
+    Examples:
+
+        vrg snapshot get before-upgrade
+        vrg -o json snapshot get 42
+        vrg -o json snapshot get before-upgrade --query "{expires: expires, immutable: immutable}"
+
+    Resolves `snapshot` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.cloud_snapshots, snapshot, "Cloud snapshot")
     snap = vctx.client.cloud_snapshots.get(key)
@@ -135,7 +199,19 @@ def create_cmd(
         typer.Option("--wait", help="Wait for snapshot completion"),
     ] = False,
 ) -> None:
-    """Create a new cloud snapshot."""
+    """Create a new cloud snapshot.
+
+    Examples:
+
+        vrg snapshot create --name before-upgrade
+        vrg snapshot create --name nightly --retention 604800 --wait
+        vrg snapshot create --name compliance --immutable --never-expire
+
+    Without `--name`, VergeOS auto-generates one using the
+    `Snapshot_%Y%m%d_%H%M` pattern. `--retention` (seconds) and
+    `--never-expire` are mutually exclusive. `--immutable` blocks deletion
+    until the snapshot's immutable lock expires.
+    """
     # Mutual exclusion check
     if retention is not None and never_expire:
         typer.echo("Error: --retention and --never-expire are mutually exclusive.", err=True)
@@ -171,7 +247,16 @@ def delete_cmd(
     snapshot: Annotated[str, typer.Argument(help="Snapshot name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a cloud snapshot."""
+    """Delete a cloud snapshot.
+
+    Examples:
+
+        vrg snapshot delete 42 --yes
+        vrg snapshot delete before-upgrade
+
+    This is a destructive operation. Immutable snapshots cannot be deleted
+    until their immutable lock expires. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.cloud_snapshots, snapshot, "Cloud snapshot")
 
@@ -189,7 +274,16 @@ def vms_cmd(
     ctx: typer.Context,
     snapshot: Annotated[str, typer.Argument(help="Snapshot name or key")],
 ) -> None:
-    """List VMs captured in a cloud snapshot."""
+    """List VMs captured in a cloud snapshot.
+
+    Examples:
+
+        vrg snapshot vms before-upgrade
+        vrg -o json snapshot vms 42
+        vrg -o json snapshot vms before-upgrade | jq '.[] | select(.status == "running") | .name'
+
+    Resolves `snapshot` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.cloud_snapshots, snapshot, "Cloud snapshot")
     vms = vctx.client.cloud_snapshots.vms(key).list()
@@ -210,7 +304,16 @@ def tenants_cmd(
     ctx: typer.Context,
     snapshot: Annotated[str, typer.Argument(help="Snapshot name or key")],
 ) -> None:
-    """List tenants captured in a cloud snapshot."""
+    """List tenants captured in a cloud snapshot.
+
+    Examples:
+
+        vrg snapshot tenants before-upgrade
+        vrg -o json snapshot tenants 42
+        vrg -o json snapshot tenants before-upgrade --query "[].name"
+
+    Resolves `snapshot` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.cloud_snapshots, snapshot, "Cloud snapshot")
     tenants = vctx.client.cloud_snapshots.tenants(key).list()
@@ -236,7 +339,18 @@ def restore_vm_cmd(
         typer.Option("--new-name", help="Name for the restored VM"),
     ] = None,
 ) -> None:
-    """Restore a VM from a cloud snapshot."""
+    """Restore a VM from a cloud snapshot.
+
+    Examples:
+
+        vrg snapshot restore-vm before-upgrade --vm web-01
+        vrg snapshot restore-vm before-upgrade --vm web-01 --new-name web-01-restored
+        vrg snapshot restore-vm 42 --vm 17 --new-name web-01-restored
+
+    Without `--new-name`, the restored VM takes the original name, which
+    will conflict if the source VM still exists. Both the snapshot and the
+    VM argument accept name or numeric key.
+    """
     vctx = get_context(ctx)
     snap_key = resolve_resource_id(vctx.client.cloud_snapshots, snapshot, "Cloud snapshot")
 
@@ -271,7 +385,18 @@ def restore_tenant_cmd(
         typer.Option("--new-name", help="Name for the restored tenant"),
     ] = None,
 ) -> None:
-    """Restore a tenant from a cloud snapshot."""
+    """Restore a tenant from a cloud snapshot.
+
+    Examples:
+
+        vrg snapshot restore-tenant before-upgrade --tenant customer-a
+        vrg snapshot restore-tenant before-upgrade --tenant customer-a --new-name customer-a-restored
+        vrg snapshot restore-tenant 42 --tenant 7 --new-name customer-a-restored
+
+    Without `--new-name`, the restored tenant takes the original name,
+    which will conflict if the source tenant still exists. Both the
+    snapshot and the tenant argument accept name or numeric key.
+    """
     vctx = get_context(ctx)
     snap_key = resolve_resource_id(vctx.client.cloud_snapshots, snapshot, "Cloud snapshot")
 

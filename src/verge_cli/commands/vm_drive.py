@@ -15,8 +15,32 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="drive",
-    help="Manage VM drives.",
+    help=(
+        "Manage virtual disks attached to a VM.\n\n"
+        "Drives are virtual disks stored on vSAN storage tiers. Each drive has a"
+        " media type (`disk` or `cdrom`), an interface (`virtio-scsi`, `ide`,"
+        " `sata`), and a preferred storage tier (1–5). Drives are addressed by"
+        " **name** or **numeric key** within the parent VM.\n\n"
+        "Use `-o json` for structured output. The first argument to every"
+        " command is the parent VM (name or key).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg vm drive list web-01\n\n"
+        "    vrg vm drive list web-01 --media disk\n\n"
+        "    vrg -o json vm drive get web-01 drive-0\n\n"
+        "    vrg vm drive create web-01 --size 50GB --tier 2\n\n"
+        "    vrg vm drive create web-01 --media cdrom --media-source ubuntu-22.04.iso\n\n"
+        "    vrg vm drive import web-01 --file-name disk.vmdk\n\n"
+        "    vrg vm drive delete web-01 drive-0 --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Sizes accept human-readable units: `50GB`, `1TB`, `512MB`. Drives on"
+        " higher tiers (lower number = faster) get better I/O performance."
+        " The `import` subcommand converts VMDK, QCOW2, VHD, and OVA disk"
+        " images into native vSAN drives."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
@@ -67,7 +91,16 @@ def drive_list(
         str | None, typer.Option("--media", help="Filter by media type (disk, cdrom)")
     ] = None,
 ) -> None:
-    """List drives attached to a VM."""
+    """List drives attached to a VM.
+
+    **Examples:**
+
+        vrg vm drive list web-01
+
+        vrg vm drive list web-01 --media disk
+
+        vrg -o json vm drive list web-01
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     drives = vm_obj.drives.list(media=media)
     data = [_drive_to_dict(d) for d in drives]
@@ -88,7 +121,13 @@ def drive_get(
     vm: Annotated[str, typer.Argument(help="VM name or key")],
     drive: Annotated[str, typer.Argument(help="Drive name or key")],
 ) -> None:
-    """Get details of a VM drive."""
+    """Get details of a VM drive.
+
+    **Examples:**
+
+        vrg vm drive get web-01 drive-0
+        vrg -o json vm drive get web-01 42
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     drive_key = _resolve_drive(vm_obj, drive)
     drive_obj = vm_obj.drives.get(drive_key)
@@ -121,7 +160,17 @@ def drive_create(
         str | None, typer.Option("--media-source", help="Media file ID or name (for cdrom/import)")
     ] = None,
 ) -> None:
-    """Add a drive to a VM."""
+    """Add a drive to a VM.
+
+    Sizes accept human-readable units (`50GB`, `1TB`, `512MB`). Tier
+    defaults to the cluster's preferred tier if omitted.
+
+    **Examples:**
+
+        vrg vm drive create web-01 --size 50GB --tier 2
+        vrg vm drive create web-01 --size 1TB --name data-disk
+        vrg vm drive create web-01 --media cdrom --media-source ubuntu-22.04.iso
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
 
     size_gb = parse_disk_size(size) if size else None
@@ -164,7 +213,16 @@ def drive_update(
         bool | None, typer.Option("--enabled/--disabled", help="Enable/disable")
     ] = None,
 ) -> None:
-    """Update a VM drive."""
+    """Update a VM drive.
+
+    Only the flags you supply are changed; everything else stays as-is.
+
+    **Examples:**
+
+        vrg vm drive update web-01 drive-0 --size 100GB
+        vrg vm drive update web-01 drive-0 --tier 1
+        vrg vm drive update web-01 drive-0 --disabled
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     drive_key = _resolve_drive(vm_obj, drive)
 
@@ -201,7 +259,16 @@ def drive_delete(
     drive: Annotated[str, typer.Argument(help="Drive name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Remove a drive from a VM."""
+    """Remove a drive from a VM.
+
+    Prompts for confirmation unless `--yes` is passed. This is destructive
+    — the drive's data is permanently deleted.
+
+    **Examples:**
+
+        vrg vm drive delete web-01 drive-0
+        vrg vm drive delete web-01 drive-0 --yes
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     drive_key = _resolve_drive(vm_obj, drive)
 
@@ -227,7 +294,17 @@ def drive_import(
     interface: Annotated[str, typer.Option("--interface", help="Drive interface")] = "virtio-scsi",
     tier: Annotated[int | None, typer.Option("--tier", help="Storage tier")] = None,
 ) -> None:
-    """Import a drive from a file (VMDK, QCOW2, VHD, OVA)."""
+    """Import a drive from a file (VMDK, QCOW2, VHD, OVA).
+
+    Converts an uploaded disk image into a native vSAN drive attached to
+    the VM. Provide either `--file-name` or `--file-key` to identify the
+    source image in the media catalog.
+
+    **Examples:**
+
+        vrg vm drive import web-01 --file-name disk.vmdk
+        vrg vm drive import web-01 --file-key 42 --tier 1
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
 
     if not file_name and not file_key:

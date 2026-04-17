@@ -15,8 +15,53 @@ from verge_cli.output import output_result, output_warning
 
 app = typer.Typer(
     name="log",
-    help="View system logs.",
+    help=(
+        "View the VergeOS event log.\n\n"
+        "The event log is a centralized, append-only record of operational"
+        " activity across the platform — VM lifecycle, node and cluster"
+        " state changes, network operations, authentication events, task"
+        " executions, and similar. It serves both as a real-time monitoring"
+        " feed and as an audit trail. Entries carry a severity `level`"
+        " (`critical`, `error`, `warning`, `audit`, `message`), an"
+        " `object_type` (the resource category, e.g. `vm`, `vnet`, `node`,"
+        " `tenant`, `user`, `system`, `task`), an `object_name`, the"
+        " acting `user`, and a microsecond-precision `timestamp`.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `level`, `object_type`, `object_name`, `user`, `text`,"
+        " `timestamp`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Recent log entries (newest first)\n"
+        "    vrg log list\n\n"
+        "    # Only error and critical entries\n"
+        "    vrg log list --errors\n"
+        "    vrg log list --level error\n\n"
+        "    # Scope by object type or user\n"
+        "    vrg log list --type vm\n"
+        "    vrg log list --user admin\n\n"
+        "    # Time-window filtering\n"
+        "    vrg log list --since 2026-04-01\n"
+        "    vrg log list --since 2026-04-15T08:00:00 --before 2026-04-15T18:00:00\n\n"
+        "    # Free-text search across log messages\n"
+        '    vrg log search "migration failed"\n'
+        '    vrg log search "login" --type user --since 2026-04-01\n\n'
+        "    # Fetch a single entry by key\n"
+        "    vrg -o json log get 12345\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Logs are retained up to 25,000 entries or 31 days, whichever comes"
+        " first — older entries are pruned automatically. Export via `-o"
+        " json` to an external system if long-term retention is required.\n\n"
+        "`--before` is only honored on the general listing path. When"
+        " combined with `--errors`, `--level`, `--type`, or `--user` in"
+        " isolation, the CLI routes to a specialized SDK method that does"
+        " not accept `--before`, and the flag is ignored with a warning.\n\n"
+        "Log entries are identified by numeric key, not by name. Log"
+        " entries also emit events that the Task Engine can subscribe to"
+        " — see `vrg task trigger` for event-driven automation."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 LOG_COLUMNS: list[ColumnDef] = [
@@ -130,7 +175,21 @@ def list_cmd(
         ),
     ] = 100,
 ) -> None:
-    """List system log entries."""
+    """List system log entries.
+
+    Examples:
+
+        vrg log list
+        vrg log list --errors --limit 50
+        vrg log list --type vm --user admin
+        vrg log list --since 2026-04-15T08:00:00 --before 2026-04-15T18:00:00
+        vrg -o json log list --level error
+
+    Useful `--query` fields: `level`, `object_type`, `object_name`,
+    `user`, `text`, `timestamp`. `--before` is only honored on the
+    general listing path; combined with `--errors`/`--level`/`--type`/
+    `--user` in isolation it is ignored with a warning.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.logs.list(), _log_to_dict, LOG_COLUMNS)
         return
@@ -192,7 +251,16 @@ def get(
         typer.Argument(help="Log entry key (numeric ID)."),
     ],
 ) -> None:
-    """Get a log entry by key."""
+    """Get a log entry by key.
+
+    Examples:
+
+        vrg log get 12345
+        vrg -o json log get 12345
+
+    Log entries are addressed by numeric key only. Use `vrg log list`
+    or `vrg log search` to discover keys.
+    """
     vctx = get_context(ctx)
     entry = vctx.client.logs.get(key=key)
     output_result(
@@ -243,7 +311,18 @@ def search(
         ),
     ] = 100,
 ) -> None:
-    """Search log entries by text content."""
+    """Search log entries by text content.
+
+    Examples:
+
+        vrg log search "migration failed"
+        vrg log search "login" --type user --since 2026-04-01
+        vrg log search "timeout" --level error --limit 50
+
+    Performs a server-side substring match against the log message
+    body. Combine with `--level`, `--type`, and `--since` to narrow
+    the result window.
+    """
     vctx = get_context(ctx)
 
     since_dt = _parse_datetime(since) if since else None

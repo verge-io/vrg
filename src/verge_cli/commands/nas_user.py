@@ -14,8 +14,69 @@ from verge_cli.utils import confirm_action, resolve_nas_resource, resolve_resour
 
 app = typer.Typer(
     name="user",
-    help="Manage NAS local users.",
+    help=(
+        "Manage local CIFS/SMB users on a NAS service — the user database"
+        " Samba consults when a Windows, macOS, or Linux client authenticates"
+        " to a CIFS share.\n\n"
+        "NAS local users are per-service: each NAS service VM has its own"
+        " independent user list and is selected with `--service`. These users"
+        " are the identities referenced by the `valid_users`, `admin_users`,"
+        " and `force_user` fields on CIFS shares (`vrg nas cifs`). NFS"
+        " shares ignore this list — NFS authenticates by client UID/GID, not"
+        " username. Use AD domain accounts instead of local users when the"
+        " NAS is joined to Active Directory; see `nas-join-ad-domain` in the"
+        " product guide.\n\n"
+        "`--home-share` / `--home-drive` bind the user to a CIFS home"
+        " directory. The home share must already exist on the service"
+        " (create with `vrg nas cifs create`); once attached, it cannot be"
+        " deleted until every referencing user is removed or repointed."
+        " `--home-drive` is the Windows drive letter (e.g., `H`) mounted on"
+        " login.\n\n"
+        "Users resolve by name or hex `$key` within the scope of their NAS"
+        " service. Ambiguous names exit with code 7 — disambiguate with the"
+        " key. Use `-o json` with `--query` to pluck fields like `enabled`,"
+        " `status`, `home_share_name`, or `service_name` for scripting.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all NAS local users across services\n"
+        "    vrg nas user list\n\n"
+        "    # Scope to one service, or filter by enabled state\n"
+        "    vrg nas user list --service my-nas\n"
+        "    vrg nas user list --service my-nas --disabled\n\n"
+        "    # Inspect one user as JSON for agents / scripting\n"
+        "    vrg -o json nas user get jdoe\n\n"
+        "    # Create a basic CIFS user\n"
+        "    vrg nas user create --service my-nas \\\n"
+        "        --name jdoe --password 's3cret!' \\\n"
+        "        --displayname 'Jane Doe' --description 'Finance team'\n\n"
+        "    # Create a user with a mapped home drive\n"
+        "    vrg nas user create --service my-nas \\\n"
+        "        --name jdoe --password 's3cret!' \\\n"
+        "        --home-share home-jdoe --home-drive H\n\n"
+        "    # Rotate a password / update attributes\n"
+        "    vrg nas user update jdoe --password 'n3w-s3cret!'\n"
+        "    vrg nas user update jdoe --displayname 'Jane D. Smith'\n\n"
+        "    # Toggle access without destroying the account\n"
+        "    vrg nas user disable jdoe\n"
+        "    vrg nas user enable  jdoe\n\n"
+        "    # Remove a user (confirms unless --yes)\n"
+        "    vrg nas user delete jdoe --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The parent NAS service VM **must be running** for user management"
+        " to take effect; changes made while the service is stopped apply on"
+        " next start. Users authenticate only against CIFS/SMB shares — NFS"
+        " clients are controlled via `allowed_hosts` and squash settings on"
+        " the NFS share instead.\n\n"
+        "Passwords are set server-side; the CLI has no password-reveal or"
+        " hash-import operation. Pipe secrets from a vault rather than"
+        " embedding them in shell history where possible.\n\n"
+        "Deleting a user referenced by a CIFS home share is blocked until"
+        " the share's `home_shares` link is cleared or the share itself is"
+        " removed."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 NAS_USER_COLUMNS: list[ColumnDef] = [
@@ -66,7 +127,15 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled state"),
     ] = None,
 ) -> None:
-    """List all NAS local users."""
+    """List all NAS local users.
+
+    **Examples:**
+
+        vrg nas user list
+        vrg nas user list --service my-nas
+        vrg nas user list --enabled
+        vrg -o json nas user list
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if service is not None:
@@ -93,7 +162,13 @@ def get_cmd(
     ctx: typer.Context,
     user: Annotated[str, typer.Argument(help="NAS user name or hex key")],
 ) -> None:
-    """Get details of a NAS local user."""
+    """Get details of a NAS local user.
+
+    **Examples:**
+
+        vrg nas user get alice
+        vrg -o json nas user get alice
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_users, user, "NAS user")
     item = vctx.client.nas_users.get(key=key)
@@ -133,7 +208,19 @@ def create_cmd(
         typer.Option("--home-drive", help="Home drive letter (e.g., H)"),
     ] = None,
 ) -> None:
-    """Create a new NAS local user."""
+    """Create a new NAS local user.
+
+    NAS local users authenticate against CIFS shares on this NAS
+    service. They are distinct from VergeOS platform users and from
+    AD/LDAP principals. Pass the password on the CLI only from trusted
+    environments.
+
+    **Examples:**
+
+        vrg nas user create --service my-nas --name alice --password '***'
+        vrg nas user create --service my-nas --name bob --password '***' \\
+            --displayname "Bob Smith" --home-share home-bob --home-drive H
+    """
     vctx = get_context(ctx)
 
     # Resolve service name to key
@@ -188,7 +275,17 @@ def update_cmd(
         typer.Option("--home-drive", help="Home drive letter (e.g., H)"),
     ] = None,
 ) -> None:
-    """Update a NAS local user."""
+    """Update a NAS local user.
+
+    Use `--password` to reset credentials. Other options update profile
+    metadata without re-prompting for the password.
+
+    **Examples:**
+
+        vrg nas user update alice --password '***'
+        vrg nas user update alice --displayname "Alice Jones"
+        vrg nas user update alice --home-share home-alice --home-drive H
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_users, user, "NAS user")
 
@@ -215,7 +312,16 @@ def delete_cmd(
     user: Annotated[str, typer.Argument(help="NAS user name or hex key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a NAS local user."""
+    """Delete a NAS local user.
+
+    Revokes the user's CIFS credentials. Files owned by the user on
+    volumes are not deleted.
+
+    **Examples:**
+
+        vrg nas user delete alice
+        vrg nas user delete alice --yes
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_users, user, "NAS user")
 
@@ -233,7 +339,12 @@ def enable_cmd(
     ctx: typer.Context,
     user: Annotated[str, typer.Argument(help="NAS user name or hex key")],
 ) -> None:
-    """Enable a NAS local user."""
+    """Enable a NAS local user.
+
+    **Examples:**
+
+        vrg nas user enable alice
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_users, user, "NAS user")
     vctx.client.nas_users.enable(key)
@@ -246,7 +357,14 @@ def disable_cmd(
     ctx: typer.Context,
     user: Annotated[str, typer.Argument(help="NAS user name or hex key")],
 ) -> None:
-    """Disable a NAS local user."""
+    """Disable a NAS local user.
+
+    Blocks the user from authenticating without deleting the account.
+
+    **Examples:**
+
+        vrg nas user disable alice
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_users, user, "NAS user")
     vctx.client.nas_users.disable(key)

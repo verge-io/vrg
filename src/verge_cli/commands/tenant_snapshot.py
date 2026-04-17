@@ -14,8 +14,56 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="snapshot",
-    help="Manage tenant snapshots.",
+    help=(
+        "Capture and restore per-tenant recovery points.\n\n"
+        "A **tenant snapshot** is a point-in-time recovery image of an"
+        " entire tenant — its virtual nodes, storage, and nested VergeOS"
+        " state — captured inside the tenant's own quota. It is distinct"
+        " from system-wide cloud snapshots: the tenant owns these, names"
+        " are unique per tenant, and up to 1,000 snapshots may be retained."
+        " Each snapshot has a configurable expiry (0 means never) and may"
+        " be linked to a snapshot profile/period for scheduled creation"
+        " and retention.\n\n"
+        "Every command takes the tenant as the first argument (name or"
+        " numeric key); the snapshot itself is then identified by name or"
+        " numeric key. Use `-o json` for machine-readable output; useful"
+        " `--query` targets are `$key`, `name`, `created`, `expires`, and"
+        " `profile`. Snapshot name lookups that match multiple snapshots"
+        " exit with code 7 — pass the numeric key to disambiguate.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List snapshots held by a tenant\n"
+        "    vrg tenant snapshot list acme-corp\n\n"
+        "    # JSON output for agents\n"
+        "    vrg -o json tenant snapshot list acme-corp\n\n"
+        "    # Inspect a specific snapshot by name\n"
+        "    vrg tenant snapshot get acme-corp before-migration\n\n"
+        "    # Create a snapshot that never expires\n"
+        "    vrg tenant snapshot create acme-corp --name before-migration\n\n"
+        "    # Create a snapshot with description and 30-day expiry\n"
+        "    vrg tenant snapshot create acme-corp -n pre-upgrade"
+        " -d 'Before 2026.04 upgrade' --expires-in-days 30\n\n"
+        "    # Restore the tenant from a snapshot (applies on next power-on)\n"
+        "    vrg tenant snapshot restore acme-corp before-migration\n\n"
+        "    # Delete a snapshot without prompting\n"
+        "    vrg tenant snapshot delete acme-corp before-migration -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Restoring overwrites the entire tenant — every VM, volume, and"
+        " configuration inside the nested environment is rolled back to"
+        " the snapshot point. The restore does not run immediately: it"
+        " marks `restore_pending` on the tenant record and applies on the"
+        " next power-on, so the tenant must be stopped and started to"
+        " complete the operation. `--expires-in-days 0` means the"
+        " snapshot never expires and must be deleted manually; any other"
+        " value sets `expires = created + N days` and the system reaps it"
+        " automatically. Tenant snapshots are separate from system-wide"
+        " cloud snapshots; tenants with `expose_cloud_snapshots` enabled"
+        " can also restore from provider snapshots, but that is a"
+        " different workflow."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 

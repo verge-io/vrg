@@ -15,13 +15,93 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="group",
-    help="Manage groups.",
+    help=(
+        "Manage local VergeOS groups.\n\n"
+        "Groups are the unit of bulk RBAC assignment. Each group has its own"
+        " `/sys/identities` record and acts as a principal for"
+        " [permission](# 'vrg permission') evaluation — permissions assigned to"
+        " a group apply to every member. Groups can nest: a group may contain"
+        " users *and* other groups, and permissions cascade to all descendants"
+        " through the `members` join.\n\n"
+        "Groups provisioned from an external auth source (LDAP/OIDC) carry an"
+        " `auth_source` reference; system-managed groups have `system_group:"
+        " true` and are read-only for administrators.\n\n"
+        "Use `-o json` for machine-readable output. Filter lists with"
+        " `--query` on fields like `name`, `enabled`, `email`,"
+        " `member_count`, `description`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all groups\n"
+        "    vrg group list\n\n"
+        "    # List only enabled groups as JSON\n"
+        "    vrg -o json group list --enabled\n\n"
+        "    # Get a single group by name\n"
+        "    vrg group get engineering\n\n"
+        "    # Create a group\n"
+        "    vrg group create --name engineering \\\n"
+        "        --description 'Engineering team' --email eng@example.com\n\n"
+        "    # Add a user to a group\n"
+        "    vrg group member add engineering --user alice\n\n"
+        "    # Nest a group inside another group\n"
+        "    vrg group member add engineering --group backend-team\n\n"
+        "    # List members (includes nested groups)\n"
+        "    vrg group member list engineering\n\n"
+        "    # Remove a member\n"
+        "    vrg group member remove engineering --user alice\n\n"
+        "    # Delete a group (prompts unless -y)\n"
+        "    vrg group delete engineering -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Groups are referenced by **name** or **numeric key** (`$key`). When a"
+        " name matches multiple groups, vrg prints all matches and exits with"
+        " code 7. Use the numeric key to disambiguate.\n\n"
+        "**Nesting cascades permissions**: a permission granted to a parent"
+        " group applies to every user and every nested group beneath it. Plan"
+        " the hierarchy before granting broad permissions on a top-level"
+        " group.\n\n"
+        "**Deleting a group cascades**: all membership records (both incoming"
+        " memberships and this group's roster), all permissions assigned to"
+        " the group, and any OIDC application group grants are removed. The"
+        " backing `/sys/identities` record is also deleted.\n\n"
+        "System groups (`system_group: true`) cannot be modified or deleted"
+        " through this command.\n"
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
 member_app = typer.Typer(
     name="member",
-    help="Manage group members.",
+    help=(
+        "Manage group members (users and nested groups).\n\n"
+        "Members can be users *or* other groups — nesting is supported and"
+        " permissions cascade from parent groups to all descendants. The"
+        " `members` join enforces a unique `(parent_group, member)`"
+        " constraint, so duplicate memberships are rejected.\n\n"
+        "Use `-o json` for machine-readable output. Filter lists with"
+        " `--query` on fields like `member_name`, `member_type` (`user` or"
+        " `group`), `member_key`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all members of a group\n"
+        "    vrg group member list engineering\n\n"
+        "    # Add a user\n"
+        "    vrg group member add engineering --user alice\n\n"
+        "    # Nest a group inside another group\n"
+        "    vrg group member add engineering --group backend-team\n\n"
+        "    # Remove a user\n"
+        "    vrg group member remove engineering --user alice\n\n"
+        "    # Remove a nested group\n"
+        "    vrg group member remove engineering --group backend-team\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`add` and `remove` take exactly one of `--user` or `--group`."
+        " Specifying both or neither exits with code 2.\n\n"
+        "User and group names are resolved via `vrg user` and `vrg group`"
+        " lookups; ambiguous names exit with code 7 — use the numeric key to"
+        " disambiguate.\n"
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
@@ -69,7 +149,18 @@ def group_list(
         typer.Option("--enabled/--disabled", help="Filter by enabled/disabled status."),
     ] = None,
 ) -> None:
-    """List groups."""
+    """List groups.
+
+    Examples:
+
+        vrg group list
+        vrg group list --enabled
+        vrg -o json group list | jq '.[] | select(.member_count > 0) | .name'
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    Useful `--query` fields include `name`, `enabled`, `email`,
+    `member_count`, and `description`.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.groups.list(), _group_to_dict, GROUP_COLUMNS)
         return
@@ -99,7 +190,16 @@ def group_get(
     ctx: typer.Context,
     group: Annotated[str, typer.Argument(help="Group name or key.")],
 ) -> None:
-    """Get details of a group."""
+    """Get details of a group.
+
+    Examples:
+
+        vrg group get engineering
+        vrg -o json group get 12
+        vrg -o json group get engineering --query "{members: member_count}"
+
+    Resolves `group` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.groups, group, "Group")
@@ -125,7 +225,18 @@ def group_create(
     email: Annotated[str | None, typer.Option("--email", help="Group email address.")] = None,
     disabled: Annotated[bool, typer.Option("--disabled", help="Create group as disabled.")] = False,
 ) -> None:
-    """Create a new group."""
+    """Create a new group.
+
+    Examples:
+
+        vrg group create --name engineering
+        vrg group create --name engineering \\
+            --description 'Engineering team' --email eng@example.com
+        vrg group create --name backend-team --disabled
+
+    Follow up with `vrg group member add` to populate membership or
+    `vrg permission grant --group` to assign RBAC permissions.
+    """
     vctx = get_context(ctx)
 
     kwargs: dict[str, Any] = {
@@ -162,7 +273,17 @@ def group_update(
     ] = None,
     email: Annotated[str | None, typer.Option("--email", help="New email address.")] = None,
 ) -> None:
-    """Update a group."""
+    """Update a group.
+
+    Examples:
+
+        vrg group update engineering --description 'Platform engineering'
+        vrg group update engineering --email platform-eng@example.com
+        vrg group update backend-team --name backend
+
+    Pass at least one field to change; calling without any option exits 2.
+    System groups (`system_group: true`) cannot be modified.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.groups, group, "Group")
@@ -199,7 +320,19 @@ def group_delete(
     group: Annotated[str, typer.Argument(help="Group name or key.")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation.")] = False,
 ) -> None:
-    """Delete a group."""
+    """Delete a group.
+
+    Examples:
+
+        vrg group delete engineering
+        vrg group delete backend-team -y
+        vrg group delete 12 -y
+
+    **Destructive.** Cascades: all membership records, every permission
+    granted to the group, and any OIDC ACL entries. The backing
+    `/sys/identities` record is also deleted. System groups cannot be
+    deleted.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.groups, group, "Group")
@@ -219,7 +352,15 @@ def group_enable(
     ctx: typer.Context,
     group: Annotated[str, typer.Argument(help="Group name or key.")],
 ) -> None:
-    """Enable a group."""
+    """Enable a group.
+
+    Examples:
+
+        vrg group enable engineering
+        vrg group enable 12
+
+    Re-activates a group so its members' permissions apply again.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.groups, group, "Group")
@@ -234,7 +375,16 @@ def group_disable(
     ctx: typer.Context,
     group: Annotated[str, typer.Argument(help="Group name or key.")],
 ) -> None:
-    """Disable a group."""
+    """Disable a group.
+
+    Examples:
+
+        vrg group disable engineering
+        vrg group disable 12
+
+    Disabling preserves the group and its memberships; members lose the
+    permissions cascaded from this group until it is re-enabled.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.groups, group, "Group")
@@ -254,7 +404,18 @@ def member_list(
     ctx: typer.Context,
     group: Annotated[str, typer.Argument(help="Group name or key.")],
 ) -> None:
-    """List members of a group."""
+    """List members of a group.
+
+    Examples:
+
+        vrg group member list engineering
+        vrg -o json group member list engineering
+        vrg -o json group member list engineering \\
+            | jq '.[] | select(.member_type == "group") | .member_name'
+
+    Lists both users and nested groups. Useful `--query` fields include
+    `member_name`, `member_type` (`user` or `group`), and `member_key`.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.groups, group, "Group")
@@ -284,7 +445,17 @@ def member_add(
         typer.Option("--group", help="Group name or key to add as member."),
     ] = None,
 ) -> None:
-    """Add a user or group to a group."""
+    """Add a user or group to a group.
+
+    Examples:
+
+        vrg group member add engineering --user alice
+        vrg group member add engineering --group backend-team
+        vrg group member add platform --group engineering
+
+    Pass exactly one of `--user` or `--group`. Neither or both exits 2.
+    Nested group permissions cascade from parent to every descendant.
+    """
     vctx = get_context(ctx)
 
     if not user and not member_group:
@@ -328,7 +499,18 @@ def member_remove(
         typer.Option("--group", help="Group name or key to remove."),
     ] = None,
 ) -> None:
-    """Remove a user or group from a group."""
+    """Remove a user or group from a group.
+
+    Examples:
+
+        vrg group member remove engineering --user alice
+        vrg group member remove engineering --group backend-team
+        vrg group member remove platform --group engineering
+
+    Pass exactly one of `--user` or `--group`. Neither or both exits 2.
+    Removing a nested parent does not cascade to the nested group's own
+    members — only the parent relationship is severed.
+    """
     vctx = get_context(ctx)
 
     if not user and not member_group:

@@ -14,7 +14,39 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="group",
-    help="Manage OIDC application allowed groups (ACL).",
+    help=(
+        "Manage the allowed-groups ACL on an OIDC application.\n\n"
+        "When an OIDC application has `restrict_access` enabled, any member"
+        " of a group on this whitelist may authenticate through it (in"
+        " addition to any individually allowed users). The ACL has no"
+        " effect while `restrict_access` is off. Groups provisioned from an"
+        " upstream auth source are eligible just like local groups.\n\n"
+        "Use `-o json` for machine-readable output. `--query` on fields like"
+        " `group_key`, `group_display`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List allowed groups on an application\n"
+        "    vrg oidc group list partner-portal\n\n"
+        "    # Add a group by name or key\n"
+        "    vrg oidc group add partner-portal platform-eng\n"
+        "    vrg oidc group add partner-portal 12\n\n"
+        "    # Remove a group (prompts for confirmation)\n"
+        "    vrg oidc group remove partner-portal platform-eng\n\n"
+        "    # Dump the ACL as JSON\n"
+        "    vrg -o json oidc group list partner-portal\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "**Turn on `restrict_access` first.** Adding a group while"
+        " `restrict_access` is off has no gating effect — the whitelist is"
+        " only consulted when restriction is enabled. Enable it with"
+        " `vrg oidc update <app> --restrict-access`.\n\n"
+        "**`remove` accepts group name, group key, or ACL entry key.** The"
+        " command resolves whichever form you provide to the underlying ACL"
+        " entry and deletes it.\n\n"
+        "**Name resolution**: the `<oidc-app>` and `<group>` arguments"
+        " accept names or numeric keys. Ambiguous names exit with code 7.\n"
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
@@ -51,7 +83,18 @@ def oidc_group_list(
     ctx: typer.Context,
     oidc_app: Annotated[str, typer.Argument(help="OIDC application name or key.")],
 ) -> None:
-    """List allowed groups for an OIDC application."""
+    """List allowed groups for an OIDC application.
+
+    Examples:
+
+        vrg oidc group list partner-portal
+        vrg -o json oidc group list partner-portal
+        vrg -o json oidc group list partner-portal --query "[].group_display"
+
+    Shows only explicit group ACL entries — individual user grants are
+    managed through `vrg oidc user list`. ACL has no effect until
+    `restrict_access` is enabled on the application.
+    """
     vctx = get_context(ctx)
     app_key = _resolve_oidc_app(vctx.client, oidc_app)
     groups_mgr = vctx.client.oidc_applications.allowed_groups(app_key)
@@ -74,7 +117,19 @@ def oidc_group_add(
     oidc_app: Annotated[str, typer.Argument(help="OIDC application name or key.")],
     group: Annotated[str, typer.Argument(help="Group name or key to add.")],
 ) -> None:
-    """Add a group to the OIDC application's allowed list."""
+    """Add a group to the OIDC application's allowed list.
+
+    Examples:
+
+        vrg oidc group add partner-portal platform-eng
+        vrg oidc group add partner-portal 12
+        vrg oidc group add 7 engineering
+
+    Every member of the group — including nested group members — may
+    authenticate through the application when `restrict_access` is on.
+    Groups from an upstream auth source are eligible just like local
+    groups. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     app_key = _resolve_oidc_app(vctx.client, oidc_app)
     group_key = resolve_resource_id(vctx.client.groups, group, "Group")
@@ -93,7 +148,17 @@ def oidc_group_remove(
     group_or_key: Annotated[str, typer.Argument(help="Group name/key or ACL entry key.")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation.")] = False,
 ) -> None:
-    """Remove a group from the OIDC application's allowed list."""
+    """Remove a group from the OIDC application's allowed list.
+
+    Examples:
+
+        vrg oidc group remove partner-portal platform-eng
+        vrg oidc group remove partner-portal 12 -y
+        vrg oidc group remove 7 engineering -y
+
+    Accepts group name, group key, or ACL entry key — all three resolve
+    to the same underlying entry. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     app_key = _resolve_oidc_app(vctx.client, oidc_app)
     groups_mgr = vctx.client.oidc_applications.allowed_groups(app_key)

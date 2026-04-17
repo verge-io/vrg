@@ -17,8 +17,52 @@ from verge_cli.utils import confirm_action
 
 app = typer.Typer(
     name="diag",
-    help="Manage system diagnostic bundles.",
+    help=(
+        "Create and manage system diagnostic bundles.\n\n"
+        "A system diagnostic bundle is a comprehensive snapshot of cloud"
+        " state used for troubleshooting and support escalations — system"
+        " and kernel logs, hardware inventory (dmidecode, lspci, lshw,"
+        " SMART data), vSAN cluster and per-node state, network fabric"
+        " details, and container/tenant log collection. Bundles are"
+        " produced by the on-node `diagnostics` tool and stored on the"
+        " cluster under `/vsan/vol/tmp/diags/`. They can be sent directly"
+        " to Verge.io support from the CLI.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `name`, `status`, `timestamp`, `description`, `status_info`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List existing diagnostic bundles (newest first)\n"
+        "    vrg system diag list\n\n"
+        "    # Create a bundle and wait for completion (default)\n"
+        "    vrg system diag create support-2026-04-17 \\\n"
+        '        --description "vSAN rebalance investigation"\n\n'
+        "    # Create and auto-send to Verge.io support\n"
+        "    vrg system diag create support-2026-04-17 \\\n"
+        "        --send-to-support\n\n"
+        "    # Kick off the bundle but don't block\n"
+        "    vrg system diag create support-2026-04-17 --no-wait\n\n"
+        "    # Inspect a bundle's current state\n"
+        "    vrg -o json system diag get support-2026-04-17\n\n"
+        "    # Send an existing bundle to support\n"
+        "    vrg system diag send support-2026-04-17\n\n"
+        "    # Remove a bundle\n"
+        "    vrg system diag delete support-2026-04-17 --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Bundle creation can take several minutes on large clusters — it"
+        " touches every node and collects vSAN, hardware, and log data."
+        " Running without `--no-wait` streams a spinner and returns when"
+        " the bundle reaches a terminal state; the default timeout is 300"
+        " seconds.\n\n"
+        "Diagnostics are resolved by name or numeric key. If multiple"
+        " bundles share a name, name lookup fails with exit code 7"
+        " (conflict) — use the numeric key instead. `--send-to-support`"
+        " requires outbound connectivity from the cloud to Verge.io; on"
+        " air-gap systems, download the bundle from the UI and upload it"
+        " through the support portal."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
@@ -50,7 +94,17 @@ def _diag_to_dict(diag: Any) -> dict[str, Any]:
 @app.command("list")
 @handle_errors()
 def diag_list(ctx: typer.Context) -> None:
-    """List system diagnostic bundles."""
+    """List system diagnostic bundles.
+
+    Examples:
+
+        vrg system diag list
+        vrg -o json system diag list
+        vrg -o json system diag list | jq '.[] | select(.status == "error")'
+
+    Lists bundles newest-first. Useful `--query` fields: `name`,
+    `status`, `timestamp`, `description`, `status_info`.
+    """
     vctx = get_context(ctx)
     diags = vctx.client.system_diagnostics.list()
     data = [_diag_to_dict(d) for d in diags]
@@ -85,8 +139,19 @@ def diag_create(
 ) -> None:
     """Create a new system diagnostic bundle.
 
-    By default, waits for the bundle to complete. Use --no-wait to
-    return immediately and check status later with `vrg system diag get`.
+    Examples:
+
+        vrg system diag create support-2026-04-17
+        vrg system diag create support-2026-04-17 \\
+            --description "vSAN rebalance investigation"
+        vrg system diag create support-2026-04-17 --send-to-support
+        vrg system diag create support-2026-04-17 --no-wait
+
+    Bundle creation can take several minutes on large clusters — it
+    touches every node and collects vSAN, hardware, and log data. By
+    default, waits for completion (300s timeout) with a spinner. Use
+    `--no-wait` to return immediately and poll status later with
+    `vrg system diag get`.
     """
     vctx = get_context(ctx)
 
@@ -124,7 +189,17 @@ def diag_get(
     ctx: typer.Context,
     name_or_key: Annotated[str, typer.Argument(help="Diagnostic name or numeric key")],
 ) -> None:
-    """Show details for a diagnostic bundle."""
+    """Show details for a diagnostic bundle.
+
+    Examples:
+
+        vrg system diag get support-2026-04-17
+        vrg system diag get 42
+        vrg -o json system diag get support-2026-04-17
+
+    Accepts bundle name or numeric `$key`. Ambiguous name matches
+    exit with code 7 — use the key instead.
+    """
     vctx = get_context(ctx)
     diag = _resolve_diag(vctx, name_or_key)
     data = _diag_to_dict(diag)
@@ -144,7 +219,17 @@ def diag_send(
     ctx: typer.Context,
     name_or_key: Annotated[str, typer.Argument(help="Diagnostic name or numeric key")],
 ) -> None:
-    """Send a diagnostic bundle to Verge.io support."""
+    """Send a diagnostic bundle to Verge.io support.
+
+    Examples:
+
+        vrg system diag send support-2026-04-17
+        vrg system diag send 42
+
+    Requires outbound connectivity from the cloud to Verge.io. On
+    air-gap systems, download the bundle from the UI and upload it
+    through the support portal instead.
+    """
     vctx = get_context(ctx)
     diag = _resolve_diag(vctx, name_or_key)
 
@@ -167,7 +252,18 @@ def diag_delete(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Delete a diagnostic bundle."""
+    """Delete a diagnostic bundle.
+
+    Examples:
+
+        vrg system diag delete support-2026-04-17
+        vrg system diag delete support-2026-04-17 --yes
+        vrg system diag delete 42 -y
+
+    Destructive — removes the bundle files from
+    `/vsan/vol/tmp/diags/`. Pass `--yes` / `-y` to skip the
+    confirmation prompt (useful in scripts).
+    """
     vctx = get_context(ctx)
     diag = _resolve_diag(vctx, name_or_key)
 

@@ -19,9 +19,52 @@ if TYPE_CHECKING:
 
 app = typer.Typer(
     name="doctor",
-    help="Check system health against best practices.",
+    help=(
+        "Run a scripted health audit against the current cloud.\n\n"
+        "`vrg doctor` is the fastest way to answer *\"is this VergeOS cloud"
+        " OK right now?\"*. It sweeps the core subsystems — connectivity,"
+        " clusters, nodes, storage tiers, active alarms, update state,"
+        " version consistency across nodes, fabric links, network"
+        " dashboard, certificates, licenses, physical drive SMART and vSAN"
+        " errors, DIMM health, vSAN journal/tier status, and pending driver"
+        " reloads — and reports each as `pass`, `warn`, `fail`, or"
+        " `skip`. Use it first when triaging an issue or before a change"
+        " window.\n\n"
+        "Each check runs in isolation: an exception in one check is"
+        " captured as `fail` and the rest continue. Exit code is `1` if"
+        " any check returns `fail`, otherwise `0` — safe to use in CI and"
+        " agent pre-flight scripts. Use `-o json` for structured output;"
+        " useful fields to `--query`: `name`, `status`, `message`,"
+        " `details`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Run every check (table output with colored summary line)\n"
+        "    vrg doctor\n\n"
+        "    # Structured output for agents / scripts\n"
+        "    vrg -o json doctor\n"
+        "    vrg -o json doctor | jq '.[] | select(.status == \"fail\")'\n\n"
+        "    # Pre-flight: only run the fast checks\n"
+        "    vrg doctor --check connectivity,alarms,updates\n\n"
+        "    # Hardware triage: drives, memory, vSAN journal\n"
+        "    vrg doctor --check drive_smart,dimm_health,vsan_journal\n\n"
+        "    # Discover available check names\n"
+        "    vrg doctor --list-checks\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Checks are additive to `vrg alarm list` and `vrg system diag`, not"
+        " a replacement. Alarms tell you what the platform has already"
+        " flagged; doctor also verifies things the platform does not raise"
+        " alarms for (version drift across nodes, certificate/license"
+        " expiry windows, pending driver reloads).\n\n"
+        "A `warn` status does not change the exit code — only `fail` does."
+        " Treat warnings as things to schedule, failures as things to fix"
+        " now. Running doctor requires admin-level credentials on the"
+        " provider cloud; tenant-scoped profiles will skip or fail checks"
+        " that need cloud-root access."
+    ),
     invoke_without_command=True,
     no_args_is_help=False,
+    rich_markup_mode="markdown",
 )
 
 # ---------------------------------------------------------------------------

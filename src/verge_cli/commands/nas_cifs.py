@@ -14,8 +14,72 @@ from verge_cli.utils import confirm_action, resolve_nas_resource
 
 app = typer.Typer(
     name="cifs",
-    help="Manage NAS CIFS (SMB) shares.",
+    help=(
+        "Manage CIFS/SMB shares — Samba exports layered on top of a NAS"
+        " volume.\n\n"
+        "A CIFS share is a child record of a volume (`volume_cifs_shares`"
+        " schema table; cascade-deletes with the parent). Samba serves it as an"
+        " SMB-compatible export consumable from Windows, macOS, and Linux."
+        " Multiple shares can target the same volume to expose different"
+        " subpaths with different access rules.\n\n"
+        "Access is layered: `valid_users` / `valid_groups` gate who can"
+        " authenticate; `admin_users` / `admin_groups` grant elevated rights"
+        " inside the share; `allowed_hosts` / `denied_hosts` filter by"
+        " hostname, IP, domain, netgroup, or subnet prefix. If both valid user"
+        " and valid group lists are empty and `guest_ok` is false, the share"
+        " is inaccessible. `force_user` / `force_group` run every file"
+        " operation as a fixed identity regardless of who connected — useful"
+        " for shared-drop-box semantics.\n\n"
+        "`--shadow-copy` wires the share into Windows Explorer's *Previous"
+        " Versions* pane by binding the parent volume's snapshots under"
+        " `.snapshots`. The parent volume also needs `automount_snapshots`"
+        " enabled — set that on the volume, not here.\n\n"
+        "Shares are referenced by name or hex `$key`. Ambiguous names exit"
+        " with code 7 — disambiguate with the key. Use `-o json` for"
+        " machine-readable output.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all CIFS shares, or filter by volume / enabled state\n"
+        "    vrg nas cifs list\n"
+        "    vrg nas cifs list --volume shared-data\n"
+        "    vrg nas cifs list --enabled\n\n"
+        "    # Get one share as JSON for scripting / agents\n"
+        "    vrg -o json nas cifs get smb-share\n\n"
+        "    # Create a basic share on an existing volume\n"
+        "    vrg nas cifs create \\\n"
+        "        --volume shared-data --name smb-share \\\n"
+        "        --description 'Team drop-box' --browseable\n\n"
+        "    # Locked-down share — specific users + host allow-list\n"
+        "    vrg nas cifs create \\\n"
+        "        --volume finance --name finance-smb \\\n"
+        "        --valid-groups 'finance,accounting' \\\n"
+        "        --admin-users 'cfo' \\\n"
+        "        --allowed-hosts '10.10.0.0/24,10.20.0.0/24'\n\n"
+        "    # Enable Windows Previous Versions via shadow copy\n"
+        "    vrg nas cifs create \\\n"
+        "        --volume shared-data --name smb-share --shadow-copy\n\n"
+        "    # Toggle availability without destroying config\n"
+        "    vrg nas cifs disable smb-share\n"
+        "    vrg nas cifs enable smb-share\n\n"
+        "    # Delete a share (volume data is retained)\n"
+        "    vrg nas cifs delete smb-share --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The parent NAS service VM **must be running** and the parent volume"
+        " must be `online` for a CIFS share to serve clients. Shares on a"
+        " stopped service stay in `offline` / `needsrefresh` regardless of"
+        " their own enabled state.\n\n"
+        "Config changes to an active share transition it to `needsrefresh`"
+        " — toggle `disable` then `enable` (or run `update` and then"
+        " re-enable) to apply. Brief disconnects are expected; warn connected"
+        " users or schedule off-hours where practical.\n\n"
+        "The `--volume` binding is **immutable** after creation — to move a"
+        " share to a different volume, delete and recreate it. Comma-separated"
+        " list options (`--valid-users`, `--allowed-hosts`, etc.) replace the"
+        " entire list; there is no incremental add/remove."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 NAS_CIFS_COLUMNS: list[ColumnDef] = [
@@ -86,7 +150,15 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled state"),
     ] = None,
 ) -> None:
-    """List all CIFS shares."""
+    """List all CIFS shares.
+
+    **Examples:**
+
+        vrg nas cifs list
+        vrg nas cifs list --volume shared-data
+        vrg nas cifs list --enabled
+        vrg -o json nas cifs list
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if volume is not None:
@@ -113,7 +185,13 @@ def get_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="CIFS share name or hex key")],
 ) -> None:
-    """Get details of a CIFS share."""
+    """Get details of a CIFS share.
+
+    **Examples:**
+
+        vrg nas cifs get smb-share
+        vrg -o json nas cifs get smb-share
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.cifs_shares, share, "CIFS share")
     item = vctx.client.cifs_shares.get(key=key)
@@ -197,7 +275,20 @@ def create_cmd(
         typer.Option("--shadow-copy", help="Enable shadow copy"),
     ] = False,
 ) -> None:
-    """Create a new CIFS share."""
+    """Create a new CIFS share.
+
+    Exposes a directory on a NAS volume over SMB. Users and groups for
+    `--valid-users`, `--admin-users`, etc. are NAS local users (managed
+    via `vrg nas user`) or AD principals if the service is domain-joined.
+    Hosts in `--allowed-hosts` / `--denied-hosts` accept CIDR notation.
+
+    **Examples:**
+
+        vrg nas cifs create --volume shared-data --name smb-share
+        vrg nas cifs create --volume shared-data --name guests --guest-ok --read-only
+        vrg nas cifs create --volume shared-data --name team \\
+            --valid-groups engineering --admin-users admin --allowed-hosts 10.0.0.0/24
+    """
     vctx = get_context(ctx)
 
     # Resolve volume name to key
@@ -317,7 +408,17 @@ def update_cmd(
         typer.Option("--shadow-copy/--no-shadow-copy", help="Enable/disable shadow copy"),
     ] = None,
 ) -> None:
-    """Update a CIFS share."""
+    """Update a CIFS share.
+
+    Any option not supplied is left unchanged. Comma-separated list
+    options replace the existing list rather than appending.
+
+    **Examples:**
+
+        vrg nas cifs update smb-share --comment "Shared team drive"
+        vrg nas cifs update smb-share --read-only
+        vrg nas cifs update smb-share --valid-groups engineering,ops
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.cifs_shares, share, "CIFS share")
 
@@ -364,7 +465,16 @@ def delete_cmd(
     share: Annotated[str, typer.Argument(help="CIFS share name or hex key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a CIFS share (data is retained on volume)."""
+    """Delete a CIFS share (data is retained on volume).
+
+    Removes the SMB export only — the underlying directory and files on
+    the volume are kept.
+
+    **Examples:**
+
+        vrg nas cifs delete smb-share
+        vrg nas cifs delete smb-share --yes
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.cifs_shares, share, "CIFS share")
 
@@ -382,7 +492,12 @@ def enable_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="CIFS share name or hex key")],
 ) -> None:
-    """Enable a CIFS share."""
+    """Enable a CIFS share.
+
+    **Examples:**
+
+        vrg nas cifs enable smb-share
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.cifs_shares, share, "CIFS share")
     vctx.client.cifs_shares.enable(key)
@@ -395,7 +510,15 @@ def disable_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="CIFS share name or hex key")],
 ) -> None:
-    """Disable a CIFS share."""
+    """Disable a CIFS share.
+
+    Stops serving the share without deleting it. Data remains on the
+    volume.
+
+    **Examples:**
+
+        vrg nas cifs disable smb-share
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.cifs_shares, share, "CIFS share")
     vctx.client.cifs_shares.disable(key)

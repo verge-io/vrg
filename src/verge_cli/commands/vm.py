@@ -16,8 +16,64 @@ from verge_cli.utils import confirm_action, resolve_resource_id, wait_for_state
 
 app = typer.Typer(
     name="vm",
-    help="Manage virtual machines.",
+    help=(
+        "Manage virtual machines (VMs) on VergeOS.\n\n"
+        "A VergeOS VM is a KVM-based virtual machine managed by the VergeHV"
+        " hypervisor. VMs have **drives** (virtual disks on vSAN tiers),"
+        " **NICs** (attached to virtual networks), and optional **devices**"
+        " (e.g., TPM). They support live migration between nodes, snapshots,"
+        " cloning, hibernation, and template-based creation from `.vrg.yaml`"
+        " files.\n\n"
+        "VMs are identified by **name** or **numeric key** in every command"
+        " that accepts a VM argument. Use `vrg vm list` to see available VMs"
+        " with their keys.\n\n"
+        "Subresources have their own groups: `vrg vm drive`, `vrg vm nic`,"
+        " `vrg vm device`, `vrg vm snapshot`, `vrg vm export`, and"
+        " `vrg vm import`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all VMs\n"
+        "    vrg vm list\n\n"
+        "    # List only running VMs\n"
+        "    vrg vm list --status running\n\n"
+        "    # Get VM details as JSON\n"
+        "    vrg -o json vm get web-01\n\n"
+        "    # Create a VM inline\n"
+        "    vrg vm create --name web-03 --ram 4096 --cpu 4\n\n"
+        "    # Create from a template\n"
+        "    vrg vm create -f web-server.vrg.yaml --set name=web-03\n\n"
+        "    # Validate a template without creating\n"
+        "    vrg vm validate -f web-server.vrg.yaml\n\n"
+        "    # Lifecycle operations\n"
+        "    vrg vm start web-01\n"
+        "    vrg vm stop web-01\n"
+        "    vrg vm restart web-01\n\n"
+        "    # Live-migrate to another node\n"
+        "    vrg vm migrate web-01 --node node-2\n\n"
+        "    # Clone a VM\n"
+        "    vrg vm clone web-01 --name web-01-copy\n\n"
+        "    # Manage drives and NICs\n"
+        "    vrg vm drive list web-01\n"
+        "    vrg vm drive create web-01 --size 50GB --tier 2\n"
+        "    vrg vm nic create web-01 --network internal-net\n\n"
+        "    # Take a snapshot\n"
+        "    vrg vm snapshot create web-01 --name before-upgrade\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "VMs are referenced by name or numeric key (`$key`). When a name"
+        " matches multiple VMs, vrg prints all matches and exits with code 7."
+        " Use the numeric key to disambiguate.\n\n"
+        "`restart` performs a graceful shutdown followed by power-on. Use"
+        " `reset` for a hard reset (equivalent to the physical reset button)."
+        " `stop` requests an ACPI shutdown; add `--force` to power off"
+        " immediately without guest cooperation.\n\n"
+        "Templates (`.vrg.yaml`) support variable substitution with `--set`"
+        " and batch creation. Use `--dry-run` with `vrg vm create -f` to"
+        " preview resources without applying them. See `vrg vm validate` for"
+        " schema-only checks."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 app.add_typer(vm_device.app, name="device")
@@ -41,7 +97,21 @@ def vm_list(
         typer.Option("--filter", help="OData filter expression (e.g., \"name eq 'foo'\")"),
     ] = None,
 ) -> None:
-    """List virtual machines."""
+    """List virtual machines.
+
+    Returns every VM visible to the current session. Use `--status` to filter
+    by lifecycle state (`running`, `stopped`, `error`, ...) or `--filter` to
+    pass an arbitrary OData expression. Combine with `-A` to list across every
+    configured profile.
+
+    **Examples:**
+
+        vrg vm list
+        vrg vm list --status running
+        vrg vm list --filter "cpu_cores gt 4"
+        vrg -o json vm list | jq '.[] | select(.running)'
+        vrg -A vm list
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.vms.list(), _vm_to_dict, VM_COLUMNS)
         return
@@ -74,7 +144,19 @@ def vm_get(
     ctx: typer.Context,
     vm: Annotated[str, typer.Argument(help="VM name or key")],
 ) -> None:
-    """Get details of a virtual machine."""
+    """Get details for a single virtual machine.
+
+    Accepts a VM name or numeric key. Use `-o json` or `-o wide` for the full
+    attribute set; the default table view shows the columns documented in
+    `vrg vm list --help`.
+
+    **Examples:**
+
+        vrg vm get web-01
+        vrg vm get 42
+        vrg -o json vm get web-01
+        vrg -o json --query status vm get web-01
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -109,7 +191,26 @@ def vm_create(
     ] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show plan without creating")] = False,
 ) -> None:
-    """Create a new virtual machine (inline or from template)."""
+    """Create a new virtual machine, inline or from a `.vrg.yaml` template.
+
+    Inline creation takes flags (`--name`, `--ram`, `--cpu`, ...) and produces
+    a minimal VM with no drives or NICs — attach those afterwards with
+    `vrg vm drive create` / `vrg vm nic create`. Template-based creation
+    provisions drives, NICs, and devices in one operation; `--set` overrides
+    individual values and `--dry-run` prints the plan without touching the
+    cluster.
+
+    **Examples:**
+
+        # Inline
+        vrg vm create --name web-03 --ram 4096 --cpu 4
+        vrg vm create --name dev-01 --ram 2048 --cpu 2 --os linux
+
+        # From template
+        vrg vm create -f web-server.vrg.yaml
+        vrg vm create -f web-server.vrg.yaml --set name=web-03 --set ram=8192
+        vrg vm create -f web-server.vrg.yaml --dry-run
+    """
     if file:
         _create_from_template(ctx, file, set_overrides or [], dry_run)
     else:
@@ -228,7 +329,19 @@ def vm_update(
         typer.Option("--description", "-d", help="VM description"),
     ] = None,
 ) -> None:
-    """Update a virtual machine."""
+    """Update a virtual machine's basic attributes.
+
+    Only the flags you supply are changed; everything else stays as-is.
+    CPU and RAM changes typically require a VM restart to take effect — check
+    `needs_restart` on the returned object.
+
+    **Examples:**
+
+        vrg vm update web-01 --ram 8192
+        vrg vm update web-01 --cpu 8 --ram 16384
+        vrg vm update web-01 --name web-01-renamed
+        vrg vm update 42 --description "Production web frontend"
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -269,7 +382,19 @@ def vm_delete(
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
     force: Annotated[bool, typer.Option("--force", "-f", help="Force delete running VM")] = False,
 ) -> None:
-    """Delete a virtual machine."""
+    """Delete a virtual machine.
+
+    Prompts for confirmation unless `--yes` is passed. Running VMs are
+    refused (exit 7) unless `--force` is also given, which powers the VM off
+    before deletion. Deletion removes the VM and all its drives — snapshots
+    on shared storage may still be retained per snapshot-profile policy.
+
+    **Examples:**
+
+        vrg vm delete web-01
+        vrg vm delete web-01 --yes
+        vrg vm delete web-01 --force --yes
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -296,7 +421,18 @@ def vm_start(
     wait: Annotated[bool, typer.Option("--wait", "-w", help="Wait for VM to start")] = False,
     timeout: Annotated[int, typer.Option("--timeout", help="Wait timeout in seconds")] = 300,
 ) -> None:
-    """Start a virtual machine."""
+    """Power on a virtual machine.
+
+    Returns as soon as the start request is accepted. Use `--wait` to block
+    until the VM reaches the `running` state (or `--timeout` seconds elapse,
+    defaulting to 300). If the VM is already running, the command is a no-op.
+
+    **Examples:**
+
+        vrg vm start web-01
+        vrg vm start web-01 --wait
+        vrg vm start web-01 --wait --timeout 60
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -331,7 +467,20 @@ def vm_stop(
     wait: Annotated[bool, typer.Option("--wait", "-w", help="Wait for VM to stop")] = False,
     timeout: Annotated[int, typer.Option("--timeout", help="Wait timeout in seconds")] = 300,
 ) -> None:
-    """Stop a virtual machine."""
+    """Stop a virtual machine.
+
+    Issues an ACPI shutdown by default so the guest OS can shut down cleanly.
+    Pass `--force` to power off immediately without guest cooperation (the
+    equivalent of pulling the power cord). Use `--wait` to block until the
+    VM reaches `stopped` / `offline`.
+
+    **Examples:**
+
+        vrg vm stop web-01
+        vrg vm stop web-01 --wait
+        vrg vm stop web-01 --force
+        vrg vm stop web-01 --force --wait --timeout 60
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -368,8 +517,16 @@ def vm_restart(
 ) -> None:
     """Restart a virtual machine (graceful stop then start).
 
-    This performs a graceful shutdown followed by power on. For a hard reset
-    (like pressing the reset button), use 'vrg vm reset' instead.
+    Performs an ACPI shutdown, waits for the VM to reach `stopped`, then
+    powers it back on. For a hard reset (equivalent to pressing the physical
+    reset button), use `vrg vm reset` instead. `--timeout` is split evenly
+    across the stop and start phases.
+
+    **Examples:**
+
+        vrg vm restart web-01
+        vrg vm restart web-01 --wait
+        vrg vm restart web-01 --wait --timeout 600
     """
     vctx = get_context(ctx)
 
@@ -419,7 +576,17 @@ def vm_reset(
     vm: Annotated[str, typer.Argument(help="VM name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Hard reset a virtual machine (like pressing the reset button)."""
+    """Hard-reset a virtual machine (equivalent to pressing the reset button).
+
+    Unlike `vrg vm restart`, no ACPI shutdown is attempted — the guest OS
+    receives no warning. Prefer `restart` whenever possible; use `reset` only
+    when the guest is unresponsive. Prompts for confirmation unless `--yes`.
+
+    **Examples:**
+
+        vrg vm reset web-01
+        vrg vm reset web-01 --yes
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -452,7 +619,18 @@ def vm_validate(
         typer.Option("--set", help="Override template values (key.path=value)"),
     ] = None,
 ) -> None:
-    """Validate a VM template file without creating anything."""
+    """Validate a `.vrg.yaml` template without creating any resources.
+
+    Loads the template, applies `--set` overrides, and runs schema validation
+    only — no API calls are made. Use this in CI to catch syntax, schema, and
+    variable-substitution errors before invoking `vrg vm create -f`. Exits 8
+    on validation failure.
+
+    **Examples:**
+
+        vrg vm validate -f web-server.vrg.yaml
+        vrg vm validate -f web-server.vrg.yaml --set name=web-03
+    """
     from verge_cli.template.loader import load_template
     from verge_cli.template.schema import ValidationError, validate_template
 
@@ -477,7 +655,19 @@ def vm_clone(
         bool, typer.Option("--preserve-macs", help="Preserve MAC addresses")
     ] = False,
 ) -> None:
-    """Clone a virtual machine."""
+    """Clone a virtual machine, including its drives and NIC configuration.
+
+    A clone is a full copy — the new VM has independent drives based on the
+    source's current contents. By default, NIC MAC addresses are regenerated
+    to avoid conflicts on the same network; pass `--preserve-macs` to keep
+    them (useful when replacing a VM on the same IP). The source VM can be
+    running; the clone starts powered off.
+
+    **Examples:**
+
+        vrg vm clone web-01 --name web-01-copy
+        vrg vm clone web-01 --name web-02 --preserve-macs
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -506,7 +696,19 @@ def vm_migrate(
         typer.Option("--node", help="Target node name or key"),
     ] = None,
 ) -> None:
-    """Live migrate a virtual machine to another node."""
+    """Live-migrate a running virtual machine to another node.
+
+    The VM keeps running throughout — its memory state is streamed to the
+    target node, then execution switches over with no guest-visible
+    downtime. Without `--node`, the scheduler picks a target. The VM must
+    be in the `running` state; stopped VMs cannot be migrated.
+
+    **Examples:**
+
+        vrg vm migrate web-01
+        vrg vm migrate web-01 --node node-2
+        vrg vm migrate 42 --node 3
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -530,7 +732,18 @@ def vm_hibernate(
     ctx: typer.Context,
     vm: Annotated[str, typer.Argument(help="VM name or key")],
 ) -> None:
-    """Hibernate a virtual machine (save memory to disk and power off)."""
+    """Hibernate a virtual machine (save memory to disk, then power off).
+
+    The VM's RAM is written to a hibernation file and the VM is powered off.
+    A subsequent `vrg vm start` resumes execution from the saved state rather
+    than booting the guest. Useful for freeing node resources without losing
+    in-memory work. The VM must be running.
+
+    **Examples:**
+
+        vrg vm hibernate web-01
+        vrg vm hibernate 42
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -551,7 +764,18 @@ def vm_tag(
     vm: Annotated[str, typer.Argument(help="VM name or key")],
     tag: Annotated[str, typer.Argument(help="Tag name or key")],
 ) -> None:
-    """Add a tag to a virtual machine."""
+    """Attach a tag to a virtual machine.
+
+    Tags are free-form labels managed under `vrg tag` and grouped by
+    `vrg tag-category`. A VM may carry multiple tags; use them for
+    environment, owner, role, or policy selectors.
+
+    **Examples:**
+
+        vrg vm tag web-01 production
+        vrg vm tag web-01 env:prod
+        vrg vm tag 42 owner:team-a
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -570,7 +794,16 @@ def vm_untag(
     vm: Annotated[str, typer.Argument(help="VM name or key")],
     tag: Annotated[str, typer.Argument(help="Tag name or key")],
 ) -> None:
-    """Remove a tag from a virtual machine."""
+    """Remove a tag from a virtual machine.
+
+    Silently does nothing if the tag is not attached. The tag itself is not
+    deleted — use `vrg tag delete` for that.
+
+    **Examples:**
+
+        vrg vm untag web-01 production
+        vrg vm untag 42 env:prod
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -588,7 +821,16 @@ def vm_favorite(
     ctx: typer.Context,
     vm: Annotated[str, typer.Argument(help="VM name or key")],
 ) -> None:
-    """Mark a virtual machine as a favorite."""
+    """Mark a virtual machine as a favorite for the current user.
+
+    Favorites are a per-user UI convenience and appear pinned in the VergeOS
+    web console. They have no effect on scheduling, permissions, or policy.
+
+    **Examples:**
+
+        vrg vm favorite web-01
+        vrg vm favorite 42
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -604,7 +846,13 @@ def vm_unfavorite(
     ctx: typer.Context,
     vm: Annotated[str, typer.Argument(help="VM name or key")],
 ) -> None:
-    """Remove a virtual machine from favorites."""
+    """Remove a virtual machine from the current user's favorites.
+
+    **Examples:**
+
+        vrg vm unfavorite web-01
+        vrg vm unfavorite 42
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")
@@ -620,7 +868,18 @@ def vm_console(
     ctx: typer.Context,
     vm: Annotated[str, typer.Argument(help="VM name or key")],
 ) -> None:
-    """Get console connection info for a virtual machine."""
+    """Get VNC console connection info for a virtual machine.
+
+    Returns the host, port, and one-time password needed to open a VNC
+    session against the VM's framebuffer. The VM must be running. The
+    credentials are single-use and short-lived — treat the output as a
+    secret and connect promptly.
+
+    **Examples:**
+
+        vrg vm console web-01
+        vrg -o json vm console web-01
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.vms, vm, "VM")

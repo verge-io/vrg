@@ -16,7 +16,62 @@ from verge_cli.utils import confirm_action
 
 app = typer.Typer(
     name="resource-group",
-    help="Manage resource groups for device passthrough.",
+    help=(
+        "Manage resource groups for physical device passthrough on VergeOS.\n\n"
+        "**Resource groups** bundle physical host devices — PCI cards, USB"
+        " devices, host GPUs, NVIDIA vGPU profiles, or SR-IOV NIC virtual"
+        " functions — into named pools that can be attached to VMs. When a"
+        " VM requests a device from a group, the scheduler picks a free"
+        " member on a node capable of hosting the workload.\n\n"
+        "Five device types are supported: `pci` (generic PCI passthrough),"
+        " `usb` (USB device passthrough), `host-gpu` (full-GPU PCI"
+        " passthrough, `max_instances=1` per GPU), `nvidia-vgpu` (NVIDIA"
+        " vGPU time-slicing across multiple VMs — requires a licensed host"
+        " driver uploaded as a custom driver), and `sriov-nic` (SR-IOV"
+        " virtual functions carved out of a physical NIC).\n\n"
+        "Resource groups are **not** the same thing as tags. Tags"
+        " (`vrg tag`) are metadata labels for classification; resource"
+        " groups allocate real hardware. PCI passthrough and full-GPU"
+        " passthrough prevent live migration — the physical device is"
+        " exclusively bound to one VM on one node.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every resource group\n"
+        "    vrg resource-group list\n\n"
+        "    # Machine-readable output for agents\n"
+        "    vrg -o json resource-group list\n\n"
+        "    # Narrow by device type or class\n"
+        "    vrg resource-group list --type host-gpu\n"
+        "    vrg resource-group list --class gpu --enabled\n\n"
+        "    # Inspect a single group (UUID or name)\n"
+        "    vrg resource-group get gpu-pool\n"
+        "    vrg -o json resource-group get gpu-pool\n\n"
+        "    # Create a GPU passthrough pool\n"
+        "    vrg resource-group create --name gpu-pool --type host-gpu \\\n"
+        "        --description 'Full GPUs for AI workloads'\n\n"
+        "    # Create an NVIDIA vGPU pool (driver file is required)\n"
+        "    vrg resource-group create --name vgpu-pool --type nvidia-vgpu \\\n"
+        "        --driver-file 42 --vgpu-profile 7 --make-guest-driver-iso\n\n"
+        "    # Create an SR-IOV NIC pool with 8 virtual functions\n"
+        "    vrg resource-group create --name sriov-pool --type sriov-nic \\\n"
+        "        --vf-count 8 --native-vlan 100\n\n"
+        "    # Disable a pool without deleting it\n"
+        "    vrg resource-group update gpu-pool --no-enabled\n\n"
+        "    # Delete a pool (prompts unless --yes)\n"
+        "    vrg resource-group delete gpu-pool --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Resource groups are referenced by **UUID** or **name**. Ambiguous"
+        " name resolution exits with code 7.\n\n"
+        "PCI and host-GPU passthrough require `iommu=true` on the node and"
+        " IOMMU/VT-d enabled in BIOS. NVIDIA vGPU requires the licensed"
+        " host driver installed as a custom driver (and a node reboot to"
+        " activate). See `vrg node` and the node lifecycle docs.\n\n"
+        "VMs with PCI or full-GPU devices **cannot be live migrated** —"
+        " the device is exclusively bound. NVIDIA vGPU live migration is"
+        " experimental and gated on `allow_vgpu_migration`."
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
@@ -98,7 +153,19 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled/disabled status."),
     ] = None,
 ) -> None:
-    """List resource groups."""
+    """List resource groups.
+
+    Examples:
+
+        vrg resource-group list
+        vrg resource-group list --type host-gpu
+        vrg resource-group list --class gpu --enabled
+        vrg -o json resource-group list | jq '.[] | select(.enabled) | .name'
+
+    Useful `--query` fields: `name`, `device_type`, `device_class`,
+    `enabled`, `resource_count`. `--type` accepts `pci`, `usb`,
+    `host-gpu`, `nvidia-vgpu`, `sriov-nic`.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(
             ctx, lambda c: c.resource_groups.list(), _group_to_dict, RESOURCE_GROUP_COLUMNS
@@ -144,7 +211,17 @@ def get_cmd(
     ctx: typer.Context,
     group: Annotated[str, typer.Argument(help="Resource group UUID or name.")],
 ) -> None:
-    """Get a resource group by UUID or name."""
+    """Get a resource group by UUID or name.
+
+    Examples:
+
+        vrg resource-group get gpu-pool
+        vrg -o json resource-group get gpu-pool
+        vrg resource-group get 550e8400-e29b-41d4-a716-446655440000
+
+    Accepts either the group's UUID (`$key`) or name. Ambiguous names
+    exit with code 7 — use the UUID to disambiguate.
+    """
     vctx = get_context(ctx)
     uuid_key = _resolve_resource_group(vctx.client, group)
     item = vctx.client.resource_groups.get(uuid_key)
@@ -220,7 +297,31 @@ def create_cmd(
         typer.Option("--native-vlan", help="Native VLAN tag (sriov-nic type)."),
     ] = None,
 ) -> None:
-    """Create a new resource group."""
+    """Create a new resource group.
+
+    Examples:
+
+        # Full-GPU passthrough pool for AI workloads
+        vrg resource-group create --name gpu-pool --type host-gpu \\
+            --description "Full GPUs for AI workloads"
+
+        # NVIDIA vGPU pool (driver file key required)
+        vrg resource-group create --name vgpu-pool --type nvidia-vgpu \\
+            --driver-file 42 --vgpu-profile 7 --make-guest-driver-iso
+
+        # SR-IOV NIC pool with 8 virtual functions
+        vrg resource-group create --name sriov-pool --type sriov-nic \\
+            --vf-count 8 --native-vlan 100
+
+        # USB passthrough with guest-initiated reset allowed
+        vrg resource-group create --name usb-pool --type usb \\
+            --allow-guest-reset
+
+    Device-type-specific flags only apply to their type and are
+    ignored elsewhere. `nvidia-vgpu` requires `--driver-file` (the key
+    of a previously uploaded licensed driver). `pci` and `host-gpu`
+    require IOMMU/VT-d enabled on each candidate node.
+    """
     vctx = get_context(ctx)
 
     # Validate device type
@@ -323,7 +424,24 @@ def update_cmd(
         typer.Option("--enabled/--no-enabled", help="Enable or disable."),
     ] = None,
 ) -> None:
-    """Update a resource group."""
+    """Update a resource group.
+
+    Examples:
+
+        # Disable without deleting
+        vrg resource-group update gpu-pool --no-enabled
+
+        # Rename and re-describe
+        vrg resource-group update gpu-pool --name ai-gpu-pool \\
+            --description "Reserved for AI training"
+
+        # Re-enable after a config change
+        vrg resource-group update gpu-pool --enabled
+
+    Only name, description, and enabled state are editable here. To
+    change device type or device-type-specific options, delete and
+    recreate the group.
+    """
     vctx = get_context(ctx)
     uuid_key = _resolve_resource_group(vctx.client, group)
 
@@ -361,7 +479,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a resource group."""
+    """Delete a resource group.
+
+    Examples:
+
+        vrg resource-group delete gpu-pool
+        vrg resource-group delete gpu-pool --yes
+
+    Destructive: VMs that reference this group for device
+    passthrough will fail to schedule on their next start. Detach
+    the group from each VM first, or confirm no VMs depend on it.
+    """
     vctx = get_context(ctx)
     uuid_key = _resolve_resource_group(vctx.client, group)
 

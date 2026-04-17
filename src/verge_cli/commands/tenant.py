@@ -23,8 +23,71 @@ from verge_cli.utils import confirm_action, resolve_resource_id, wait_for_state
 
 app = typer.Typer(
     name="tenant",
-    help="Manage tenants.",
+    help=(
+        "Manage tenants on VergeOS.\n\n"
+        "A **tenant** is a complete, nested VergeOS instance running inside a"
+        " host system — not a namespace partition or lightweight container."
+        " Each tenant runs genuine VergeOS software on virtual nodes (VMs on"
+        " the host cluster) with its own virtual networks, storage quotas,"
+        " user database, and management UI. From the tenant's view it is an"
+        " independent VergeOS environment; from the host's view it is a"
+        " resource-governed child system.\n\n"
+        "A single host can run up to **4,000 tenants**. Each tenant can host"
+        " its own sub-tenants (nested multi-tenancy). Tenants cannot see or"
+        " interact with each other — isolation is enforced at the network,"
+        " storage, and compute layers.\n\n"
+        "Subresources have their own groups: `vrg tenant node` (virtual"
+        " compute nodes), `vrg tenant storage` (per-tier quotas),"
+        " `vrg tenant net-block` / `ext-ip` / `l2` (networking), `vrg tenant"
+        " share` (shared objects), `vrg tenant snapshot` (point-in-time"
+        " captures), and `vrg tenant stats` / `logs` (observability).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all tenants\n"
+        "    vrg tenant list\n\n"
+        "    # Get tenant details as JSON\n"
+        "    vrg -o json tenant get acme-corp\n\n"
+        "    # Create a tenant\n"
+        "    vrg tenant create --name acme-corp --description 'ACME Corp VDC'\n\n"
+        "    # Lifecycle operations\n"
+        "    vrg tenant start acme-corp\n"
+        "    vrg tenant stop acme-corp\n"
+        "    vrg tenant restart acme-corp\n\n"
+        "    # View tenant resource usage\n"
+        "    vrg tenant stats current acme-corp\n\n"
+        "    # Manage tenant nodes and networking\n"
+        "    vrg tenant node list acme-corp\n"
+        "    vrg tenant net-block list acme-corp\n\n"
+        "    # Snapshot a tenant before a risky change\n"
+        "    vrg tenant snapshot create acme-corp --name before-migration\n"
+        "    vrg tenant snapshot list acme-corp\n\n"
+        "    # Clone a tenant (full duplicate including nodes and storage)\n"
+        "    vrg tenant clone acme-corp --name acme-corp-staging\n\n"
+        "    # Emergency network isolation (keeps VMs running, cuts network)\n"
+        "    vrg tenant isolate acme-corp --enable\n"
+        "    vrg tenant isolate acme-corp --disable\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Tenants are referenced by **name** or **numeric key** (`$key`). When"
+        " a name matches multiple tenants, vrg prints all matches and exits"
+        " with code 7. Use the numeric key to disambiguate.\n\n"
+        "Tenant status progresses `offline` → `starting` → `online` on power"
+        " on, and `online` → `stopping` → `offline` on power off. `reduced`"
+        " indicates the tenant is up with some nodes unavailable; `error` and"
+        " `nodesoffline` indicate failure states.\n\n"
+        "`stop` performs a graceful shutdown of every VM and service inside"
+        " the tenant. `reset` restarts all tenant nodes without a clean"
+        " shutdown — use only when graceful restart is unresponsive.\n\n"
+        "`isolate --enable` severs network connectivity while leaving node"
+        " VMs running — the fastest way to contain a tenant for security or"
+        " billing without the delay of a full shutdown. Isolation only"
+        " applies to non-snapshot tenants.\n\n"
+        "Deletion is blocked while a tenant is running or has active recipes"
+        " linked to it. Power the tenant off and detach recipes first, or"
+        " pass `--force` to override the running check."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 app.add_typer(tenant_node.app, name="node")
@@ -476,8 +539,26 @@ def tenant_isolate(
 
 crash_cart_app = typer.Typer(
     name="crash-cart",
-    help="Manage tenant crash carts.",
+    help=(
+        "Manage tenant crash carts — emergency console access to a tenant's"
+        " virtual nodes.\n\n"
+        "A **crash cart** is a temporary VNC console VM injected into a"
+        " tenant, giving the host operator direct keyboard/video access to"
+        " the tenant's nodes without requiring the tenant's network or UI"
+        " to be functional. Use when a tenant is unreachable and you need"
+        " to diagnose from inside.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg tenant crash-cart create acme-corp\n"
+        "    vrg tenant crash-cart create acme-corp --name debug-session\n"
+        "    vrg tenant crash-cart delete acme-corp -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Crash carts are scoped to a single tenant and should be deleted"
+        " after the emergency session. The tenant must be powered on."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 app.add_typer(crash_cart_app, name="crash-cart")
 

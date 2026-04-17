@@ -15,7 +15,56 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="api-key",
-    help="Manage API keys.",
+    help=(
+        "Manage long-lived API keys for programmatic VergeOS access.\n\n"
+        "API keys are scoped to a specific user account and carry their own"
+        " credential record — independent of the user's password and of other"
+        " keys on the same user. Each key can enforce its own `ip_allow_list`"
+        " and `ip_deny_list`, track its own `last_login`/`last_login_ip`, and"
+        " be revoked without disturbing the user's primary credentials.\n\n"
+        "Keys are intended for non-interactive clients: scripts, CI/CD"
+        " pipelines, and the `vrg` CLI itself. Deleting the parent user"
+        " cascades to every API key on that user.\n\n"
+        "Use `-o json` for machine-readable output. Filter lists server-side"
+        " with `--user`, or `--query` on fields like `name`, `user_name`,"
+        " `is_expired`, `expires`, `last_login`, `last_login_ip`,"
+        " `ip_allow_list`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all API keys\n"
+        "    vrg api-key list\n\n"
+        "    # List keys belonging to a specific user (by name or key)\n"
+        "    vrg api-key list --user deploy-bot\n\n"
+        "    # Get a single key as JSON\n"
+        "    vrg -o json api-key get 42\n\n"
+        "    # Look up a key by name (requires --user to disambiguate)\n"
+        "    vrg api-key get ci-pipeline --user deploy-bot\n\n"
+        "    # Create a key that expires in 90 days with an IP allow list\n"
+        "    vrg api-key create --user deploy-bot --name ci-pipeline \\\n"
+        "        --expires-in 90d --ip-allow 10.0.0.0/8,192.168.1.5\n\n"
+        "    # Delete a key without prompting\n"
+        "    vrg api-key delete 42 -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "**Secret shown once**: `create` prints the secret a single time at"
+        " creation. Capture it immediately — VergeOS does not store it in a"
+        " retrievable form and there is no recovery path. Re-issue a new key"
+        " if the secret is lost.\n\n"
+        "**Name lookups need `--user`**: `get` and `delete` accept either a"
+        " numeric key or a name. Name resolution requires `--user` because"
+        " the same key name can exist under different users; ambiguous"
+        " lookups exit with code 7.\n\n"
+        "**IP filtering is enforced before the request runs**: `--ip-allow`"
+        " and `--ip-deny` take comma-separated addresses or CIDR ranges and"
+        " are applied at the credential layer, before any API handler is"
+        " invoked. When both lists are set, the allow list is evaluated"
+        " first.\n\n"
+        "**Expiration**: `--expires-in` accepts shorthand durations"
+        " (`30d`, `1w`, `3m`, `1y`) or `never`. Keys without an expiration"
+        " remain valid until explicitly deleted or the owning user is"
+        " removed.\n"
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
@@ -60,7 +109,18 @@ def api_key_list(
         typer.Option("--filter", help="OData filter expression."),
     ] = None,
 ) -> None:
-    """List API keys."""
+    """List API keys.
+
+    Examples:
+
+        vrg api-key list
+        vrg api-key list --user deploy-bot
+        vrg -o json api-key list | jq '.[] | select(.is_expired) | .name'
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    Useful `--query` fields: `name`, `user_name`, `is_expired`, `expires`,
+    `last_login`, `last_login_ip`, `ip_allow_list`.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.api_keys.list(), _api_key_to_dict, API_KEY_COLUMNS)
         return
@@ -98,7 +158,18 @@ def api_key_get(
         typer.Option("--user", help="User (required when looking up by name)."),
     ] = None,
 ) -> None:
-    """Get an API key by key or name."""
+    """Get an API key by key or name.
+
+    Examples:
+
+        vrg api-key get 42
+        vrg api-key get ci-pipeline --user deploy-bot
+        vrg -o json api-key get 42 --query "{exp: expires, ips: ip_allow_list}"
+
+    Looking up by name requires `--user` because the same key name can
+    exist under different users. Omitting `--user` for a name lookup
+    exits 2.
+    """
     vctx = get_context(ctx)
 
     if api_key.isdigit():
@@ -160,7 +231,16 @@ def api_key_create(
 ) -> None:
     """Create a new API key.
 
-    The secret is only shown once at creation time.
+    Examples:
+
+        vrg api-key create --user deploy-bot --name ci-pipeline
+        vrg api-key create --user deploy-bot --name ci-pipeline \\
+            --expires-in 90d --ip-allow 10.0.0.0/8,192.168.1.5
+        vrg api-key create --user alice --name laptop --expires-in never
+
+    **Secret shown once.** Capture the `secret` field from the output
+    immediately — VergeOS does not store it in a retrievable form and
+    there is no recovery path. Re-issue a new key if the secret is lost.
     """
     vctx = get_context(ctx)
 
@@ -217,7 +297,15 @@ def api_key_delete(
 ) -> None:
     """Delete an API key.
 
-    Warning: this is permanent and the key will no longer be usable.
+    Examples:
+
+        vrg api-key delete 42
+        vrg api-key delete 42 -y
+        vrg api-key delete ci-pipeline -y
+
+    **Destructive.** Every client using the key stops authenticating
+    immediately. Name resolution uses the same rules as `api-key get`;
+    ambiguous names exit 7.
     """
     vctx = get_context(ctx)
 
