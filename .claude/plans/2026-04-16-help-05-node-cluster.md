@@ -106,7 +106,7 @@ Notes:
 
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `node.py`
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `cluster.py`
-- [ ] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `node_nic.py`
+- [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `node_nic.py`
 - [ ] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `node_lldp.py`
 - [ ] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `node_query.py`
 - [ ] Add examples to leaf command docstrings (Typer reads these as help text for `@app.command()` functions)
