@@ -15,29 +15,119 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 # Main DNS app
 app = typer.Typer(
     name="dns",
-    help="Manage DNS zones and records.",
+    help=(
+        "Manage per-network DNS: views, zones, and records.\n\n"
+        "Every VergeOS virtual network runs its own DNS service inside the"
+        " vnet container. The network's `dns` field selects the engine:"
+        " `disabled`, `simple` (dnsmasq forwarder with auto A records for"
+        " DHCP clients), `network` (forward to another vnet), or `bind`"
+        " (full BIND9 authoritative server). **Views, zones, and records"
+        " are only meaningful in `bind` mode** — in `simple` mode, DNS is"
+        " managed purely through the network's upstream `dnslist` and"
+        " DHCP-driven auto-registration.\n\n"
+        "**Resource hierarchy (BIND mode):**\n\n"
+        "- **View** — client-matching policy (split-horizon). Contains"
+        " `match_clients` ACLs, `recursion` toggle, cache size.\n"
+        "- **Zone** — a domain served by a view. `master`, `slave`,"
+        " `forward`, `redirect`, `stub`, or `static-stub`.\n"
+        "- **Record** — A, AAAA, CNAME, MX, TXT, NS, PTR, SRV, or CAA"
+        " entries within a zone.\n\n"
+        "Views are processed in order — the first view whose"
+        " `match_clients` ACL matches the querying client handles the"
+        " request. Use this to serve internal IPs to LAN clients and"
+        " public IPs to the internet for the same domain.\n\n"
+        "Networks, views, zones, and records are all identified by name"
+        " or numeric key. Use `-o json` for machine-readable output.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List DNS views on a network (JSON for agents)\n"
+        "    vrg -o json network dns view list internal-prod\n\n"
+        "    # Create an internal split-horizon view with recursion\n"
+        "    vrg network dns view create internal-prod --name internal"
+        " --recursion --match-clients '10.0.0.0/8,192.168.0.0/16'\n\n"
+        "    # Create an external (authoritative-only) view\n"
+        "    vrg network dns view create internal-prod --name external"
+        " --no-recursion --match-clients '0.0.0.0/0'\n\n"
+        "    # List zones in a view\n"
+        "    vrg network dns zone list internal-prod internal\n\n"
+        "    # Create a master zone\n"
+        "    vrg network dns zone create internal-prod internal"
+        " --domain example.com --type master\n\n"
+        "    # Add records to the zone\n"
+        "    vrg network dns record create internal-prod internal"
+        " example.com --name www --type A --value 10.0.1.50\n"
+        "    vrg network dns record create internal-prod internal"
+        " example.com --name @ --type MX --value mail.example.com"
+        " --priority 10\n\n"
+        "    # List/filter records by type\n"
+        "    vrg network dns record list internal-prod internal"
+        " example.com --type A\n\n"
+        "    # Apply staged DNS changes (regenerate zone files and reload)\n"
+        "    vrg network apply-dns internal-prod\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "DNS changes are **staged**, not live. `view`, `zone`, and"
+        " `record` create/update/delete operations set a `need_dns_apply`"
+        " flag on the network — existing resolvers keep answering under"
+        " the previous configuration until you run"
+        " `vrg network apply-dns <network>`, which regenerates zone files"
+        " and reloads BIND (or dnsmasq) **without restarting the"
+        " container**. If the network is stopped, changes apply on next"
+        " start.\n\n"
+        "Use `vrg network status <network>` to check whether a network"
+        " has pending DNS changes waiting to be applied. SOA"
+        " `serial_number` is auto-incremented on record changes.\n\n"
+        "View `match_clients` accepts comma-separated CIDRs (e.g."
+        " `10.0.0.0/8,192.168.0.0/16`) which vrg converts to the"
+        " semicolon-delimited ACL format BIND expects. Prefix with `!`"
+        " to negate (e.g. `!192.168.1.0/24;any;`)."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Zone subapp
 zone_app = typer.Typer(
     name="zone",
-    help="Manage DNS zones.",
+    help=(
+        "Manage BIND DNS zones within a view.\n\n"
+        "A zone is a domain (or subdomain) served by a view. Zone"
+        " operations take the network, view, and zone as positional"
+        " arguments. Changes are staged — run `vrg network apply-dns"
+        " <network>` to activate."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Record subapp
 record_app = typer.Typer(
     name="record",
-    help="Manage DNS records.",
+    help=(
+        "Manage DNS records within a zone.\n\n"
+        "Supported types: A, AAAA, CNAME, MX, TXT, NS, PTR, SRV, CAA."
+        " Record operations take network, view, and zone as positional"
+        " arguments. Use `--priority` for MX/SRV records. Changes are"
+        " staged — run `vrg network apply-dns <network>` to activate."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # View subapp
 view_app = typer.Typer(
     name="view",
-    help="Manage DNS views.",
+    help=(
+        "Manage BIND DNS views on a network.\n\n"
+        "Views implement split-horizon DNS by matching queries against"
+        " client IP ACLs. Views are evaluated in order; the first"
+        " matching view handles the query. `match_clients` accepts"
+        " comma-separated CIDRs (vrg converts to BIND's semicolon"
+        " format). Changes are staged — run `vrg network apply-dns"
+        " <network>` to activate."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Register subapps
