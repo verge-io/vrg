@@ -58,7 +58,19 @@ def list_cmd(
         typer.Option("--level", help="Filter by log level (message/warning/error/critical)."),
     ] = None,
 ) -> None:
-    """List catalog repository logs."""
+    """List catalog repository logs.
+
+    Examples:
+
+        vrg catalog repo log list
+        vrg catalog repo log list --repo MarketPlace
+        vrg catalog repo log list --level error
+        vrg -o json catalog repo log list --query "[?level!='message']"
+
+    Log levels: `message`, `warning`, `error`, `critical`. `--repo`
+    accepts a name or integer key. Useful for diagnosing failed
+    refreshes against remote repositories.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if repo is not None:
@@ -88,7 +100,16 @@ def get_cmd(
     ctx: typer.Context,
     log_key: Annotated[str, typer.Argument(help="Log entry key.")],
 ) -> None:
-    """Get a catalog repository log entry by key."""
+    """Get a catalog repository log entry by key.
+
+    Examples:
+
+        vrg catalog repo log get 4217
+        vrg -o json catalog repo log get 4217
+
+    `log_key` must be a numeric key (found via `vrg catalog repo log
+    list`).
+    """
     vctx = get_context(ctx)
     key = int(log_key)
     item = vctx.client.catalog_repository_logs.get(key=key)

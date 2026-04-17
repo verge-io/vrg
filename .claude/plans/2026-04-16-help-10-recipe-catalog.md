@@ -117,6 +117,6 @@ Notes:
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `tenant_recipe_instance.py`
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `tenant_recipe_log.py`
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `catalog.py` and `catalog_repo.py`
-- [ ] Add examples to leaf command docstrings (Typer reads these as help text for `@app.command()` functions)
-- [ ] Test all help output renders correctly
+- [x] Add examples to leaf command docstrings (Typer reads these as help text for `@app.command()` functions)
+- [x] Test all help output renders correctly
 - [ ] Commit changes

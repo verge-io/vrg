@@ -82,7 +82,18 @@ def list_cmd(
         typer.Option("--recipe", help="Filter by tenant recipe name or key."),
     ] = None,
 ) -> None:
-    """List tenant recipe logs."""
+    """List tenant recipe logs.
+
+    Examples:
+
+        vrg tenant-recipe log list
+        vrg tenant-recipe log list --recipe customer-baseline
+        vrg -o json tenant-recipe log list --query "[?level!='message']"
+
+    Log levels: `message`, `warning`, `error`, `critical`. Timestamps
+    are normalized to seconds. Without `--recipe`, returns entries
+    across every tenant recipe.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if recipe is not None:
@@ -110,7 +121,15 @@ def get_cmd(
     ctx: typer.Context,
     log: Annotated[str, typer.Argument(help="Log entry key.")],
 ) -> None:
-    """Get a tenant recipe log entry by key."""
+    """Get a tenant recipe log entry by key.
+
+    Examples:
+
+        vrg tenant-recipe log get 4217
+        vrg -o json tenant-recipe log get 4217
+
+    `log` must be a numeric key (found via `vrg tenant-recipe log list`).
+    """
     vctx = get_context(ctx)
     key = int(log)
     item = vctx.client.tenant_recipe_logs.get(key=key)

@@ -76,7 +76,16 @@ def list_cmd(
         typer.Option("--recipe", help="Filter by recipe name or key."),
     ] = None,
 ) -> None:
-    """List deployed recipe instances."""
+    """List deployed recipe instances.
+
+    Examples:
+
+        vrg recipe instance list
+        vrg recipe instance list --recipe ubuntu-server
+        vrg -o json recipe instance list --query "[?auto_update].name"
+
+    Useful `--query` fields: `name`, `recipe_name`, `auto_update`.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if recipe is not None:
@@ -104,7 +113,16 @@ def get_cmd(
     ctx: typer.Context,
     instance: Annotated[str, typer.Argument(help="Instance name or key.")],
 ) -> None:
-    """Get a recipe instance by name or key."""
+    """Get a recipe instance by name or key.
+
+    Examples:
+
+        vrg recipe instance get web-02
+        vrg -o json recipe instance get 42
+
+    Resolves `instance` by name or numeric key. Ambiguous names exit
+    with code 7 — use the key to disambiguate.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.vm_recipe_instances, instance, "recipe instance")
     item = vctx.client.vm_recipe_instances.get(key=key)
@@ -128,7 +146,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a recipe instance (removes tracking only, not the VM)."""
+    """Delete a recipe instance (removes tracking only, not the VM).
+
+    Examples:
+
+        vrg recipe instance delete web-02
+        vrg recipe instance delete web-02 --yes
+
+    Detaches the VM from its recipe. The VM keeps running — to remove
+    it, use `vrg vm delete`. A recipe with attached instances cannot be
+    deleted until all instances are detached.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.vm_recipe_instances, instance, "recipe instance")
     if not confirm_action(

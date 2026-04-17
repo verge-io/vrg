@@ -135,7 +135,19 @@ def list_cmd(
         typer.Option("--section", help="Filter by section name or key."),
     ] = None,
 ) -> None:
-    """List questions for a recipe."""
+    """List questions for a recipe.
+
+    Examples:
+
+        vrg recipe question list ubuntu-server
+        vrg recipe question list ubuntu-server --section networking
+        vrg -o json recipe question list ubuntu-server \\
+            --query "[?required].name"
+
+    Useful `--query` fields: `name`, `display`, `type`, `required`,
+    `default`, `hint`. Question `name` is the variable used in scripts
+    and cloud-init templates.
+    """
     vctx = get_context(ctx)
     recipe_key = _resolve_recipe(vctx, recipe)
     recipe_ref = f"vm_recipes/{recipe_key}"
@@ -162,7 +174,16 @@ def get_cmd(
     recipe: Annotated[str, typer.Argument(help="Recipe name or key.")],
     question: Annotated[str, typer.Argument(help="Question name or key.")],
 ) -> None:
-    """Get a recipe question by name or key."""
+    """Get a recipe question by name or key.
+
+    Examples:
+
+        vrg recipe question get ubuntu-server hostname
+        vrg -o json recipe question get ubuntu-server admin_password
+
+    Both arguments resolve by name or key. Ambiguous names exit with
+    code 7 — use keys to disambiguate.
+    """
     vctx = get_context(ctx)
     _resolve_recipe(vctx, recipe)  # Validate recipe exists
     question_key = resolve_resource_id(vctx.client.recipe_questions, question, "recipe question")
@@ -210,7 +231,28 @@ def create_cmd(
         typer.Option("--list-options", help="Comma-separated key=value pairs for list type."),
     ] = None,
 ) -> None:
-    """Create a new recipe question."""
+    """Create a new recipe question.
+
+    Examples:
+
+        vrg recipe question create ubuntu-server \\
+            --name hostname --section general --type string \\
+            --display 'Hostname' --required
+
+        vrg recipe question create ubuntu-server \\
+            --name tier --section general --type list \\
+            --display 'Service Tier' \\
+            --list-options 'small=Small,medium=Medium,large=Large'
+
+        vrg recipe question create ubuntu-server \\
+            --name cpu_count --section resources --type num \\
+            --display 'vCPUs' --default 2 --min 1 --max 16
+
+    `--name` is the variable name used by scripts and must be
+    alpha-numeric. `--type` accepts `string`, `bool`, `num`, `password`,
+    `list`, `hidden`, and database-backed types. The recipe must be
+    republished for changes to reach tenants.
+    """
     vctx = get_context(ctx)
     recipe_key = _resolve_recipe(vctx, recipe)
     recipe_ref = f"vm_recipes/{recipe_key}"
@@ -277,7 +319,19 @@ def update_cmd(
     max_value: Annotated[int | None, typer.Option("--max", help="New maximum.")] = None,
     order: Annotated[int | None, typer.Option("--order", help="Display order.")] = None,
 ) -> None:
-    """Update a recipe question."""
+    """Update a recipe question.
+
+    Examples:
+
+        vrg recipe question update ubuntu-server hostname \\
+            --default web-01 --order 10
+        vrg recipe question update ubuntu-server admin_password \\
+            --required
+        vrg recipe question update ubuntu-server cpu_count --min 2 --max 32
+
+    Only flags you pass are changed. Republish the recipe after edits
+    for tenants to see the new question configuration.
+    """
     vctx = get_context(ctx)
     _resolve_recipe(vctx, recipe)  # Validate recipe exists
     question_key = resolve_resource_id(vctx.client.recipe_questions, question, "recipe question")
@@ -325,7 +379,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a recipe question."""
+    """Delete a recipe question.
+
+    Examples:
+
+        vrg recipe question delete ubuntu-server old_field
+        vrg recipe question delete ubuntu-server old_field --yes
+
+    Deployed instances that answered this question keep their stored
+    answer, but new deploys will no longer prompt for it. Republish the
+    recipe after deletion.
+    """
     vctx = get_context(ctx)
     _resolve_recipe(vctx, recipe)  # Validate recipe exists
     question_key = resolve_resource_id(vctx.client.recipe_questions, question, "recipe question")

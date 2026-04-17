@@ -55,7 +55,19 @@ def list_cmd(
         typer.Option("--level", help="Filter by log level."),
     ] = None,
 ) -> None:
-    """List catalog operation logs."""
+    """List catalog operation logs.
+
+    Examples:
+
+        vrg catalog log list
+        vrg catalog log list --catalog windows-server
+        vrg catalog log list --level error
+        vrg -o json catalog log list --query "[?level!='message']"
+
+    Log levels: `message`, `warning`, `error`, `critical`. `--catalog`
+    accepts a name or SHA-1 hex key. Timestamps are normalized to
+    seconds for display.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if catalog is not None:
@@ -85,7 +97,15 @@ def get_cmd(
     ctx: typer.Context,
     log: Annotated[str, typer.Argument(help="Log entry key.")],
 ) -> None:
-    """Get a catalog log entry by key."""
+    """Get a catalog log entry by key.
+
+    Examples:
+
+        vrg catalog log get 4217
+        vrg -o json catalog log get 4217
+
+    `log` must be a numeric key (found via `vrg catalog log list`).
+    """
     vctx = get_context(ctx)
     key = int(log)
     item = vctx.client.catalog_logs.get(key=key)

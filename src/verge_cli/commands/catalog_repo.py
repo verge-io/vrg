@@ -153,7 +153,18 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled state."),
     ] = None,
 ) -> None:
-    """List catalog repositories."""
+    """List catalog repositories.
+
+    Examples:
+
+        vrg catalog repo list
+        vrg catalog repo list --type remote --enabled
+        vrg -o json catalog repo list --query "[?auto_refresh].name"
+
+    Useful `--query` fields: `name`, `type`, `enabled`, `auto_refresh`,
+    `url`, `last_refreshed`. `--type` accepts `local`, `remote`,
+    `remote-git`, `provider`, or `yottabyte`.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filter is not None:
@@ -180,7 +191,16 @@ def get_cmd(
     ctx: typer.Context,
     repo: Annotated[str, typer.Argument(help="Repository ID or name.")],
 ) -> None:
-    """Get a catalog repository by ID or name."""
+    """Get a catalog repository by ID or name.
+
+    Examples:
+
+        vrg catalog repo get MarketPlace
+        vrg -o json catalog repo get 2
+
+    Resolves `repo` by name or integer key. Ambiguous names exit with
+    code 7 — use the key to disambiguate.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(
         vctx.client.catalog_repositories,
@@ -243,7 +263,25 @@ def create_cmd(
         ),
     ] = "none",
 ) -> None:
-    """Create a new catalog repository."""
+    """Create a new catalog repository.
+
+    Examples:
+
+        vrg catalog repo create --name internal-catalogs --type local
+
+        vrg catalog repo create --name partner-recipes --type remote \\
+            --url https://vergeos.example.com \\
+            --user api-reader --password 's3cret' --max-tier 2
+
+        vrg catalog repo create --name team-recipes --type remote-git \\
+            --url https://git.example.com/ops/recipes.git
+
+    `--type` is fixed at creation and accepts `local`, `remote`,
+    `remote-git`, `provider`, or `yottabyte`. `--max-tier` (1-5) caps
+    the vSAN tier used when downloading recipe drives; lower is faster.
+    `--allow-insecure` permits self-signed TLS — use only on private
+    networks.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {
         "name": name,
@@ -319,7 +357,19 @@ def update_cmd(
         typer.Option("--enabled/--disabled", help="Enable or disable repository."),
     ] = None,
 ) -> None:
-    """Update a catalog repository."""
+    """Update a catalog repository.
+
+    Examples:
+
+        vrg catalog repo update partner-recipes --no-auto-refresh
+        vrg catalog repo update partner-recipes --max-tier 3
+        vrg catalog repo update MarketPlace --description 'Upstream Verge.io'
+
+    Only flags you pass are changed. The repository `type` is **not**
+    mutable — recreate the repo if you need a different source type.
+    `--auto-refresh` toggles the scheduled poll; trigger an immediate
+    pull with `vrg catalog repo refresh`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(
         vctx.client.catalog_repositories,
@@ -368,7 +418,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Delete a catalog repository."""
+    """Delete a catalog repository.
+
+    Examples:
+
+        vrg catalog repo delete partner-recipes
+        vrg catalog repo delete partner-recipes --yes
+
+    Row 1 (the default `Local` repository) cannot be deleted. Catalogs
+    inside the repository must be removed first — this API does not
+    cascade.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(
         vctx.client.catalog_repositories,
@@ -387,7 +447,17 @@ def refresh_cmd(
     ctx: typer.Context,
     repo: Annotated[str, typer.Argument(help="Repository ID or name.")],
 ) -> None:
-    """Refresh a catalog repository to fetch latest catalogs."""
+    """Refresh a catalog repository to fetch latest catalogs.
+
+    Examples:
+
+        vrg catalog repo refresh MarketPlace
+        vrg catalog repo refresh partner-recipes
+
+    Only one refresh runs per repository at a time — a second call
+    while one is in flight is a no-op. Check live progress with `vrg
+    catalog repo status <repo>`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(
         vctx.client.catalog_repositories,
@@ -404,7 +474,17 @@ def status_cmd(
     ctx: typer.Context,
     repo: Annotated[str, typer.Argument(help="Repository ID or name.")],
 ) -> None:
-    """Show catalog repository status."""
+    """Show catalog repository status.
+
+    Examples:
+
+        vrg catalog repo status MarketPlace
+        vrg -o json catalog repo status MarketPlace
+
+    `status` values: `online`, `refreshing`, `downloading`, `error`.
+    The `state` and `info` fields give additional context, and
+    `last_update` records when the value was last written.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(
         vctx.client.catalog_repositories,

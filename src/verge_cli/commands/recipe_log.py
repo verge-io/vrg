@@ -83,7 +83,18 @@ def list_cmd(
         typer.Option("--recipe", help="Filter by recipe name or key."),
     ] = None,
 ) -> None:
-    """List recipe operation logs."""
+    """List recipe operation logs.
+
+    Examples:
+
+        vrg recipe log list
+        vrg recipe log list --recipe ubuntu-server
+        vrg -o json recipe log list --query "[?level!='message']"
+
+    Log levels: `message`, `warning`, `error`, `critical`. Timestamps
+    are normalized to seconds. Without `--recipe`, returns entries
+    across every recipe on the system.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if recipe is not None:
@@ -111,7 +122,15 @@ def get_cmd(
     ctx: typer.Context,
     log: Annotated[str, typer.Argument(help="Log entry key.")],
 ) -> None:
-    """Get a recipe log entry by key."""
+    """Get a recipe log entry by key.
+
+    Examples:
+
+        vrg recipe log get 4217
+        vrg -o json recipe log get 4217
+
+    `log` must be a numeric key (found via `vrg recipe log list`).
+    """
     vctx = get_context(ctx)
     key = int(log)
     item = vctx.client.vm_recipe_logs.get(key=key)

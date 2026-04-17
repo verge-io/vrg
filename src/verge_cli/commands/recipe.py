@@ -141,7 +141,18 @@ def list_cmd(
         typer.Option("--downloaded/--not-downloaded", help="Filter by downloaded state."),
     ] = None,
 ) -> None:
-    """List VM recipes."""
+    """List VM recipes.
+
+    Examples:
+
+        vrg recipe list
+        vrg recipe list --catalog MarketPlace --downloaded
+        vrg -o json recipe list --query "[?enabled].name"
+
+    Useful `--query` fields: `name`, `enabled`, `description`, `notes`.
+    Combine `--catalog` and `--downloaded` to narrow down to locally
+    available recipes from a specific catalog.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.vm_recipes.list(), _recipe_to_dict, RECIPE_COLUMNS)
         return
@@ -169,7 +180,17 @@ def get_cmd(
     ctx: typer.Context,
     recipe: Annotated[str, typer.Argument(help="Recipe name or key.")],
 ) -> None:
-    """Get a VM recipe by name or key."""
+    """Get a VM recipe by name or key.
+
+    Examples:
+
+        vrg recipe get ubuntu-server
+        vrg -o json recipe get ubuntu-server
+        vrg -o json recipe get 8f3a...0b2c
+
+    Resolves `recipe` by name or 40-character hex key. Ambiguous names
+    exit with code 7 — use the hex key to disambiguate.
+    """
     vctx = get_context(ctx)
     key = _resolve_recipe(vctx, recipe)
     item = vctx.client.vm_recipes.get(key)
@@ -210,7 +231,20 @@ def create_cmd(
         typer.Option("--enabled/--no-enabled", help="Enable the recipe."),
     ] = True,
 ) -> None:
-    """Create a new VM recipe from an existing VM."""
+    """Create a new VM recipe from an existing VM.
+
+    Examples:
+
+        vrg recipe create --name web-template --vm web-01 --catalog local
+        vrg recipe create --name db-base --vm postgres-golden \\
+            --catalog internal --description 'Hardened Postgres 15' \\
+            --version 1.0.0
+
+    The source `--vm` should be a generalized template VM — not a running
+    production workload. After creation, add questions with `vrg recipe
+    question create` and sections with `vrg recipe section create`, then
+    republish so the recipe is visible to deployers.
+    """
     vctx = get_context(ctx)
     vm_key = resolve_resource_id(vctx.client.vms, vm, "vm")
     kwargs: dict[str, Any] = {"name": name, "vm": vm_key}
@@ -262,7 +296,18 @@ def update_cmd(
         typer.Option("--version", help="New version string."),
     ] = None,
 ) -> None:
-    """Update a VM recipe."""
+    """Update a VM recipe.
+
+    Examples:
+
+        vrg recipe update ubuntu-server --description 'Base Ubuntu 24.04'
+        vrg recipe update ubuntu-server --version 2.1.0
+        vrg recipe update ubuntu-server --name ubuntu-lts
+
+    Only the flags you pass are changed; omitted fields are left alone.
+    Renames and version bumps do not republish the recipe — run `vrg
+    recipe republish` separately to push changes to tenants.
+    """
     vctx = get_context(ctx)
     key = _resolve_recipe(vctx, recipe)
     kwargs: dict[str, Any] = {}
@@ -294,7 +339,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a VM recipe."""
+    """Delete a VM recipe.
+
+    Examples:
+
+        vrg recipe delete old-template
+        vrg recipe delete old-template --yes
+
+    Recipes with attached instances cannot be deleted — detach them
+    first with `vrg recipe instance delete <instance>`. The source VM
+    is not deleted.
+    """
     vctx = get_context(ctx)
     key = _resolve_recipe(vctx, recipe)
     if not confirm_action(f"Delete recipe '{recipe}'?", yes=yes):
@@ -309,7 +364,17 @@ def download_cmd(
     ctx: typer.Context,
     recipe: Annotated[str, typer.Argument(help="Recipe name or key.")],
 ) -> None:
-    """Download a recipe from the catalog repository."""
+    """Download a recipe from the catalog repository.
+
+    Examples:
+
+        vrg recipe download ubuntu-server
+        vrg recipe download 8f3a...0b2c
+
+    Marketplace recipes must be downloaded before they can be deployed.
+    This copies the recipe (and its base-image drives) from the remote
+    repository into a local catalog on this system.
+    """
     vctx = get_context(ctx)
     key = _resolve_recipe(vctx, recipe)
     vctx.client.vm_recipes.download(key)
@@ -331,7 +396,22 @@ def deploy_cmd(
         typer.Option("--auto-update", help="Auto-update when recipe is updated."),
     ] = False,
 ) -> None:
-    """Deploy a VM recipe to create a new VM."""
+    """Deploy a VM recipe to create a new VM.
+
+    Examples:
+
+        vrg recipe deploy ubuntu-server --name web-02
+        vrg recipe deploy ubuntu-server --name web-02 \\
+            --set USERNAME=admin --set HOSTNAME=web-02
+        vrg recipe deploy ubuntu-server --name web-02 --auto-update \\
+            --set USERNAME=admin
+
+    `--set KEY=VALUE` provides answers to recipe questions (repeatable).
+    Discover question names with `vrg recipe question list <recipe>`.
+    Missing answers fall back to each question's default; questions
+    without a default cause the deploy to fail. `--auto-update` keeps
+    the VM in sync when the recipe is republished.
+    """
     vctx = get_context(ctx)
     key = _resolve_recipe(vctx, recipe)
     answers: dict[str, str] | None = None

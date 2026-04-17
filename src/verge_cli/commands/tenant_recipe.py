@@ -125,7 +125,18 @@ def _resolve_tenant_recipe(vctx: Any, identifier: str) -> str:
 def list_cmd(
     ctx: typer.Context,
 ) -> None:
-    """List tenant recipes."""
+    """List tenant recipes.
+
+    Examples:
+
+        vrg tenant-recipe list
+        vrg -o json tenant-recipe list
+        vrg -o json tenant-recipe list --query "[?enabled].name"
+
+    Useful `--query` fields: `name`, `enabled`, `description`, `version`.
+    Use `--all-profiles` to list tenant recipes across every configured
+    profile.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(
             ctx, lambda c: c.tenant_recipes.list(), _recipe_to_dict, TENANT_RECIPE_COLUMNS
@@ -150,7 +161,16 @@ def get_cmd(
     ctx: typer.Context,
     recipe: Annotated[str, typer.Argument(help="Tenant recipe name or key.")],
 ) -> None:
-    """Get a tenant recipe by name or key."""
+    """Get a tenant recipe by name or key.
+
+    Examples:
+
+        vrg tenant-recipe get customer-baseline
+        vrg -o json tenant-recipe get customer-baseline
+
+    Resolves `recipe` by name or 40-character hex key. Ambiguous names
+    exit with code 7 — use the hex key to disambiguate.
+    """
     vctx = get_context(ctx)
     key = _resolve_tenant_recipe(vctx, recipe)
     item = vctx.client.tenant_recipes.get(key)
@@ -190,7 +210,19 @@ def update_cmd(
         typer.Option("--preserve-certs/--no-preserve-certs", help="Preserve certificates."),
     ] = None,
 ) -> None:
-    """Update a tenant recipe."""
+    """Update a tenant recipe.
+
+    Examples:
+
+        vrg tenant-recipe update customer-baseline \\
+            --description 'Hardened tenant template'
+        vrg tenant-recipe update customer-baseline --version 2.0.0
+        vrg tenant-recipe update customer-baseline --preserve-certs
+
+    Only flags you pass are changed. `--preserve-certs` controls whether
+    SSL certificates from the base tenant are copied into deployed
+    instances.
+    """
     vctx = get_context(ctx)
     key = _resolve_tenant_recipe(vctx, recipe)
     kwargs: dict[str, Any] = {}
@@ -226,7 +258,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a tenant recipe."""
+    """Delete a tenant recipe.
+
+    Examples:
+
+        vrg tenant-recipe delete old-baseline
+        vrg tenant-recipe delete old-baseline --yes
+
+    Recipes with attached instances cannot be deleted — detach them
+    first with `vrg tenant-recipe instance delete <instance>`. The
+    underlying base tenant is not deleted.
+    """
     vctx = get_context(ctx)
     key = _resolve_tenant_recipe(vctx, recipe)
     if not confirm_action(f"Delete tenant recipe '{recipe}'?", yes=yes):
@@ -241,7 +283,17 @@ def download_cmd(
     ctx: typer.Context,
     recipe: Annotated[str, typer.Argument(help="Tenant recipe name or key.")],
 ) -> None:
-    """Download a tenant recipe from the catalog repository."""
+    """Download a tenant recipe from the catalog repository.
+
+    Examples:
+
+        vrg tenant-recipe download customer-baseline
+        vrg tenant-recipe download 8f3a...0b2c
+
+    Remote tenant recipes must be downloaded before they can be
+    deployed. This copies the recipe (and every drive used by its VMs)
+    from the remote repository into a local catalog on this system.
+    """
     vctx = get_context(ctx)
     key = _resolve_tenant_recipe(vctx, recipe)
     vctx.client.tenant_recipes.download(key)
@@ -259,7 +311,22 @@ def deploy_cmd(
         typer.Option("--set", help="Answer in KEY=VALUE format (repeatable)."),
     ] = None,
 ) -> None:
-    """Deploy a tenant recipe to create a new tenant."""
+    """Deploy a tenant recipe to create a new tenant.
+
+    Examples:
+
+        vrg tenant-recipe deploy customer-baseline --name acme-corp \\
+            --set YB_USER_NAME=admin --set YB_USER_PASSWORD=...
+
+        vrg tenant-recipe deploy customer-baseline --name acme-corp \\
+            --set YB_USER_NAME=admin --set YB_USER_PASSWORD=... \\
+            --set YB_NET_1_IP=10.50.0.10
+
+    `--set KEY=VALUE` provides answers to recipe questions (repeatable).
+    System questions (names starting with `YB_`) cover tenant identity,
+    admin credentials, SSL certs, node resources, and network addresses.
+    Missing required answers cause the deploy to fail.
+    """
     vctx = get_context(ctx)
     key = _resolve_tenant_recipe(vctx, recipe)
     answers: dict[str, str] | None = None
