@@ -14,8 +14,59 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="alias",
-    help="Manage network IP aliases.",
+    help=(
+        "Manage per-network **rule aliases** — named IP address entries"
+        " referenced by firewall, NAT, and routing rules.\n\n"
+        "A network alias binds a **name** to an **IP address** (or CIDR"
+        " block) inside a vnet so the same address can be reused across"
+        " many rules without copy-pasting. In rule source/destination"
+        " fields, refer to an alias as `alias:<name>` — change the alias"
+        " once and every rule that references it picks up the new value on"
+        " the next apply. Use aliases for addresses that change"
+        " frequently (e.g. an admin jumphost IP) or that belong together"
+        " as a logical set (e.g. `management-servers`, `monitoring`).\n\n"
+        "Aliases are identified by **name (hostname)**, **IP address**,"
+        " or **numeric key** within their network. Use `-o json` for"
+        " machine-readable output; `--query` against the `hostname`, `ip`,"
+        " and `description` fields.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List aliases on a network (JSON for agents)\n"
+        "    vrg -o json network alias list internal-prod\n\n"
+        "    # Get a specific alias by name, IP, or key\n"
+        "    vrg network alias get internal-prod trusted-admin\n"
+        "    vrg network alias get internal-prod 10.0.1.5\n\n"
+        "    # Create an alias (name is what you use in rules as"
+        " alias:<name>)\n"
+        "    vrg network alias create internal-prod --name trusted-admin"
+        " --ip 10.0.1.5 --description 'Ops jumphost'\n\n"
+        "    # Reference the alias from a firewall rule\n"
+        "    vrg network rule create internal-prod --name allow-ssh-admin"
+        " --direction incoming --action accept --protocol tcp"
+        " --dest-ports 22 --source-ip alias:trusted-admin\n\n"
+        "    # Update an alias (replaces the entry — delete + recreate)\n"
+        "    vrg network alias update internal-prod trusted-admin"
+        " --ip 10.0.1.6\n\n"
+        "    # Delete an alias (skip prompt with -y)\n"
+        "    vrg network alias delete internal-prod trusted-admin -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Changing an alias does **not** automatically reload the rules"
+        " that reference it. After creating, updating, or deleting an"
+        " alias, run `vrg network apply-rules <network>` on every"
+        " network whose rules reference it so the new address takes"
+        " effect in nftables.\n\n"
+        "Because the underlying API does not expose a PUT for aliases,"
+        " `alias update` is implemented as **delete + recreate**. The"
+        " numeric key changes as a result; rules that reference the"
+        " alias by `alias:<name>` are unaffected.\n\n"
+        "Networks are identified by name or numeric key. Ambiguous"
+        " network names return **exit code 7** (multiple matches);"
+        " missing networks or aliases return **exit code 6** (not"
+        " found)."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
