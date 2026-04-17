@@ -14,8 +14,50 @@ from verge_cli.utils import resolve_resource_id
 
 app = typer.Typer(
     name="incoming",
-    help="Manage incoming site syncs.",
+    help=(
+        "Manage **incoming site syncs** — the receiving end of a"
+        " replication pair.\n\n"
+        "An incoming sync lives on the destination VergeOS system and"
+        " accepts cloud snapshots pushed by a paired outgoing sync on a"
+        " remote source. Creating an incoming sync generates a one-time"
+        " **registration code** that is entered on the source side to"
+        " authenticate the pairing; the system also provisions a dedicated"
+        " vSAN user for the remote source to use during transfers.\n\n"
+        "The most important safety field is `min_snapshots`: the"
+        " destination always retains at least this many snapshots even if"
+        " every snapshot has technically expired. Without it, an extended"
+        " source outage can cause all remote recovery points to age out,"
+        " leaving nothing to fail over to. `force_tier` optionally pins"
+        " received data to a specific storage tier (1–5).\n\n"
+        "Status values include `Generating Reg`, `Offline`, `Syncing`,"
+        " `Error`, and `Regeneration Needed` — the last means the"
+        " registration code has been invalidated and must be regenerated"
+        " (via the API) before the pairing will reconnect.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all incoming syncs on this (destination) system\n"
+        "    vrg site sync incoming list\n\n"
+        "    # Filter to a specific paired site\n"
+        "    vrg site sync incoming list --site dr-east\n\n"
+        "    # Show only disabled receivers\n"
+        "    vrg site sync incoming list --disabled\n\n"
+        "    # Full details for scripting / agents\n"
+        "    vrg -o json site sync incoming get offsite-backup\n\n"
+        "    # Pause accepting new data without deleting the pairing\n"
+        "    vrg site sync incoming disable offsite-backup\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "System limit: **100,000 incoming syncs** per system. Syncs are"
+        " referenced by name or numeric `$key`; when a name matches"
+        " multiple records, vrg exits with code 7 — use the key to"
+        " disambiguate. `disable` stops the receiver from accepting new"
+        " transfers but preserves the pairing and existing snapshots."
+        " Use `-o json` for machine-readable output; useful `--query`"
+        " fields include `status`, `enabled`, `state`, `last_sync`, and"
+        " `min_snapshots`."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
