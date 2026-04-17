@@ -13,8 +13,38 @@ from verge_cli.output import output_result
 
 app = typer.Typer(
     name="log",
-    help="View update logs.",
+    help=(
+        "View log entries emitted by the update subsystem.\n\n"
+        "An *update log* is one row in `update_logs` — the audit trail for"
+        " check/download/install/apply actions. Each entry has a `level`"
+        " (audit/message/warning/error/critical), a free-text `text`,"
+        " optionally an `object_name` identifying the package or source,"
+        " and a `timestamp`. Entries are retained for up to 70 days and"
+        " capped at 10,000 rows.\n\n"
+        "Use `--level` to narrow by severity — `error` and `critical`"
+        " surface failed downloads and failed applies. Use `-o json` for"
+        " structured output. Useful fields to `--query`: `level`, `text`,"
+        " `object_name`, `timestamp`, `user`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List recent update log entries\n"
+        "    vrg update log list\n\n"
+        "    # Show only errors and criticals\n"
+        "    vrg update log list --level error\n"
+        "    vrg update log list --level critical\n\n"
+        "    # Pull the full log as JSON for further filtering\n"
+        "    vrg -o json update log list\n\n"
+        "    # Inspect one entry by key\n"
+        "    vrg update log get 4821\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Timestamps are stored in microseconds on the wire; `vrg` converts"
+        " them to seconds for display. Entries older than 70 days are"
+        " expired automatically — archive externally if you need longer"
+        " retention."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 UPDATE_LOG_COLUMNS: list[ColumnDef] = [
