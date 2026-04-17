@@ -14,8 +14,43 @@ from verge_cli.utils import confirm_action, resolve_nas_resource, resolve_resour
 
 app = typer.Typer(
     name="instance",
-    help="Manage tenant recipe instances (deployed tenants).",
+    help=(
+        "Manage tenant recipe instances — tenants deployed from a recipe.\n\n"
+        "A **tenant recipe instance** is the link between a deployed tenant"
+        " and the tenant recipe it was created from. Every"
+        " `vrg tenant-recipe deploy` produces an instance row that records"
+        " the source recipe and the answer values supplied at deploy time"
+        " (admin credentials, hostnames, IP addresses, node CPU/RAM,"
+        " etc.).\n\n"
+        "Instances are tracking metadata, not the tenant itself. Deleting"
+        " an instance only detaches the tenant from its recipe; the"
+        " tenant — including its VMs, networks, users, and storage —"
+        " keeps running. To remove the tenant, use `vrg tenant delete`."
+        " A recipe with any attached instances cannot be deleted until the"
+        " instances are detached.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every tenant recipe instance on the system\n"
+        "    vrg tenant-recipe instance list\n\n"
+        "    # Filter instances to a specific tenant recipe\n"
+        "    vrg tenant-recipe instance list --recipe customer-baseline\n\n"
+        "    # Inspect an instance as JSON (includes recipe + key)\n"
+        "    vrg -o json tenant-recipe instance get acme-corp\n\n"
+        "    # Detach an instance from its recipe (the tenant is not deleted)\n"
+        "    vrg tenant-recipe instance delete acme-corp --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Instances are referenced by name or numeric key. When a name"
+        " matches multiple instances, vrg prints all matches and exits"
+        " with code 7 — use the key to disambiguate.\n\n"
+        "Use `--recipe NAME_OR_KEY` on `list` to scope output to a single"
+        " tenant recipe. Detaching an instance leaves the tenant fully"
+        " functional but breaks the link the parent recipe uses to track"
+        " deployments — recipe republish notifications no longer reach"
+        " that tenant."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 TENANT_RECIPE_INSTANCE_COLUMNS: list[ColumnDef] = [
