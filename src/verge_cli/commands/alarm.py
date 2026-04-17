@@ -15,8 +15,61 @@ from verge_cli.output import output_result, output_success
 
 app = typer.Typer(
     name="alarm",
-    help="Manage alarms.",
+    help=(
+        "View and manage VergeOS alarms.\n\n"
+        "Alarms are real-time alerts raised automatically when a monitored"
+        " resource enters an abnormal state — hardware failures, missing or"
+        " vulnerable configuration, security concerns, capacity thresholds,"
+        " sync failures, and similar conditions. They are not created or"
+        " deleted manually; the platform raises them when a condition trips"
+        " and lowers them when the condition clears. Each alarm is bound to"
+        " an `owner` resource (`VM`, `Network`, `Node`, `Tenant`, `User`,"
+        " `System`, or `CloudSnapshot`) and has a severity `level`"
+        " (`critical`, `error`, `warning`, `message`).\n\n"
+        "Active alarms are listed here. Use `vrg alarm history` for the"
+        " archive of resolved/lowered alarms. Use `-o json` for structured"
+        " output. Useful fields to `--query`: `level`, `alarm_type`,"
+        " `status`, `owner_type`, `owner_name`, `is_resolvable`,"
+        " `is_snoozed`, `created_at`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List active alarms\n"
+        "    vrg alarm list\n\n"
+        "    # Only critical or error-level alarms\n"
+        "    vrg alarm list --level critical\n"
+        "    vrg alarm list --level error\n\n"
+        "    # Alarms against a specific owner type\n"
+        "    vrg alarm list --owner-type Node\n"
+        "    vrg alarm list --owner-type VM\n\n"
+        "    # Include snoozed alarms (hidden by default)\n"
+        "    vrg alarm list --include-snoozed\n\n"
+        "    # Counts by severity and state\n"
+        "    vrg alarm summary\n\n"
+        "    # Inspect one alarm by key\n"
+        "    vrg -o json alarm get 412\n\n"
+        "    # Snooze for 4 hours, then unsnooze\n"
+        "    vrg alarm snooze 412 --hours 4\n"
+        "    vrg alarm unsnooze 412\n\n"
+        "    # Run the alarm's built-in resolve action (if resolvable)\n"
+        "    vrg alarm resolve 412\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Snoozing is suppression, not acknowledgment — the alarm reappears"
+        " in the active view when the snooze timestamp passes. Default"
+        " snooze is 24 hours; alarm types may cap the duration and repeat"
+        " count.\n\n"
+        "Only alarms with `is_resolvable = true` accept `resolve` — it"
+        " triggers the alarm type's built-in corrective action (e.g."
+        " restart a VM after a config change, apply pending firewall"
+        " rules). Non-resolvable alarms clear automatically once the"
+        " underlying condition is addressed.\n\n"
+        "Alarms are identified by numeric key, not by name. Active alarms"
+        " live in `/v4/alarms`; archived alarms live in `/v4/alarm_archives`"
+        " (capped at 100,000 records). Use `vrg doctor` for a quick health"
+        " audit that includes active alarm state."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Register sub-commands
