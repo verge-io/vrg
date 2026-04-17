@@ -15,13 +15,93 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="group",
-    help="Manage groups.",
+    help=(
+        "Manage local VergeOS groups.\n\n"
+        "Groups are the unit of bulk RBAC assignment. Each group has its own"
+        " `/sys/identities` record and acts as a principal for"
+        " [permission](# 'vrg permission') evaluation — permissions assigned to"
+        " a group apply to every member. Groups can nest: a group may contain"
+        " users *and* other groups, and permissions cascade to all descendants"
+        " through the `members` join.\n\n"
+        "Groups provisioned from an external auth source (LDAP/OIDC) carry an"
+        " `auth_source` reference; system-managed groups have `system_group:"
+        " true` and are read-only for administrators.\n\n"
+        "Use `-o json` for machine-readable output. Filter lists with"
+        " `--query` on fields like `name`, `enabled`, `email`,"
+        " `member_count`, `description`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all groups\n"
+        "    vrg group list\n\n"
+        "    # List only enabled groups as JSON\n"
+        "    vrg -o json group list --enabled\n\n"
+        "    # Get a single group by name\n"
+        "    vrg group get engineering\n\n"
+        "    # Create a group\n"
+        "    vrg group create --name engineering \\\n"
+        "        --description 'Engineering team' --email eng@example.com\n\n"
+        "    # Add a user to a group\n"
+        "    vrg group member add engineering --user alice\n\n"
+        "    # Nest a group inside another group\n"
+        "    vrg group member add engineering --group backend-team\n\n"
+        "    # List members (includes nested groups)\n"
+        "    vrg group member list engineering\n\n"
+        "    # Remove a member\n"
+        "    vrg group member remove engineering --user alice\n\n"
+        "    # Delete a group (prompts unless -y)\n"
+        "    vrg group delete engineering -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Groups are referenced by **name** or **numeric key** (`$key`). When a"
+        " name matches multiple groups, vrg prints all matches and exits with"
+        " code 7. Use the numeric key to disambiguate.\n\n"
+        "**Nesting cascades permissions**: a permission granted to a parent"
+        " group applies to every user and every nested group beneath it. Plan"
+        " the hierarchy before granting broad permissions on a top-level"
+        " group.\n\n"
+        "**Deleting a group cascades**: all membership records (both incoming"
+        " memberships and this group's roster), all permissions assigned to"
+        " the group, and any OIDC application group grants are removed. The"
+        " backing `/sys/identities` record is also deleted.\n\n"
+        "System groups (`system_group: true`) cannot be modified or deleted"
+        " through this command.\n"
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
 member_app = typer.Typer(
     name="member",
-    help="Manage group members.",
+    help=(
+        "Manage group members (users and nested groups).\n\n"
+        "Members can be users *or* other groups — nesting is supported and"
+        " permissions cascade from parent groups to all descendants. The"
+        " `members` join enforces a unique `(parent_group, member)`"
+        " constraint, so duplicate memberships are rejected.\n\n"
+        "Use `-o json` for machine-readable output. Filter lists with"
+        " `--query` on fields like `member_name`, `member_type` (`user` or"
+        " `group`), `member_key`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all members of a group\n"
+        "    vrg group member list engineering\n\n"
+        "    # Add a user\n"
+        "    vrg group member add engineering --user alice\n\n"
+        "    # Nest a group inside another group\n"
+        "    vrg group member add engineering --group backend-team\n\n"
+        "    # Remove a user\n"
+        "    vrg group member remove engineering --user alice\n\n"
+        "    # Remove a nested group\n"
+        "    vrg group member remove engineering --group backend-team\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`add` and `remove` take exactly one of `--user` or `--group`."
+        " Specifying both or neither exits with code 2.\n\n"
+        "User and group names are resolved via `vrg user` and `vrg group`"
+        " lookups; ambiguous names exit with code 7 — use the numeric key to"
+        " disambiguate.\n"
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
