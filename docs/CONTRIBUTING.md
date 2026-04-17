@@ -154,10 +154,13 @@ When to update which file:
 
 | Change | Update |
 |--------|--------|
-| New command group | `docs/COMMANDS.md`, `README.md` command table |
+| New command group | `docs/COMMANDS.md`, `CLAUDE.md` project structure |
+| New query/diagnostic commands | `docs/COMMANDS.md`, `docs/COOKBOOK.md` |
+| New global option | `docs/COMMANDS.md` Global Options table |
 | New architecture pattern | `docs/ARCHITECTURE.md` |
 | New test fixture | `docs/TESTING.md` |
 | New workflow recipe | `docs/COOKBOOK.md` |
+| New health check | `docs/COMMANDS.md` doctor section, `docs/COOKBOOK.md` |
 | New known limitation | `docs/KNOWN_ISSUES.md` |
 
 ## Contributor License Agreement

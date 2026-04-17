@@ -24,6 +24,7 @@ vrg [global-options] <domain> [sub-domain] <action> [arguments] [options]
 | `--quiet` | `-q` | Suppress non-essential output |
 | `--no-color` | | Disable colored output |
 | `--version` | `-V` | Show version and exit |
+| `--all-profiles` | | Run list commands across all configured profiles |
 
 ## Common Patterns
 
@@ -59,6 +60,14 @@ VM lifecycle management. Source: `commands/vm.py`
 | `restart` | Restart a VM |
 | `reset` | Hard reset a VM |
 | `validate` | Validate a `.vrg.yaml` template |
+| `clone` | Clone a VM |
+| `migrate` | Live-migrate a running VM to another node |
+| `hibernate` | Hibernate a running VM |
+| `console` | Show VM console connection info |
+| `tag` | Assign a tag to a VM |
+| `untag` | Remove a tag from a VM |
+| `favorite` | Mark a VM as a favorite |
+| `unfavorite` | Remove a VM from favorites |
 
 ### `vrg vm drive`
 
@@ -181,7 +190,7 @@ Firewall rule management. Source: `commands/network_rule.py`
 
 | Subcommand | Description |
 |------------|-------------|
-| `list` | List rules on a network |
+| `list` | List rules on a network (includes packets, bytes, trace columns) |
 | `get` | Get rule details |
 | `create` | Create a firewall rule |
 | `update` | Update a rule |
@@ -251,13 +260,45 @@ IP alias management. Source: `commands/network_alias.py`
 
 ### `vrg network diag`
 
-Network diagnostics. Source: `commands/network_diag.py`
+Network diagnostics and monitoring. Source: `commands/network_diag.py`
 
 | Subcommand | Description |
 |------------|-------------|
 | `leases` | Show DHCP leases |
 | `addresses` | Show address table |
 | `stats` | Show traffic statistics |
+| `quality` | Show current quality metrics (latency, packet loss) |
+| `history` | Show monitoring history (`--long` for aggregated data) |
+
+### `vrg network diag dashboard`
+
+Network dashboard views. Source: `commands/network_dashboard.py`
+
+| Subcommand | Description |
+|------------|-------------|
+| `overview` | Show network dashboard summary |
+| `ipsec-status` | Show IPSec active connections for a network |
+| `wireguard-status` | Show WireGuard peer status for a network |
+
+### `vrg network query`
+
+Run diagnostic queries on a network's virtual router. Source: `commands/network_query.py`
+
+All commands take a network name/key as the first argument. Results are returned asynchronously via the query API.
+
+| Subcommand | Description |
+|------------|-------------|
+| `ping` | Ping a host from the network router |
+| `dns` | DNS resolution from the network |
+| `traceroute` | Traceroute from the network |
+| `tcpdump` | Packet capture on the network |
+| `arp` | Show ARP table |
+| `arp-scan` | Scan for hosts via ARP |
+| `firewall` | Show nftables rules |
+| `trace` | Trace packet flow through firewall |
+| `nmap` | Port scan a target |
+| `tcp-connect` | Test TCP connectivity to host:port |
+| `run` | Run an arbitrary query type |
 
 ---
 
@@ -424,6 +465,7 @@ Storage tier information. Source: `commands/storage.py`
 |------------|-------------|
 | `list` | List storage tiers |
 | `get` | Get tier details |
+| `summary` | Show aggregate storage across all tiers |
 
 ### `vrg nas service`
 
@@ -553,12 +595,16 @@ Media catalog (ISO, disk, OVA/OVF) management. Source: `commands/file.py`
 
 ### `vrg cluster`
 
-Cluster information. Source: `commands/cluster.py`
+Cluster management and health. Source: `commands/cluster.py`
 
 | Subcommand | Description |
 |------------|-------------|
 | `list` | List clusters |
 | `get` | Get cluster details |
+| `create` | Create a cluster |
+| `update` | Update cluster settings |
+| `delete` | Delete a cluster |
+| `vsan-status` | Show vSAN health status (`--name` to filter by cluster) |
 
 ### `vrg node`
 
@@ -570,6 +616,71 @@ Node management. Source: `commands/node.py`
 | `get` | Get node details |
 | `maintenance` | Enable or disable maintenance mode (`--enable`/`--disable`) |
 | `restart` | Restart a node |
+| `pci-list` | List PCI devices on a node |
+| `gpu-list` | List GPU devices on a node |
+| `stats` | Show node statistics (CPU, RAM, temperature) |
+
+### `vrg node nic`
+
+Node NIC monitoring and statistics. Source: `commands/node_nic.py`
+
+| Subcommand | Description |
+|------------|-------------|
+| `stats` | Show NIC traffic statistics (rx/tx bytes, packets, errors) |
+| `status` | Show NIC link status (speed, duplex, carrier) |
+| `fabric` | Show NIC fabric membership and role |
+
+All commands take a node name/key. Use `--nic <key>` to filter to a single NIC.
+
+### `vrg node lldp`
+
+LLDP neighbor discovery. Source: `commands/node_lldp.py`
+
+| Subcommand | Description |
+|------------|-------------|
+| `list` | List LLDP neighbors on a node (`--nic` to filter by NIC) |
+
+### `vrg node query`
+
+Run diagnostic queries on a physical node. Source: `commands/node_query.py`
+
+All commands take a node name/key as the first argument. Results are returned asynchronously via the query API.
+
+**Network diagnostics:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `ping` | Ping a host from the node |
+| `dns` | DNS resolution from the node |
+| `traceroute` | Traceroute from the node |
+| `tcpdump` | Packet capture on the node |
+| `arp` | Show ARP table |
+| `arp-scan` | Scan for hosts via ARP |
+
+**Storage & hardware:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `smartctl` | SMART health data for a drive |
+| `smartctl-test` | Run a SMART self-test |
+| `lsblk` | List block devices |
+| `dmidecode` | Hardware/BIOS information |
+
+**IPMI:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `ipmi-sensor` | IPMI sensor readings |
+| `ipmi-sel` | IPMI system event log |
+| `ipmi-fru` | IPMI FRU (field-replaceable unit) data |
+| `ipmi-lan` | IPMI LAN configuration |
+| `ipmi-chassis` | IPMI chassis status |
+
+**Generic:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `run` | Run an arbitrary query type |
 
 ### `vrg gpu`
 
@@ -1163,12 +1274,69 @@ System log viewing. Source: `commands/log.py`
 
 ### `vrg system`
 
-System information. Source: `commands/system.py`
+System information and management. Source: `commands/system.py`
 
 | Subcommand | Description |
 |------------|-------------|
 | `info` | Show system info and statistics |
 | `version` | Show VergeOS version |
+| `inventory` | Full system inventory (`--vms`, `--nodes` to filter) |
+
+### `vrg system settings`
+
+System settings management. Source: `commands/system.py`
+
+| Subcommand | Description |
+|------------|-------------|
+| `list` | Show system settings (`--modified` for changed only) |
+| `get` | Get a specific setting value and default |
+| `set` | Change a system setting |
+| `reset` | Reset a setting to its default |
+
+### `vrg system license`
+
+License management. Source: `commands/system.py`
+
+| Subcommand | Description |
+|------------|-------------|
+| `list` | List licenses with validity status |
+| `get` | Get license details (validity, features, auto-renewal) |
+| `add` | Add a license key |
+| `generate-payload` | Generate air-gap license request payload |
+
+### `vrg system diag`
+
+System diagnostic bundle management. Source: `commands/system_diag.py`
+
+| Subcommand | Description |
+|------------|-------------|
+| `list` | List diagnostic bundles |
+| `create` | Create a new diagnostic bundle |
+| `get` | Get bundle details |
+| `send` | Send a bundle to support |
+| `delete` | Delete a diagnostic bundle |
+
+### `vrg doctor`
+
+System health checks against best practices. Source: `commands/doctor.py`
+
+Runs 15 automated checks covering connectivity, clusters, nodes, storage, alarms, updates, version consistency, NIC fabric, networks, certificates, licenses, drive SMART health, DIMM health, vSAN journal, and driver reload state.
+
+| Option | Description |
+|--------|-------------|
+| `--check <names>` | Comma-separated check names to run (e.g. `--check connectivity,alarms`) |
+| `--list-checks` | Print all available check names and exit |
+
+**Available checks:** `connectivity`, `clusters`, `nodes`, `storage`, `alarms`, `updates`, `versions`, `fabric`, `networks`, `certificates`, `licenses`, `drive_smart`, `dimm_health`, `vsan_journal`, `driver_reload`
+
+**Exit codes:** 0 if all checks pass/warn/skip, 1 if any check fails.
+
+```bash
+vrg doctor                                    # Run all checks
+vrg doctor --check connectivity,alarms        # Run specific checks
+vrg doctor --list-checks                      # List check names
+vrg -o json doctor                            # JSON output with details
+```
 
 ### `vrg configure`
 

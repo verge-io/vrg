@@ -45,12 +45,17 @@ vrg/
 │   ├── utils.py            # Resolver (name→key) and waiter utilities
 │   ├── template/           # VM template subsystem (loader, schema, resolver, builder, units)
 │   ├── schemas/            # JSON schema for .vrg.yaml templates
-│   └── commands/           # Command modules (~75 files, organized by domain)
+│   ├── multi.py            # Multi-profile list infrastructure (--all-profiles)
+│   └── commands/           # Command modules (~80 files, organized by domain)
+│       ├── _query_helpers.py   # Shared async query infrastructure (run_query, output_query_result)
 │       ├── vm.py, vm_drive.py, vm_nic.py, vm_device.py, vm_snapshot.py
 │       ├── network.py, network_rule.py, network_dns.py, network_host.py, network_alias.py, network_diag.py
+│       ├── network_query.py, network_dashboard.py
 │       ├── tenant.py, tenant_node.py, tenant_storage.py, tenant_net.py, tenant_snapshot.py, tenant_stats.py, tenant_share.py
 │       ├── nas.py, nas_service.py, nas_volume.py, nas_cifs.py, nas_nfs.py, nas_user.py, nas_sync.py, nas_files.py
-│       ├── cluster.py, node.py, storage.py, snapshot.py, snapshot_profile.py, site.py, site_sync*.py
+│       ├── cluster.py, node.py, node_nic.py, node_lldp.py, node_query.py
+│       ├── storage.py, snapshot.py, snapshot_profile.py, site.py, site_sync*.py
+│       ├── system_diag.py, doctor.py
 │       ├── user.py, group.py, permission.py, api_key.py, auth_source.py
 │       ├── task.py, task_schedule.py, task_trigger.py, task_event.py, task_script.py
 │       ├── recipe.py, recipe_section.py, recipe_question.py, recipe_instance.py, recipe_log.py
