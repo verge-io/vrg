@@ -99,6 +99,50 @@ Output helpers in `verge_cli.output`:
 
 **Important**: `output_result()` takes `data` as its first arg (not a context object) and requires explicit keyword args: `output_format`, `query`, `quiet`, `no_color`.
 
+## Async Query Pattern
+
+Network and node diagnostic commands use an async query API. The `_query_helpers.py` module provides shared infrastructure:
+
+```python
+from verge_cli.commands._query_helpers import run_query, output_query_result
+
+result = run_query(
+    net_obj.queries,        # Any QueryManager (VNet, Node, etc.)
+    "ping",                 # Query type string
+    {"host": "8.8.8.8"},   # Parameters
+    timeout=30,
+    quiet=vctx.quiet,
+    label="Running ping...",
+)
+output_query_result(result, output_format=vctx.output_format, ...)
+```
+
+`run_query()` submits the query, polls for completion with a Rich spinner, and raises `CliError` on timeout or failure. Used by `network_query.py` and `node_query.py`.
+
+## Multi-Profile List
+
+The `--all-profiles` global flag runs a `list` command across every configured profile and merges the results. Commands opt in by checking `ctx.obj["all_profiles"]` early and calling `list_all_profiles()` from `verge_cli.multi`:
+
+```python
+if ctx.obj.get("all_profiles"):
+    list_all_profiles(ctx, lambda c: c.vms.list(), _vm_to_dict, VM_COLUMNS)
+```
+
+Each profile is queried in sequence, results are tagged with a `profile` column, and output is merged into a single table.
+
+## Doctor Check Registry
+
+`commands/doctor.py` uses a decorator-based registry for health checks:
+
+```python
+@_register("connectivity")
+def check_connectivity(client: VergeClient) -> CheckResult:
+    ...
+    return CheckResult(name="connectivity", status=PASS, message="OK")
+```
+
+`CheckResult` is a frozen dataclass with `name`, `status` (pass/warn/fail/skip), `message`, and optional `details` dict. The `run_checks()` function iterates registered checks, isolating exceptions per-check.
+
 ## Update Operations
 
 Use the read-patch-write pattern when the API doesn't support partial updates:

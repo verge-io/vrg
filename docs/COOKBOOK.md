@@ -384,3 +384,173 @@ Pull a single field with `--query`:
 ```bash
 vrg --query status vm get web-server
 ```
+
+### Multi-Profile
+
+List resources across all configured profiles:
+
+```bash
+vrg --all-profiles vm list
+vrg --all-profiles -o json tenant list
+```
+
+Each result row includes a `profile` column showing which profile it came from.
+
+---
+
+## Recipe 7: Network Diagnostics
+
+**Goal:** Troubleshoot network connectivity using built-in diagnostic queries.
+
+### Quick Health Check
+
+```bash
+# DHCP leases and addresses
+vrg network diag leases my-network
+vrg network diag addresses my-network
+
+# Network quality and monitoring history
+vrg network diag quality External
+vrg network diag history External --limit 10
+```
+
+### Query Commands
+
+All query commands run on the network's virtual router and return results asynchronously.
+
+```bash
+# Ping and DNS from the network
+vrg network query ping External 8.8.8.8
+vrg network query dns External example.com
+
+# Traceroute and TCP connectivity
+vrg network query traceroute External 8.8.8.8
+vrg network query tcp-connect External 8.8.8.8 443
+
+# Firewall inspection
+vrg network query firewall External
+vrg network query trace External 10.0.0.5
+
+# ARP and discovery
+vrg network query arp External
+vrg network query arp-scan my-network
+
+# JSON output for scripting
+vrg -o json network query ping External 8.8.8.8
+```
+
+### Network Dashboard
+
+```bash
+vrg network diag dashboard overview
+vrg network diag dashboard ipsec-status my-vpn-network
+vrg network diag dashboard wireguard-status my-wg-network
+```
+
+---
+
+## Recipe 8: Node Troubleshooting
+
+**Goal:** Diagnose hardware and connectivity issues on a physical node.
+
+### Network Diagnostics
+
+```bash
+vrg node query ping node1 8.8.8.8
+vrg node query dns node1 example.com
+vrg node query traceroute node1 8.8.8.8
+vrg node query arp node1
+```
+
+### Storage Health
+
+```bash
+# SMART data for a drive
+vrg node query smartctl node1 /dev/sda
+
+# Block device layout
+vrg node query lsblk node1
+
+# Hardware inventory
+vrg node query dmidecode node1
+```
+
+### IPMI
+
+```bash
+vrg node query ipmi-sensor node1    # Temperature, voltage, fan readings
+vrg node query ipmi-chassis node1   # Power state, intrusion detection
+vrg node query ipmi-sel node1       # System event log
+vrg node query ipmi-fru node1       # FRU data (serial numbers, part numbers)
+vrg node query ipmi-lan node1       # IPMI network configuration
+```
+
+### NIC Monitoring
+
+```bash
+vrg node nic stats node1             # Traffic counters (rx/tx bytes, packets)
+vrg node nic status node1            # Link state (speed, duplex, carrier)
+vrg node nic fabric node1            # Fabric membership and role
+vrg node nic stats node1 --nic 3     # Single NIC only
+```
+
+### LLDP Neighbors
+
+```bash
+vrg node lldp list node1             # All discovered neighbors
+vrg node lldp list node1 --nic 5     # Filter by NIC
+```
+
+---
+
+## Recipe 9: System Health Check
+
+**Goal:** Run automated health checks to verify system best practices.
+
+### Full Check
+
+```bash
+vrg doctor
+```
+
+Runs all 15 checks and displays a summary table with pass/warn/fail/skip status for each.
+
+### Targeted Checks
+
+```bash
+# Infrastructure basics
+vrg doctor --check connectivity,clusters,nodes,storage
+
+# Security and compliance
+vrg doctor --check certificates,licenses
+
+# Hardware health
+vrg doctor --check drive_smart,dimm_health,fabric
+
+# Operational state
+vrg doctor --check alarms,updates,versions
+```
+
+### Scripting
+
+```bash
+# JSON output for automation
+vrg -o json doctor | jq '.[] | select(.status == "fail")'
+
+# List available check names
+vrg doctor --list-checks
+
+# Exit code: 0 = healthy, 1 = failures
+vrg doctor && echo "All clear" || echo "Issues found"
+```
+
+### Diagnostic Bundles
+
+Collect and send a diagnostic bundle to support:
+
+```bash
+vrg system diag list                           # List existing bundles
+vrg system diag create                         # Create a new bundle
+vrg system diag send <bundle-name-or-key>      # Send to support
+vrg system diag delete <bundle-name-or-key> --yes  # Clean up
+```
