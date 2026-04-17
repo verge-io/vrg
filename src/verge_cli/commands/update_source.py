@@ -15,8 +15,52 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="source",
-    help="Manage update sources.",
+    help=(
+        "Manage update sources — remote servers that publish VergeOS"
+        " `ybpkg` packages.\n\n"
+        "An *update source* is a row in `update_sources`: a URL pointing"
+        " at a VergeOS update server, optionally protected by a user and"
+        " password. Multiple sources can be configured, but only one is"
+        " *active* at a time — the active source is named in"
+        " `update_settings.source` and determines which branches and"
+        " packages `vrg update check` sees. Authoring a source does not"
+        " activate it; use `vrg update configure --source <key>` to"
+        " switch.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `name`, `url`, `enabled`, `last_refreshed`, `last_updated`."
+        " Looking up by name returns exit 6 (not found) or exit 7 (multiple"
+        " matches) when ambiguous — pass the numeric `$key` to disambiguate.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List configured sources\n"
+        "    vrg update source list\n\n"
+        "    # Scope to enabled sources only\n"
+        "    vrg update source list --enabled\n\n"
+        "    # Inspect one source as JSON\n"
+        "    vrg -o json update source get verge-updates\n\n"
+        "    # Check refresh/download/install status for a source\n"
+        "    vrg update source status verge-updates\n\n"
+        "    # Add a new authenticated mirror\n"
+        "    vrg update source create --name internal-mirror \\\n"
+        "        --url https://updates.internal.example.com \\\n"
+        "        --user deploy --password $UPDATE_TOKEN\n\n"
+        "    # Disable a source without deleting it\n"
+        "    vrg update source update verge-updates --disabled\n\n"
+        "    # Remove a source (requires confirmation)\n"
+        "    vrg update source delete legacy-mirror\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Creating or editing a source does not change which source is"
+        " active. Run `vrg update configure --source <key>` to switch,"
+        " then `vrg update check` to repopulate the candidate package list"
+        " against the new source.\n\n"
+        "`vrg update source status` reports the current pipeline stage"
+        " for a source: `idle`, `refreshing`, `downloading`, `installing`,"
+        " `applying`, or `error`. Wait for `idle` before starting another"
+        " operation against the same source."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 SOURCE_COLUMNS: list[ColumnDef] = [
@@ -87,9 +131,7 @@ def list_cmd(
 ) -> None:
     """List update sources."""
     if ctx.obj.get("all_profiles"):
-        list_all_profiles(
-            ctx, lambda c: c.update_sources.list(), _source_to_dict, SOURCE_COLUMNS
-        )
+        list_all_profiles(ctx, lambda c: c.update_sources.list(), _source_to_dict, SOURCE_COLUMNS)
         return
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
