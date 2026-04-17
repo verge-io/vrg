@@ -14,8 +14,39 @@ from verge_cli.utils import confirm_action, resolve_nas_resource, resolve_resour
 
 app = typer.Typer(
     name="instance",
-    help="Manage recipe instances (deployed VMs).",
+    help=(
+        "Manage VM recipe instances — VMs deployed from a recipe.\n\n"
+        "A **recipe instance** is the link between a deployed VM and the"
+        " recipe it was created from. Every `vrg recipe deploy` produces an"
+        " instance row that records the source recipe, the answer values"
+        " supplied at deploy time, and whether the VM should auto-update"
+        " when the recipe is republished.\n\n"
+        "Instances are tracking metadata, not the VM itself. Deleting an"
+        " instance only detaches the VM from its recipe; the VM keeps"
+        " running. To remove the VM, use `vrg vm delete`. A recipe with"
+        " any attached instances cannot be deleted until the instances are"
+        " detached.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every recipe instance on the system\n"
+        "    vrg recipe instance list\n\n"
+        "    # Filter instances to a specific recipe\n"
+        "    vrg recipe instance list --recipe ubuntu-server\n\n"
+        "    # Inspect an instance as JSON (includes recipe + auto-update flag)\n"
+        "    vrg -o json recipe instance get web-02\n\n"
+        "    # Detach an instance from its recipe (the VM is not deleted)\n"
+        "    vrg recipe instance delete web-02 --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Instances are referenced by name or numeric key. When a name"
+        " matches multiple instances, vrg prints all matches and exits with"
+        " code 7 — use the key to disambiguate.\n\n"
+        "Instances created with `--auto-update` are re-templated when the"
+        " source recipe is republished. Instances without auto-update stay"
+        " on the recipe version they were deployed from."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 RECIPE_INSTANCE_COLUMNS: list[ColumnDef] = [
