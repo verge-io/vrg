@@ -87,7 +87,21 @@ def nic_stats(
         typer.Option("--nic", help="Show only this NIC (by key)."),
     ] = None,
 ) -> None:
-    """Show NIC traffic statistics for a node."""
+    """Show NIC traffic statistics for a node.
+
+    Examples:
+
+        # Packet and byte counters for every NIC on node1
+        vrg node nic stats node1
+
+        # Drill into one NIC by its node-local key
+        vrg node nic stats node1 --nic 2
+
+        # Find hot NICs (> 100k pps out)
+        vrg -o json node nic stats node1 --query "[?txpps>`100000`]"
+
+    Read-only. NICs with no cached stats are skipped silently.
+    """
     vctx = get_context(ctx)
     nics = _get_node_nics(vctx, node, nic)
 
@@ -119,7 +133,17 @@ def nic_status(
         typer.Option("--nic", help="Show only this NIC (by key)."),
     ] = None,
 ) -> None:
-    """Show NIC link status for a node."""
+    """Show NIC link status for a node.
+
+    Examples:
+
+        vrg node nic status node1
+        vrg node nic status node1 --nic 2
+        vrg -o json node nic status node1 --query "[?status=='down']"
+
+    Reports kernel-level link state (up/down), negotiated speed, and
+    duplex. First check when a node looks isolated.
+    """
     vctx = get_context(ctx)
     nics = _get_node_nics(vctx, node, nic)
 
@@ -151,7 +175,18 @@ def nic_fabric(
         typer.Option("--nic", help="Show only this NIC (by key)."),
     ] = None,
 ) -> None:
-    """Show NIC fabric status for a node."""
+    """Show NIC fabric status for a node.
+
+    Examples:
+
+        vrg node nic fabric node1
+        vrg node nic fabric node1 --nic 2
+        vrg -o json node nic fabric node1 --query "[?status!='confirmed']"
+
+    Reports vSAN fabric reachability per NIC: `confirmed` (full path),
+    `degraded` (partial), or `no_path` (isolated from peers). Combine
+    with `vrg node lldp list` to figure out which uplink is cabled wrong.
+    """
     vctx = get_context(ctx)
     nics = _get_node_nics(vctx, node, nic)
 
