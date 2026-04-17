@@ -105,7 +105,21 @@ def oidc_log_list(
         typer.Option("--limit", "-l", help="Maximum number of log entries."),
     ] = 50,
 ) -> None:
-    """List OIDC application logs."""
+    """List OIDC application logs.
+
+    Examples:
+
+        vrg oidc log list partner-portal
+        vrg oidc log list partner-portal --errors
+        vrg oidc log list partner-portal --level audit --limit 500
+        vrg -o json oidc log list partner-portal --limit 1000
+
+    `--errors` matches `error` and `critical`; `--warnings` matches
+    `warning`. Both are mutually exclusive with `--level`. `--limit`
+    defaults to 50 — raise it when searching back through history.
+    Useful `--query` fields: `timestamp`, `level`, `user_display`,
+    `text`, `is_error`, `is_warning`.
+    """
     vctx = get_context(ctx)
     app_key = _resolve_oidc_app(vctx.client, oidc_app)
     logs_mgr = vctx.client.oidc_applications.logs(app_key)
@@ -138,7 +152,17 @@ def oidc_log_get(
     oidc_app: Annotated[str, typer.Argument(help="OIDC application name or key.")],
     log_id: Annotated[int, typer.Argument(help="Log entry key.")],
 ) -> None:
-    """Get a specific OIDC application log entry."""
+    """Get a specific OIDC application log entry.
+
+    Examples:
+
+        vrg oidc log get partner-portal 8421
+        vrg -o json oidc log get partner-portal 8421
+        vrg -o json oidc log get partner-portal 8421 --query "text"
+
+    Use `vrg oidc log list` to find the entry key, then `get` for the
+    full record.
+    """
     vctx = get_context(ctx)
     app_key = _resolve_oidc_app(vctx.client, oidc_app)
     logs_mgr = vctx.client.oidc_applications.logs(app_key)

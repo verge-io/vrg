@@ -145,7 +145,19 @@ def auth_source_list(
         typer.Option("--filter", help="OData filter expression."),
     ] = None,
 ) -> None:
-    """List authentication sources."""
+    """List authentication sources.
+
+    Examples:
+
+        vrg auth-source list
+        vrg auth-source list --driver azure
+        vrg -o json auth-source list --query "[?show_on_login].name"
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    Useful `--query` fields: `name`, `driver`, `show_on_login`, `debug`.
+    The driver-specific `settings` blob is only included via
+    `auth-source get --show-settings`.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(
             ctx, lambda c: c.auth_sources.list(), _auth_source_to_dict, AUTH_SOURCE_COLUMNS
@@ -181,7 +193,20 @@ def auth_source_get(
         typer.Option("--show-settings", help="Include sensitive settings in output."),
     ] = False,
 ) -> None:
-    """Get details of an authentication source."""
+    """Get details of an authentication source.
+
+    Examples:
+
+        vrg auth-source get corporate-sso
+        vrg -o json auth-source get corporate-sso --show-settings
+        vrg -o json auth-source get 4 --show-settings \\
+            --query "settings.{client: client_id, tenant: tenant_id}"
+
+    `--show-settings` includes the driver-specific `settings` blob
+    (client ID, secret, endpoints, scopes). Omitted by default because
+    it contains credentials. Resolves by name or numeric key; ambiguous
+    names exit 7.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.auth_sources, auth_source, "Auth source")
@@ -243,7 +268,25 @@ def auth_source_create(
         typer.Option("--settings-json", help="Raw JSON string for driver-specific settings."),
     ] = None,
 ) -> None:
-    """Create a new authentication source."""
+    """Create a new authentication source.
+
+    Examples:
+
+        vrg auth-source create --name corporate-sso --driver azure \\
+            --tenant-id 11111111-2222-3333-4444-555555555555 \\
+            --client-id my-app-id --client-secret s3cret \\
+            --show-on-login --button-icon bi-microsoft
+        vrg auth-source create --name google-sso --driver google \\
+            --client-id xxx.apps.googleusercontent.com \\
+            --client-secret s3cret --auto-create-users
+        vrg auth-source create --name custom-idp --driver openid \\
+            --settings-json '{"issuer_url":"https://idp.example.com"}'
+
+    `--driver` is immutable after creation (`azure`, `google`, `gitlab`,
+    `okta`, `openid`, `oauth2`, `verge.io`). Individual flags override
+    matching keys in `--settings-json`; for driver-specific fields not
+    covered by a flag, pass the full JSON blob.
+    """
     vctx = get_context(ctx)
 
     settings = _build_settings(
@@ -316,7 +359,18 @@ def auth_source_update(
         typer.Option("--settings-json", help="Raw JSON string for driver-specific settings."),
     ] = None,
 ) -> None:
-    """Update an authentication source."""
+    """Update an authentication source.
+
+    Examples:
+
+        vrg auth-source update corporate-sso --client-secret new-s3cret
+        vrg auth-source update corporate-sso --no-show-on-login
+        vrg auth-source update corporate-sso --button-bg-color '#0078d4'
+
+    Pass at least one field to change; calling without any option exits 2.
+    `--driver` cannot be changed here — delete and recreate the source
+    to switch providers.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.auth_sources, auth_source, "Auth source")
@@ -363,7 +417,18 @@ def auth_source_delete(
     auth_source: Annotated[str, typer.Argument(help="Auth source name or key.")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation.")] = False,
 ) -> None:
-    """Delete an authentication source."""
+    """Delete an authentication source.
+
+    Examples:
+
+        vrg auth-source delete corporate-sso
+        vrg auth-source delete corporate-sso -y
+        vrg auth-source delete 4 -y
+
+    **Destructive.** Users currently authenticated via this source keep
+    their existing sessions, but future logins through it will fail.
+    Local users whose passwords still work continue to authenticate.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.auth_sources, auth_source, "Auth source")
@@ -385,7 +450,15 @@ def auth_source_debug_on(
 ) -> None:
     """Enable debug logging for an authentication source.
 
-    Debug mode auto-disables after 1 hour.
+    Examples:
+
+        vrg auth-source debug-on corporate-sso
+        vrg auth-source debug-on 4
+
+    Debug mode auto-disables after 1 hour to limit log volume. Use
+    `auth-source debug-off` to turn it off earlier. Useful when
+    troubleshooting a failed login flow — inspect `vrg log` afterwards
+    for the emitted diagnostic events.
     """
     vctx = get_context(ctx)
 
@@ -405,7 +478,16 @@ def auth_source_debug_off(
     ctx: typer.Context,
     auth_source: Annotated[str, typer.Argument(help="Auth source name or key.")],
 ) -> None:
-    """Disable debug logging for an authentication source."""
+    """Disable debug logging for an authentication source.
+
+    Examples:
+
+        vrg auth-source debug-off corporate-sso
+        vrg auth-source debug-off 4
+
+    Clears debug logging earlier than the 1-hour auto-disable. Safe to
+    call when debug is already off.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.auth_sources, auth_source, "Auth source")
