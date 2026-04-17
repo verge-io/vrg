@@ -334,8 +334,13 @@ def zone_list(
 ) -> None:
     """List DNS zones for a view.
 
-    Shows all BIND DNS zones configured in the view.
-    Changes require apply-dns to take effect.
+    **Examples:**
+
+        vrg network dns zone list internal-prod internal
+        vrg -o json network dns zone list internal-prod internal
+
+    Only meaningful when the network has `dns=bind`. Zone changes
+    require `vrg network apply-dns <network>` to take effect.
     """
     vctx = get_context(ctx)
 
@@ -366,7 +371,15 @@ def zone_get(
     view: Annotated[str, typer.Argument(help="View name or key")],
     zone: Annotated[str, typer.Argument(help="Zone domain or key")],
 ) -> None:
-    """Get details of a DNS zone."""
+    """Get details of a DNS zone.
+
+    **Examples:**
+
+        vrg network dns zone get internal-prod internal example.com
+        vrg -o json network dns zone get internal-prod internal 42
+
+    Zones are resolved by domain name or numeric key within the view.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -400,8 +413,18 @@ def zone_create(
 ) -> None:
     """Create a new DNS zone.
 
-    Creates a BIND DNS zone in the view. Zone commands work on
-    networks with BIND enabled. Changes require apply-dns to take effect.
+    **Examples:**
+
+        # Authoritative master zone
+        vrg network dns zone create internal-prod internal \\
+            --domain example.com --type master
+
+        # Slave zone (transfers from a master)
+        vrg network dns zone create internal-prod internal \\
+            --domain example.com --type slave
+
+    Only valid when the network has `dns=bind`. Zone changes are
+    **staged** — run `vrg network apply-dns <network>` to activate.
     """
     vctx = get_context(ctx)
 
@@ -445,7 +468,13 @@ def zone_update(
 ) -> None:
     """Update a DNS zone.
 
-    Changes require apply-dns to take effect.
+    **Examples:**
+
+        vrg network dns zone update internal-prod internal example.com \\
+            --domain internal.example.com
+
+    Changes are **staged** — run `vrg network apply-dns <network>`
+    to activate. Exits with code 2 if no updates are specified.
     """
     vctx = get_context(ctx)
 
@@ -493,8 +522,14 @@ def zone_delete(
 ) -> None:
     """Delete a DNS zone.
 
-    This will delete the zone and all its records.
-    Changes require apply-dns to take effect.
+    **Examples:**
+
+        vrg network dns zone delete internal-prod internal example.com
+        vrg network dns zone delete internal-prod internal example.com --yes
+
+    Destructive — removes the zone and all its records. Change is
+    **staged** — run `vrg network apply-dns <network>` to activate.
+    Prompts for confirmation unless `--yes` is passed.
     """
     vctx = get_context(ctx)
 
@@ -535,8 +570,13 @@ def record_list(
 ) -> None:
     """List DNS records for a zone.
 
-    Shows all DNS records in the specified zone.
-    Changes require apply-dns to take effect.
+    **Examples:**
+
+        vrg network dns record list internal-prod internal example.com
+        vrg network dns record list internal-prod internal example.com --type A
+        vrg -o json network dns record list internal-prod internal example.com --type MX
+
+    Filter by type (A/AAAA/CNAME/MX/TXT/NS/PTR/SRV/CAA) with `--type`.
     """
     vctx = get_context(ctx)
 
@@ -576,7 +616,15 @@ def record_get(
     zone: Annotated[str, typer.Argument(help="Zone domain or key")],
     record: Annotated[str, typer.Argument(help="Record ID")],
 ) -> None:
-    """Get details of a DNS record."""
+    """Get details of a DNS record.
+
+    **Examples:**
+
+        vrg network dns record get internal-prod internal example.com www
+        vrg -o json network dns record get internal-prod internal example.com 42
+
+    Records are resolved by host name or numeric key within the zone.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -621,12 +669,23 @@ def record_create(
 ) -> None:
     """Create a new DNS record.
 
-    Creates a DNS record in the specified zone.
-    Changes require apply-dns to take effect.
+    **Examples:**
 
-    Examples:
-        vrg network dns record create mynet internal example.com --name www --type A --value 10.0.0.100
-        vrg network dns record create mynet internal example.com --name @ --type MX --value mail.example.com --priority 10
+        # A record for a web server
+        vrg network dns record create internal-prod internal example.com \\
+            --name www --type A --value 10.0.1.50
+
+        # Zone apex MX record
+        vrg network dns record create internal-prod internal example.com \\
+            --name @ --type MX --value mail.example.com --priority 10
+
+        # CNAME alias
+        vrg network dns record create internal-prod internal example.com \\
+            --name api --type CNAME --value www.example.com
+
+    Supports A, AAAA, CNAME, MX, TXT, NS, PTR, SRV, CAA. Use
+    `--priority` for MX and SRV. Change is **staged** — run
+    `vrg network apply-dns <network>` to activate.
     """
     vctx = get_context(ctx)
 
@@ -682,7 +741,16 @@ def record_update(
 ) -> None:
     """Update a DNS record.
 
-    Changes require apply-dns to take effect.
+    **Examples:**
+
+        # Point the record at a new IP
+        vrg network dns record update internal-prod internal example.com www --value 10.0.1.51
+
+        # Lower the TTL before a planned change
+        vrg network dns record update internal-prod internal example.com www --ttl 60
+
+    Change is **staged** — run `vrg network apply-dns <network>`
+    to activate. Exits with code 2 if no updates are specified.
     """
     vctx = get_context(ctx)
 
@@ -740,7 +808,13 @@ def record_delete(
 ) -> None:
     """Delete a DNS record.
 
-    Changes require apply-dns to take effect.
+    **Examples:**
+
+        vrg network dns record delete internal-prod internal example.com www
+        vrg network dns record delete internal-prod internal example.com www --yes
+
+    Change is **staged** — run `vrg network apply-dns <network>`
+    to activate. Prompts for confirmation unless `--yes` is passed.
     """
     vctx = get_context(ctx)
 
@@ -779,8 +853,13 @@ def view_list(
 ) -> None:
     """List DNS views for a network.
 
-    DNS views enable split-horizon DNS where different clients see
-    different responses for the same domain.
+    **Examples:**
+
+        vrg network dns view list internal-prod
+        vrg -o json network dns view list internal-prod
+
+    Views implement split-horizon DNS — the first view whose
+    `match_clients` ACL matches the query handles it.
     """
     vctx = get_context(ctx)
 
@@ -807,7 +886,16 @@ def view_get(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     view: Annotated[str, typer.Argument(help="View name or key")],
 ) -> None:
-    """Get details of a DNS view."""
+    """Get details of a DNS view.
+
+    **Examples:**
+
+        vrg network dns view get internal-prod internal
+        vrg -o json network dns view get internal-prod 42
+
+    `match_clients` is displayed as comma-separated CIDRs (BIND's
+    semicolon-delimited format is converted for readability).
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -850,12 +938,20 @@ def view_create(
 ) -> None:
     """Create a new DNS view.
 
-    DNS views enable split-horizon DNS where different clients see
-    different responses for the same domain. Changes require apply-dns.
+    **Examples:**
 
-    Examples:
-        vrg network dns view create mynet --name internal --recursion
-        vrg network dns view create mynet --name external --match-clients "0.0.0.0/0"
+        # Internal split-horizon view with recursion
+        vrg network dns view create internal-prod --name internal --recursion \\
+            --match-clients "10.0.0.0/8,192.168.0.0/16"
+
+        # External authoritative-only view
+        vrg network dns view create internal-prod --name external --no-recursion \\
+            --match-clients "0.0.0.0/0"
+
+    Views are evaluated in order — put the most specific
+    `match_clients` first. `match_clients` accepts comma-separated
+    CIDRs (vrg converts to BIND's semicolon format). Change is
+    **staged** — run `vrg network apply-dns <network>` to activate.
     """
     vctx = get_context(ctx)
 
@@ -911,7 +1007,17 @@ def view_update(
 ) -> None:
     """Update a DNS view.
 
-    Changes require apply-dns to take effect.
+    **Examples:**
+
+        # Expand the client ACL
+        vrg network dns view update internal-prod internal \\
+            --match-clients "10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
+
+        # Disable recursion
+        vrg network dns view update internal-prod internal --no-recursion
+
+    Change is **staged** — run `vrg network apply-dns <network>`
+    to activate. Exits with code 2 if no updates are specified.
     """
     vctx = get_context(ctx)
 
@@ -961,8 +1067,14 @@ def view_delete(
 ) -> None:
     """Delete a DNS view.
 
-    This will delete the view and all its zones and records.
-    Changes require apply-dns to take effect.
+    **Examples:**
+
+        vrg network dns view delete internal-prod internal
+        vrg network dns view delete internal-prod internal --yes
+
+    Destructive — removes the view, all its zones, and all their
+    records. Change is **staged** — run `vrg network apply-dns
+    <network>` to activate. Prompts unless `--yes` is passed.
     """
     vctx = get_context(ctx)
 

@@ -99,7 +99,18 @@ def query_ping(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Ping a host from a network's virtual router."""
+    """Ping a host from a network's virtual router.
+
+    **Examples:**
+
+        vrg network query ping internal-prod 10.0.1.5
+        vrg network query ping external-wan 8.8.8.8 --timeout 10
+        vrg -o json network query ping internal-prod api.example.com
+
+    Runs ICMP echo from **inside** the vnet container — this is the
+    router's reachability, not your workstation's. Default timeout
+    is 30 seconds.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
     net_obj = vctx.client.networks.get(net_key)
@@ -133,7 +144,17 @@ def query_dns(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Resolve a DNS name from a network's virtual router."""
+    """Resolve a DNS name from a network's virtual router.
+
+    **Examples:**
+
+        vrg network query dns internal-prod api.example.com
+        vrg -o json network query dns external-wan www.google.com
+
+    Resolves via the vnet's configured resolver — use this to verify
+    split-horizon DNS or detect misconfigured upstreams. Default
+    timeout is 30 seconds.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
     net_obj = vctx.client.networks.get(net_key)
@@ -167,7 +188,17 @@ def query_traceroute(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 60,
 ) -> None:
-    """Trace route to a host from a network's virtual router."""
+    """Trace route to a host from a network's virtual router.
+
+    **Examples:**
+
+        vrg network query traceroute internal-prod 10.0.1.5
+        vrg network query traceroute external-wan 8.8.8.8
+        vrg -o json network query traceroute external-wan 8.8.8.8 --timeout 120
+
+    Runs from inside the vnet container. Default timeout is 60
+    seconds — raise it for distant targets.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
     net_obj = vctx.client.networks.get(net_key)
@@ -212,7 +243,22 @@ def query_tcpdump(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 120,
 ) -> None:
-    """Capture packets on a network's virtual router."""
+    """Capture packets on a network's virtual router.
+
+    **Examples:**
+
+        # Capture 50 packets matching a BPF filter
+        vrg network query tcpdump internal-prod --count 50 --filter 'tcp port 443'
+
+        # Target a specific interface
+        vrg network query tcpdump internal-prod --interface eth0 --count 100
+
+        # Long-running capture with custom timeout
+        vrg network query tcpdump internal-prod --count 1000 --timeout 300
+
+    Generates real traffic load — be mindful on busy production
+    networks. Default timeout is 120 seconds.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
     net_obj = vctx.client.networks.get(net_key)
@@ -253,7 +299,16 @@ def query_arp(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Show ARP table for a network's virtual router."""
+    """Show ARP table for a network's virtual router.
+
+    **Examples:**
+
+        vrg network query arp internal-prod
+        vrg -o json network query arp internal-prod
+
+    Dumps the vnet's current ARP cache. Use `arp-scan` if you need
+    to actively discover neighbours.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
     net_obj = vctx.client.networks.get(net_key)
@@ -285,7 +340,16 @@ def query_arp_scan(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Scan for hosts via ARP on a network."""
+    """Scan for hosts via ARP on a network.
+
+    **Examples:**
+
+        vrg network query arp-scan internal-prod
+        vrg -o json network query arp-scan internal-prod
+
+    Actively discovers L2 neighbours on the local segment. Generates
+    ARP traffic on the wire — avoid on sensitive production networks.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
     net_obj = vctx.client.networks.get(net_key)
@@ -317,7 +381,18 @@ def query_firewall(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Show nftables firewall rules for a network."""
+    """Show nftables firewall rules for a network.
+
+    **Examples:**
+
+        vrg network query firewall internal-prod
+        vrg -o json network query firewall internal-prod
+
+    Returns the **live** `nft list ruleset` output — the compiled
+    nftables rules actually loaded in the vnet container. Compare
+    against `vrg network rule list` to spot staged changes that
+    haven't been applied yet.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
     net_obj = vctx.client.networks.get(net_key)
@@ -349,7 +424,17 @@ def query_trace(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Run nftables packet trace on a network."""
+    """Run nftables packet trace on a network.
+
+    **Examples:**
+
+        vrg network query trace internal-prod
+        vrg -o json network query trace internal-prod
+
+    Only returns useful output when nftables tracing is enabled —
+    either per-rule (`trace=true` on a firewall rule) or
+    network-wide. Otherwise returns an empty buffer.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
     net_obj = vctx.client.networks.get(net_key)
@@ -382,7 +467,20 @@ def query_nmap(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 120,
 ) -> None:
-    """Run nmap scan from a network's virtual router."""
+    """Run nmap scan from a network's virtual router.
+
+    **Examples:**
+
+        # Scan a single host
+        vrg network query nmap internal-prod 10.0.1.5
+
+        # Scan a subnet (raise timeout for large ranges)
+        vrg network query nmap internal-prod 10.0.1.0/24 --timeout 180
+
+    Runs from inside the vnet container. Default timeout is 120
+    seconds — scans of large CIDR ranges need longer. Generates
+    real scan traffic; avoid on networks that monitor for probing.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
     net_obj = vctx.client.networks.get(net_key)
@@ -417,7 +515,18 @@ def query_tcp_connect(
         typer.Option("--timeout", "-t", help="Max seconds to wait for result."),
     ] = 30,
 ) -> None:
-    """Test TCP connectivity to a host and port from a network."""
+    """Test TCP connectivity to a host and port from a network.
+
+    **Examples:**
+
+        vrg network query tcp-connect internal-prod db-01 5432
+        vrg network query tcp-connect external-wan api.example.com 443
+        vrg -o json network query tcp-connect internal-prod 10.0.1.5 8080
+
+    Probes a single TCP host:port from inside the vnet container —
+    faster and quieter than `nmap` when you just need a yes/no
+    answer on one port.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
     net_obj = vctx.client.networks.get(net_key)
@@ -457,8 +566,24 @@ def query_run(
 ) -> None:
     """Run an arbitrary query type on a network.
 
-    Escape hatch for query types without dedicated commands (ip, logs,
-    top, top_if, ipsec, whatsmyip, frr, dhcp_release_renew, wireguard).
+    **Examples:**
+
+        # Show interface addresses
+        vrg network query run internal-prod ip
+
+        # Top talkers on the vnet
+        vrg network query run internal-prod top --params '{"count": 20}'
+
+        # Show the vnet's public-facing IP
+        vrg network query run external-wan whatsmyip
+
+        # Release and renew a DHCP lease
+        vrg network query run internal-prod dhcp_release_renew
+
+    Escape hatch for query types without dedicated subcommands:
+    `ip`, `logs`, `top`, `top_if`, `ipsec`, `whatsmyip`, `frr`,
+    `dhcp_release_renew`, `wireguard`. Pass params as a JSON object
+    via `--params`. Default timeout is 120 seconds.
     """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "network")

@@ -128,7 +128,16 @@ def host_list(
     ctx: typer.Context,
     network: Annotated[str, typer.Argument(help="Network name or key")],
 ) -> None:
-    """List DNS/DHCP host overrides for a network."""
+    """List DNS/DHCP host overrides for a network.
+
+    **Examples:**
+
+        vrg network host list internal-prod
+        vrg -o json network host list internal-prod
+
+    Each entry is both a DHCP static reservation (`dhcp-host` in
+    dnsmasq) and — when DNS is enabled — an auto-registered A record.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -154,7 +163,16 @@ def host_get(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     host: Annotated[str, typer.Argument(help="Host hostname, IP, or key")],
 ) -> None:
-    """Get details of a DNS/DHCP host override."""
+    """Get details of a DNS/DHCP host override.
+
+    **Examples:**
+
+        vrg network host get internal-prod database-01
+        vrg network host get internal-prod 10.0.1.50
+        vrg -o json network host get internal-prod 42
+
+    Hosts are resolved by hostname, IP address, or numeric key.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -185,8 +203,18 @@ def host_create(
 ) -> None:
     """Create a new DNS/DHCP host override.
 
-    Host overrides map hostnames to IP addresses for DNS resolution
-    and DHCP static assignments. Changes require apply-dns to take effect.
+    **Examples:**
+
+        # Static IP for a specific hostname (DHCP reservation + DNS A record)
+        vrg network host create internal-prod --hostname database-01 --ip 10.0.1.50
+
+        # Domain-wide override
+        vrg network host create internal-prod --hostname example.com \\
+            --ip 10.0.1.10 --type domain
+
+    dnsmasq matches incoming DHCP requests by the client-provided
+    hostname (not MAC). Change is **staged** — run
+    `vrg network apply-dns <network>` to activate.
     """
     vctx = get_context(ctx)
 
@@ -223,7 +251,16 @@ def host_update(
 ) -> None:
     """Update a DNS/DHCP host override.
 
-    Changes require apply-dns to take effect.
+    **Examples:**
+
+        # Move the reservation to a new IP
+        vrg network host update internal-prod database-01 --ip 10.0.1.51
+
+        # Rename the host
+        vrg network host update internal-prod database-01 --hostname db-primary
+
+    Change is **staged** — run `vrg network apply-dns <network>`
+    to activate. Exits with code 2 if no updates are specified.
     """
     vctx = get_context(ctx)
 
@@ -269,7 +306,14 @@ def host_delete(
 ) -> None:
     """Delete a DNS/DHCP host override.
 
-    Changes require apply-dns to take effect.
+    **Examples:**
+
+        vrg network host delete internal-prod database-01
+        vrg network host delete internal-prod database-01 --yes
+
+    Removes both the DHCP reservation and the auto-registered A
+    record. Change is **staged** — run `vrg network apply-dns
+    <network>` to activate. Prompts unless `--yes` is passed.
     """
     vctx = get_context(ctx)
 

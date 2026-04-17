@@ -14,8 +14,33 @@ from verge_cli.utils import resolve_resource_id
 
 app = typer.Typer(
     name="dashboard",
-    help="Network dashboard and VPN status.",
+    help=(
+        "Aggregate network dashboard + VPN tunnel status (IPSec,"
+        " WireGuard).\n\n"
+        "`overview` returns the cluster-wide network dashboard payload"
+        " (same data the UI shows on the Networks dashboard). The"
+        " `ipsec-status` and `wireguard-status` subcommands drill into a"
+        " single vnet's active VPN connections and peer handshake state,"
+        " respectively — useful for verifying tunnels after config changes"
+        " or when troubleshooting disconnects.\n\n"
+        "All subcommands support `-o json` for machine-readable output.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Cluster-wide network dashboard summary\n"
+        "    vrg -o json network diag dashboard overview\n\n"
+        "    # Active IPSec connections on a specific vnet\n"
+        "    vrg network diag dashboard ipsec-status site-vpn\n\n"
+        "    # WireGuard peer handshake state for a vnet\n"
+        "    vrg -o json network diag dashboard wireguard-status remote-access\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "VPN status is read-only — configuration lives on the network"
+        " itself (IPSec) or on WireGuard interfaces attached to the"
+        " network. Ambiguous network names return **exit code 7** (multiple"
+        " matches); missing networks return **exit code 6** (not found)."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 IPSEC_CONNECTION_COLUMNS: list[ColumnDef] = [
@@ -66,7 +91,16 @@ def _wg_peer_to_dict(peer: Any) -> dict[str, Any]:
 @app.command("overview")
 @handle_errors()
 def dashboard_cmd(ctx: typer.Context) -> None:
-    """Display network dashboard summary."""
+    """Display network dashboard summary.
+
+    **Examples:**
+
+        vrg network diag dashboard overview
+        vrg -o json network diag dashboard overview
+
+    Cluster-wide aggregate — the same payload the web UI renders on
+    the Networks dashboard. Use `-o json` for agent consumption.
+    """
     vctx = get_context(ctx)
     dashboard = vctx.client.network_dashboard.get()
     output_result(
@@ -84,7 +118,17 @@ def ipsec_status_cmd(
     ctx: typer.Context,
     network: Annotated[str, typer.Argument(help="Network name or key")],
 ) -> None:
-    """Show IPSec active connections for a network."""
+    """Show IPSec active connections for a network.
+
+    **Examples:**
+
+        vrg network diag dashboard ipsec-status site-vpn
+        vrg -o json network diag dashboard ipsec-status site-vpn
+
+    Lists currently-established IPSec tunnels with local/remote
+    addresses and subnets. Read-only — to change config, update
+    the network's IPSec settings.
+    """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "Network")
     net_obj = vctx.client.networks.get(net_key)
@@ -108,8 +152,14 @@ def wireguard_status_cmd(
 ) -> None:
     """Show WireGuard peer status for a network.
 
-    Lists all WireGuard interfaces on the network and shows
-    peer connection status for each.
+    **Examples:**
+
+        vrg network diag dashboard wireguard-status remote-access
+        vrg -o json network diag dashboard wireguard-status remote-access
+
+    Aggregates peer status across **every** WireGuard interface on
+    the network. Each peer shows endpoint, last handshake time,
+    connection state, and transfer counters.
     """
     vctx = get_context(ctx)
     net_key = resolve_resource_id(vctx.client.networks, network, "Network")
