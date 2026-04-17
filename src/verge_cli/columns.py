@@ -219,6 +219,10 @@ RULE_COLUMNS = [
     # wide-only
     ColumnDef("description", wide_only=True),
     ColumnDef("dest_ip", header="Dest IP", wide_only=True),
+    ColumnDef("statistics", header="Stats", style_map=BOOL_STYLES, format_fn=format_bool_yn, wide_only=True),
+    ColumnDef("trace", header="Trace", style_map=BOOL_STYLES, format_fn=format_bool_yn, wide_only=True),
+    ColumnDef("packets", header="Packets", wide_only=True),
+    ColumnDef("bytes", header="Bytes", wide_only=True),
 ]
 
 ZONE_COLUMNS = [
@@ -983,4 +987,109 @@ GPU_DEVICE_COLUMNS: list[ColumnDef] = [
     ColumnDef("device", header="Device"),
     ColumnDef("driver"),
     ColumnDef("max_instances", header="Max Instances"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Network Monitor Stats
+# ---------------------------------------------------------------------------
+
+MONITOR_QUALITY_COLUMNS: list[ColumnDef] = [
+    ColumnDef("quality", header="Quality %"),
+    ColumnDef("latency_avg_ms", header="Latency Avg (ms)"),
+    ColumnDef("latency_peak_ms", header="Latency Peak (ms)"),
+    ColumnDef("sent", header="Sent"),
+    ColumnDef("dropped", header="Dropped"),
+    ColumnDef("dropped_pct", header="Drop %", wide_only=True),
+    ColumnDef("duplicates", header="Duplicates", wide_only=True),
+    ColumnDef("bad_checksums", header="Bad Checksums", wide_only=True),
+    ColumnDef("bad_data", header="Bad Data", wide_only=True),
+]
+
+MONITOR_HISTORY_COLUMNS: list[ColumnDef] = [
+    ColumnDef("timestamp", header="Timestamp"),
+    ColumnDef("quality", header="Quality %"),
+    ColumnDef("latency_avg_ms", header="Latency Avg (ms)"),
+    ColumnDef("latency_peak_ms", header="Latency Peak (ms)", wide_only=True),
+    ColumnDef("dropped", header="Dropped"),
+    ColumnDef("sent", header="Sent", wide_only=True),
+]
+
+
+# ---------------------------------------------------------------------------
+# LLDP Neighbors
+# ---------------------------------------------------------------------------
+
+LLDP_NEIGHBOR_COLUMNS: list[ColumnDef] = [
+    ColumnDef("$key", header="Key"),
+    ColumnDef("nic", header="NIC"),
+    ColumnDef("chassis_name", header="Chassis"),
+    ColumnDef("port_id", header="Port"),
+    ColumnDef("via", header="Via"),
+    ColumnDef("age", header="Age"),
+    ColumnDef("rid", header="Remote ID", wide_only=True),
+]
+
+
+# ---------------------------------------------------------------------------
+# NIC Stats / Status / Fabric
+# ---------------------------------------------------------------------------
+
+NIC_STATS_COLUMNS: list[ColumnDef] = [
+    ColumnDef("parent_nic", header="NIC"),
+    ColumnDef("txpps", header="TX pps"),
+    ColumnDef("rxpps", header="RX pps"),
+    ColumnDef("txbps", header="TX bps"),
+    ColumnDef("rxbps", header="RX bps"),
+    ColumnDef("totalxbps", header="Total bps"),
+    ColumnDef("tx_pckts", header="TX Packets", wide_only=True),
+    ColumnDef("rx_pckts", header="RX Packets", wide_only=True),
+    ColumnDef("tx_bytes", header="TX Bytes", wide_only=True),
+    ColumnDef("rx_bytes", header="RX Bytes", wide_only=True),
+]
+
+NIC_STATUS_COLUMNS: list[ColumnDef] = [
+    ColumnDef("parent_nic", header="NIC"),
+    ColumnDef(
+        "status",
+        header="Link",
+        style_map={"up": "green", "down": "red", "unknown": "yellow"},
+    ),
+    ColumnDef("state", header="State"),
+    ColumnDef("speed", header="Speed"),
+]
+
+NIC_FABRIC_COLUMNS: list[ColumnDef] = [
+    ColumnDef("parent_nic", header="NIC"),
+    ColumnDef(
+        "status",
+        header="Fabric",
+        style_map={"confirmed": "green", "degraded": "yellow", "no_path": "red"},
+    ),
+    ColumnDef("state", header="State"),
+    ColumnDef("max_score", header="Max Score"),
+    ColumnDef("min_score", header="Min Score"),
+]
+
+
+# ---------------------------------------------------------------------------
+# System Diagnostics
+# ---------------------------------------------------------------------------
+
+SYSTEM_DIAG_COLUMNS: list[ColumnDef] = [
+    ColumnDef("$key", header="Key"),
+    ColumnDef("name"),
+    ColumnDef(
+        "status",
+        style_map={
+            "complete": "green",
+            "error": "red",
+            "building": "yellow",
+            "uploading": "yellow",
+            "initializing": "dim",
+        },
+    ),
+    ColumnDef("timestamp", header="Created"),
+    ColumnDef("description", wide_only=True),
+    ColumnDef("status_info", header="Status Info", wide_only=True),
 ]

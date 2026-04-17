@@ -90,6 +90,10 @@ vrg tenant snapshot create acme ...  # Snapshot a tenant
 
 Full reference: [`docs/COMMANDS.md`](docs/COMMANDS.md) | VM templates: [`docs/TEMPLATES.md`](docs/TEMPLATES.md)
 
+## Security
+
+- **Never disclose internal infrastructure details** in PRs, commit messages, or any content pushed to GitHub. This includes IP addresses, hostnames, system names, and profile names. Use generic references ("dev instance", "prod") instead.
+
 ## Development Workflow
 
 - **Branches**: `feature/<name>`, `fix/<name>`, `refactor/<name>`
@@ -104,6 +108,15 @@ Details: [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)
 2. Environment variables (`VERGE_HOST`, `VERGE_TOKEN`, etc.)
 3. Named profile in `~/.vrg/config.toml`
 4. Default profile
+
+## External References
+
+- **pyVergeOS SDK** (local): `/Volumes/HOME/projects/pyVergeOS`
+- **VergeOS API docs** (local): `/Users/larry/Development/VergeOS-Docs/`
+  - `docs/api-reference/` — Rendered endpoint documentation
+  - `RAW/api-schema/endpoints/*.json` — Canonical JSON schemas (336 endpoints)
+
+> **Important**: The SDK does not wrap every API endpoint. Never infer API limitations from SDK gaps — always check the API docs.
 
 ## Core Dependencies
 
