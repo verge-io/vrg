@@ -87,7 +87,19 @@ def list_cmd(
         typer.Option("--branch", help="Filter by branch key."),
     ] = None,
 ) -> None:
-    """List installed update packages."""
+    """List installed update packages.
+
+    Examples:
+
+        vrg update package list
+        vrg update package list --branch 1
+        vrg -o json update package list
+        vrg -o json update package list --query "[].[name,version]"
+
+    Useful `--query` fields: `name`, `version`, `type`, `optional`,
+    `branch`. The `type` column identifies the payload format
+    (squashfs, tgz, vdb, gguf).
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filter_expr is not None:
@@ -112,7 +124,17 @@ def get_cmd(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument(help="Package name.")],
 ) -> None:
-    """Get an installed update package by name."""
+    """Get an installed update package by name.
+
+    Examples:
+
+        vrg update package get verge-os
+        vrg -o json update package get verge-os
+
+    Installed packages are keyed by name (string), so the argument is
+    passed directly to the SDK — no numeric lookup. Exit 6 if the
+    package isn't installed.
+    """
     vctx = get_context(ctx)
     # Package keys are strings (name), not integers — pass directly
     pkg = vctx.client.update_packages.get(key=name)

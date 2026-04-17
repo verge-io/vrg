@@ -93,7 +93,20 @@ def list_cmd(
         ),
     ] = None,
 ) -> None:
-    """List update logs."""
+    """List update logs.
+
+    Examples:
+
+        vrg update log list
+        vrg update log list --level error
+        vrg update log list --level critical
+        vrg -o json update log list --query "[?level=='error'].text"
+
+    Levels are `audit`, `message`, `warning`, `error`, `critical`.
+    Useful `--query` fields: `level`, `text`, `object_name`,
+    `timestamp`, `user`. Entries older than 70 days are expired
+    automatically.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if level is not None:
@@ -116,7 +129,16 @@ def get_cmd(
     ctx: typer.Context,
     log_key: Annotated[str, typer.Argument(help="Log entry key.")],
 ) -> None:
-    """Get an update log entry by key."""
+    """Get an update log entry by key.
+
+    Examples:
+
+        vrg update log get 4821
+        vrg -o json update log get 4821
+
+    Takes a numeric key only — log entries have no name lookup. Grab
+    the key from `vrg update log list` output first.
+    """
     vctx = get_context(ctx)
     key = int(log_key)
     item = vctx.client.update_logs.get(key=key)
