@@ -18,8 +18,47 @@ from verge_cli.output import output_result, output_success
 
 app = typer.Typer(
     name="system",
-    help="System information and management.",
+    help=(
+        "Inspect and manage the VergeOS cloud itself.\n\n"
+        "This group covers system-wide state that isn't scoped to a single"
+        " resource — version and build identity, aggregate counts of running"
+        " resources, cloud-wide settings, installed licenses, and the"
+        " support diagnostic bundles used for escalations. Most commands"
+        " read from the cloud root and require admin-level access. Use"
+        " `vrg doctor` for a scripted health audit that layers on top of"
+        " this data.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `version`, `os_version`, `cloud_name`, `vms_total`, `vms_online`,"
+        " `nodes_total`, `nodes_online`, `alarms_total`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Version and dashboard-style counts for the current cloud\n"
+        "    vrg system info\n"
+        "    vrg -o json system info\n\n"
+        "    # VergeOS and underlying OS version\n"
+        "    vrg system version\n\n"
+        "    # Full resource inventory (opt-in per category)\n"
+        "    vrg system inventory\n"
+        "    vrg system inventory --vms --networks --no-tenants\n\n"
+        "    # Cloud-wide settings (see subcommands below)\n"
+        "    vrg system settings list --modified\n"
+        "    vrg system settings get ui.theme\n\n"
+        "    # License inventory and air-gap provisioning\n"
+        "    vrg system license list\n"
+        "    vrg system license generate-payload\n\n"
+        "    # Create a diagnostic bundle for Verge.io support\n"
+        "    vrg system diag create support-2026-04-17 --send-to-support\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`vrg system info` reports the cloud the current profile is"
+        " connected to; when a tenant scope is active, counts reflect that"
+        " tenant. Run against the provider cloud for system-wide numbers.\n\n"
+        "Settings keys are string-addressed and mostly undocumented — pull"
+        " the list with `settings list` and filter with `--modified` to see"
+        " what has been changed from defaults before editing blindly."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 app.add_typer(system_diag.app, name="diag")
@@ -29,8 +68,36 @@ app.add_typer(system_diag.app, name="diag")
 # ---------------------------------------------------------------------------
 settings_app = typer.Typer(
     name="settings",
-    help="Manage system settings.",
+    help=(
+        "Read and modify cloud-wide system settings.\n\n"
+        "Settings are the key/value knobs that control platform behavior"
+        " across the entire cloud — UI defaults, scheduler tunables,"
+        " security toggles, notification endpoints, and similar. Each"
+        " setting has a `key`, a current `value`, a `default_value`, and a"
+        " `modified` flag indicating whether it has been changed from"
+        " default. Settings apply to the whole cloud, not per-tenant.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `key`, `value`, `default_value`, `modified`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # All settings, or only those changed from default\n"
+        "    vrg system settings list\n"
+        "    vrg system settings list --modified\n\n"
+        "    # Inspect one setting\n"
+        "    vrg -o json system settings get ui.theme\n\n"
+        "    # Change a setting, then revert to default\n"
+        "    vrg system settings set ui.theme dark\n"
+        "    vrg system settings reset ui.theme\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Settings are addressed by string key, not numeric key. There is no"
+        " central catalog of valid keys — use `list` to discover what is"
+        " available before editing. Most settings take effect immediately;"
+        " a few require a service restart (the setting description, when"
+        " present, calls this out)."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 app.add_typer(settings_app, name="settings")
 
@@ -39,8 +106,39 @@ app.add_typer(settings_app, name="settings")
 # ---------------------------------------------------------------------------
 license_app = typer.Typer(
     name="license",
-    help="Manage system licenses.",
+    help=(
+        "Inspect and install VergeOS licenses.\n\n"
+        "Licenses gate platform features and feature tiers for the cloud."
+        " Connected systems pull and renew licenses automatically; air-gap"
+        " systems require a manual exchange — generate a request payload,"
+        " send it to Verge.io support, and install the returned license"
+        " key. Each license record carries `is_valid`, `valid_from`,"
+        " `valid_until`, a comma-separated `features` string, and an"
+        " `auto_renewal` flag.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `is_valid`, `valid_from`, `valid_until`, `features`,"
+        " `auto_renewal`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List installed licenses\n"
+        "    vrg system license list\n"
+        "    vrg -o json system license list\n\n"
+        "    # Inspect one license by name or key\n"
+        "    vrg system license get 1\n"
+        "    vrg system license get enterprise\n\n"
+        "    # Air-gap workflow: produce a payload to send to support\n"
+        "    vrg system license generate-payload > request.txt\n\n"
+        "    # Install the license text returned by support\n"
+        '    vrg system license add --license-text "$(cat license.key)"\n\n'
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`generate-payload` and `add` are only needed on air-gap systems."
+        " Cloud-connected systems provision and renew licenses"
+        " automatically; manual intervention there is usually a sign of"
+        " broken outbound connectivity to licensing."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 app.add_typer(license_app, name="license")
 
