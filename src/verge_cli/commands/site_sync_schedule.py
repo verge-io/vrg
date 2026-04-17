@@ -98,7 +98,17 @@ def list_cmd(
         typer.Option("--sync", "-s", help="Filter by sync key"),
     ] = None,
 ) -> None:
-    """List site sync schedules."""
+    """List site sync schedules.
+
+    Examples:
+
+        vrg site sync schedule list
+        vrg site sync schedule list --sync production-sync
+        vrg -o json site sync schedule list --query "[?do_not_expire]"
+
+    Useful `--query` fields include `sync_name`, `profile_period_name`,
+    `retention`, `priority`, `do_not_expire`, and `destination_prefix`.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
 
@@ -126,7 +136,17 @@ def get_cmd(
     ctx: typer.Context,
     schedule_id: Annotated[int, typer.Argument(help="Schedule key")],
 ) -> None:
-    """Get details of a site sync schedule."""
+    """Get details of a site sync schedule.
+
+    Examples:
+
+        vrg site sync schedule get 42
+        vrg -o json site sync schedule get 42 \\
+            --query "{sync: sync_name, period: profile_period_name, retention: retention}"
+
+    Schedules are identified only by numeric key — look them up via
+    `vrg site sync schedule list`.
+    """
     vctx = get_context(ctx)
     schedule = vctx.client.site_sync_schedules.get(schedule_id)
     output_result(
@@ -155,7 +175,27 @@ def create_cmd(
         str, typer.Option("--destination-prefix", help="Destination prefix")
     ] = "remote",
 ) -> None:
-    """Create a site sync schedule."""
+    """Create a site sync schedule.
+
+    Examples:
+
+        # Attach the hourly profile period to a sync, 7-day remote
+        # retention, holding source snapshots until transfer completes
+        vrg site sync schedule create \\
+            --sync-key 3 --profile-period-key 11 \\
+            --retention 604800 --do-not-expire
+
+        # Custom priority and destination prefix
+        vrg site sync schedule create \\
+            --sync-key 3 --profile-period-key 11 \\
+            --retention 2592000 --priority 10 \\
+            --destination-prefix offsite
+
+    Both `--sync-key` and `--profile-period-key` are numeric keys: look
+    them up with `vrg site sync outgoing list` and `vrg snapshot profile
+    period list`. `--retention` is in **seconds**. Set `--do-not-expire`
+    when local retention is shorter than a typical transfer window.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {
         "sync_key": sync_key,
@@ -178,7 +218,17 @@ def delete_cmd(
     schedule_id: Annotated[int, typer.Argument(help="Schedule key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a site sync schedule."""
+    """Delete a site sync schedule.
+
+    Examples:
+
+        vrg site sync schedule delete 42
+        vrg site sync schedule delete 42 --yes
+
+    Stops future auto-enqueue for the linked profile period. Snapshots
+    already transferred to the remote are not removed — only new fires of
+    the period stop enqueuing on this sync.
+    """
     vctx = get_context(ctx)
 
     if not confirm_action(f"Delete site sync schedule {schedule_id}?", yes=yes):

@@ -105,7 +105,18 @@ def list_cmd(
         ),
     ] = None,
 ) -> None:
-    """List all outgoing site syncs."""
+    """List all outgoing site syncs.
+
+    Examples:
+
+        vrg site sync outgoing list
+        vrg site sync outgoing list --site dr-east --enabled
+        vrg -o json site sync outgoing list --query "[?status=='Error'].name"
+
+    Useful `--query` fields include `status`, `enabled`, `state`,
+    `last_run`, `destination_tier`, `threads`, `encryption`, and
+    `compression`.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
 
@@ -137,7 +148,17 @@ def get_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Get details of an outgoing site sync."""
+    """Get details of an outgoing site sync.
+
+    Examples:
+
+        vrg site sync outgoing get production-sync
+        vrg -o json site sync outgoing get 12
+        vrg -o json site sync outgoing get production-sync \\
+            --query "{status: status, last_run: last_run, threads: threads}"
+
+    Resolves `sync` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs, sync, "Outgoing Sync")
     item = vctx.client.site_syncs.get(key)
@@ -156,7 +177,16 @@ def enable_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Enable an outgoing site sync."""
+    """Enable an outgoing site sync.
+
+    Examples:
+
+        vrg site sync outgoing enable production-sync
+        vrg site sync outgoing enable 12
+
+    Resumes auto-enqueue and transfer activity for this sync. Queued but
+    not-yet-transferred snapshots are processed according to priority.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs, sync, "Outgoing Sync")
     vctx.client.site_syncs.enable(key)
@@ -169,7 +199,17 @@ def disable_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Disable an outgoing site sync."""
+    """Disable an outgoing site sync.
+
+    Examples:
+
+        vrg site sync outgoing disable production-sync
+        vrg site sync outgoing disable 12
+
+    Pauses the sender without deleting the pairing or the queue. Any
+    in-progress transfer is stopped cleanly. Re-enable with
+    `vrg site sync outgoing enable`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs, sync, "Outgoing Sync")
     vctx.client.site_syncs.disable(key)
@@ -182,7 +222,16 @@ def start_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Trigger an outgoing site sync to run now."""
+    """Trigger an outgoing site sync to run now.
+
+    Examples:
+
+        vrg site sync outgoing start production-sync
+        vrg site sync outgoing start 12
+
+    Kicks off transfer of any queued snapshots immediately, bypassing the
+    normal scheduled cadence. Has no effect if the queue is empty.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs, sync, "Outgoing Sync")
     vctx.client.site_syncs.start(key)
@@ -195,7 +244,16 @@ def stop_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Stop a running outgoing site sync."""
+    """Stop a running outgoing site sync.
+
+    Examples:
+
+        vrg site sync outgoing stop production-sync
+        vrg site sync outgoing stop 12
+
+    Aborts the in-progress transfer but leaves the queue intact. The
+    interrupted transfer resumes from where it left off on the next run.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs, sync, "Outgoing Sync")
     vctx.client.site_syncs.stop(key)
@@ -209,7 +267,17 @@ def set_throttle_cmd(
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
     mbps: Annotated[int, typer.Option("--mbps", help="Throttle limit in Mbps")],
 ) -> None:
-    """Set bandwidth throttle on an outgoing site sync."""
+    """Set bandwidth throttle on an outgoing site sync.
+
+    Examples:
+
+        vrg site sync outgoing set-throttle production-sync --mbps 100
+        vrg site sync outgoing set-throttle 12 --mbps 500
+
+    Caps the send rate at the specified megabits per second. Applied
+    immediately to in-progress and future transfers. Remove with
+    `vrg site sync outgoing disable-throttle`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs, sync, "Outgoing Sync")
     vctx.client.site_syncs.set_throttle(key, mbps)
@@ -222,7 +290,16 @@ def disable_throttle_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Remove bandwidth throttle from an outgoing site sync."""
+    """Remove bandwidth throttle from an outgoing site sync.
+
+    Examples:
+
+        vrg site sync outgoing disable-throttle production-sync
+        vrg site sync outgoing disable-throttle 12
+
+    Clears any bandwidth cap previously set with `set-throttle`. Transfers
+    resume at full available link speed.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs, sync, "Outgoing Sync")
     vctx.client.site_syncs.disable_throttle(key)
@@ -235,7 +312,17 @@ def refresh_remote_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Refresh remote snapshots for an outgoing site sync."""
+    """Refresh remote snapshots for an outgoing site sync.
+
+    Examples:
+
+        vrg site sync outgoing refresh-remote production-sync
+        vrg site sync outgoing refresh-remote 12
+
+    Re-reads the cache of snapshots held on the destination. Useful when
+    the remote side has pruned or added snapshots out-of-band and the
+    source's view of what exists there has drifted.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs, sync, "Outgoing Sync")
     vctx.client.site_syncs.refresh_remote_snapshots(key)

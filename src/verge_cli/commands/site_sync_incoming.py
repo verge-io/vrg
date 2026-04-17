@@ -92,7 +92,17 @@ def list_cmd(
         ),
     ] = None,
 ) -> None:
-    """List all incoming site syncs."""
+    """List all incoming site syncs.
+
+    Examples:
+
+        vrg site sync incoming list
+        vrg site sync incoming list --site dr-east --enabled
+        vrg -o json site sync incoming list --query "[?status!='Syncing'].name"
+
+    Useful `--query` fields include `status`, `enabled`, `state`,
+    `last_sync`, and `min_snapshots`.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
 
@@ -124,7 +134,17 @@ def get_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Get details of an incoming site sync."""
+    """Get details of an incoming site sync.
+
+    Examples:
+
+        vrg site sync incoming get offsite-backup
+        vrg -o json site sync incoming get 7
+        vrg -o json site sync incoming get offsite-backup \\
+            --query "{status: status, min_snapshots: min_snapshots}"
+
+    Resolves `sync` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs_incoming, sync, "Incoming Sync")
     item = vctx.client.site_syncs_incoming.get(key)
@@ -143,7 +163,16 @@ def enable_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Enable an incoming site sync."""
+    """Enable an incoming site sync.
+
+    Examples:
+
+        vrg site sync incoming enable offsite-backup
+        vrg site sync incoming enable 7
+
+    Resumes accepting transfers from the paired outgoing sync on the
+    source. Previously received snapshots are untouched.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs_incoming, sync, "Incoming Sync")
     vctx.client.site_syncs_incoming.enable(key)
@@ -156,7 +185,17 @@ def disable_cmd(
     ctx: typer.Context,
     sync: Annotated[str, typer.Argument(help="Sync name or key")],
 ) -> None:
-    """Disable an incoming site sync."""
+    """Disable an incoming site sync.
+
+    Examples:
+
+        vrg site sync incoming disable offsite-backup
+        vrg site sync incoming disable 7
+
+    Stops the receiver from accepting new transfers but preserves the
+    pairing and existing snapshots. Re-enable with
+    `vrg site sync incoming enable`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.site_syncs_incoming, sync, "Incoming Sync")
     vctx.client.site_syncs_incoming.disable(key)
