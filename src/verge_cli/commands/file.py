@@ -72,7 +72,7 @@ app = typer.Typer(
         "Use `-o json` for structured output, `-o wide` to include"
         " description, allocated/used capacity, creator, and modified"
         " timestamp, and `--query` to pluck fields (e.g., `--query"
-        " \"[?type=='iso'].name\"`). Files are addressable by `$key`"
+        " `[].name`), or pipe through jq for filtering. Files are addressable by `$key`"
         " (numeric) or `name`; an ambiguous name yields exit code 7"
         " (multiple matches).\n\n"
         "---\n\n"

@@ -30,7 +30,7 @@ app = typer.Typer(
         " `send` action to push a one-off test message, and `history`"
         " to inspect prior delivery attempts.\n\n"
         "Use `-o json` for structured output and `--query` to pluck"
-        " fields (e.g., `--query \"[?authorization_type=='Bearer'].name\"`)."
+        " fields (e.g., `--query [].name`), or pipe through jq for filtering."
         " Webhooks resolve by `$key` (numeric) or `name`; an ambiguous"
         " name yields exit code 7 (multiple matches). `list` honors"
         " `--all-profiles` / `-A` to fan out across every configured"

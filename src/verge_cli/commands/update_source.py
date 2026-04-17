@@ -136,7 +136,7 @@ def list_cmd(
         vrg update source list
         vrg update source list --enabled
         vrg update source list --disabled
-        vrg -o json update source list --query "[?enabled=='Y'].name"
+        vrg -o json update source list | jq '.[] | select(.enabled == "Y") | .name'
         vrg -A update source list
 
     Useful `--query` fields: `name`, `url`, `enabled`,

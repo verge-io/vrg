@@ -160,7 +160,7 @@ def list_cmd(
         vrg resource-group list
         vrg resource-group list --type host-gpu
         vrg resource-group list --class gpu --enabled
-        vrg -o json resource-group list --query "[?enabled].name"
+        vrg -o json resource-group list | jq '.[] | select(.enabled) | .name'
 
     Useful `--query` fields: `name`, `device_type`, `device_class`,
     `enabled`, `resource_count`. `--type` accepts `pci`, `usb`,
