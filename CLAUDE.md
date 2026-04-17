@@ -90,6 +90,10 @@ vrg tenant snapshot create acme ...  # Snapshot a tenant
 
 Full reference: [`docs/COMMANDS.md`](docs/COMMANDS.md) | VM templates: [`docs/TEMPLATES.md`](docs/TEMPLATES.md)
 
+## Security
+
+- **Never disclose internal infrastructure details** in PRs, commit messages, or any content pushed to GitHub. This includes IP addresses, hostnames, system names, and profile names. Use generic references ("dev instance", "prod") instead.
+
 ## Development Workflow
 
 - **Branches**: `feature/<name>`, `fix/<name>`, `refactor/<name>`
