@@ -15,8 +15,42 @@ from verge_cli.utils import resolve_resource_id
 
 app = typer.Typer(
     name="storage",
-    help="Manage storage tiers.",
+    help=(
+        "Inspect VergeOS vSAN storage tiers.\n\n"
+        "VergeOS pools every physical drive across cluster nodes into a single"
+        " vSAN, partitioned into **tiers 0-5** by performance class. Tier 0"
+        " holds vSAN metadata; tiers 1-5 hold user data, typically ordered"
+        " from fastest (NVMe) to slowest (archive HDD). VM drives and NAS"
+        " volumes target a **preferred tier**; vSAN places data there when"
+        " capacity allows and falls back to the next available tier otherwise."
+        " Deduplication, redundancy, and repair run automatically per tier.\n\n"
+        "This group is read-only — tiers are defined by node hardware and"
+        " installation parameters, not by CLI commands. Use `-o json` with"
+        " `list`, `get`, or `summary` to surface the raw tier metrics"
+        " (`capacity_gb`, `used_gb`, `free_gb`, `used_percent`, `dedupe_ratio`,"
+        " `read_ops`, `write_ops`) for monitoring or capacity planning.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every storage tier with utilization\n"
+        "    vrg storage list\n\n"
+        "    # Fetch tier 1 details as JSON\n"
+        "    vrg -o json storage get 1\n\n"
+        "    # Aggregate capacity across all tiers\n"
+        "    vrg storage summary\n\n"
+        "    # Extract just the free space per tier for scripting\n"
+        "    vrg -o json storage list --query '[].{tier: tier, free_gb: free_gb}'\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Tier 0 is reserved for vSAN metadata and is not a target for VM"
+        " drives or NAS volumes. Use tier numbers 1-5 when configuring drive"
+        " placement via `vrg vm drive create --tier N`.\n\n"
+        "`used_percent` reflects actual physical usage. VergeOS supports thin"
+        " provisioning, so allocated capacity may exceed physical usage — key"
+        " on `used_percent` and `free_gb` for alarm thresholds rather than"
+        " allocation totals."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
