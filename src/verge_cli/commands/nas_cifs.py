@@ -150,7 +150,15 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled state"),
     ] = None,
 ) -> None:
-    """List all CIFS shares."""
+    """List all CIFS shares.
+
+    **Examples:**
+
+        vrg nas cifs list
+        vrg nas cifs list --volume shared-data
+        vrg nas cifs list --enabled
+        vrg -o json nas cifs list
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if volume is not None:
@@ -177,7 +185,13 @@ def get_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="CIFS share name or hex key")],
 ) -> None:
-    """Get details of a CIFS share."""
+    """Get details of a CIFS share.
+
+    **Examples:**
+
+        vrg nas cifs get smb-share
+        vrg -o json nas cifs get smb-share
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.cifs_shares, share, "CIFS share")
     item = vctx.client.cifs_shares.get(key=key)
@@ -261,7 +275,20 @@ def create_cmd(
         typer.Option("--shadow-copy", help="Enable shadow copy"),
     ] = False,
 ) -> None:
-    """Create a new CIFS share."""
+    """Create a new CIFS share.
+
+    Exposes a directory on a NAS volume over SMB. Users and groups for
+    `--valid-users`, `--admin-users`, etc. are NAS local users (managed
+    via `vrg nas user`) or AD principals if the service is domain-joined.
+    Hosts in `--allowed-hosts` / `--denied-hosts` accept CIDR notation.
+
+    **Examples:**
+
+        vrg nas cifs create --volume shared-data --name smb-share
+        vrg nas cifs create --volume shared-data --name guests --guest-ok --read-only
+        vrg nas cifs create --volume shared-data --name team \\
+            --valid-groups engineering --admin-users admin --allowed-hosts 10.0.0.0/24
+    """
     vctx = get_context(ctx)
 
     # Resolve volume name to key
@@ -381,7 +408,17 @@ def update_cmd(
         typer.Option("--shadow-copy/--no-shadow-copy", help="Enable/disable shadow copy"),
     ] = None,
 ) -> None:
-    """Update a CIFS share."""
+    """Update a CIFS share.
+
+    Any option not supplied is left unchanged. Comma-separated list
+    options replace the existing list rather than appending.
+
+    **Examples:**
+
+        vrg nas cifs update smb-share --comment "Shared team drive"
+        vrg nas cifs update smb-share --read-only
+        vrg nas cifs update smb-share --valid-groups engineering,ops
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.cifs_shares, share, "CIFS share")
 
@@ -428,7 +465,16 @@ def delete_cmd(
     share: Annotated[str, typer.Argument(help="CIFS share name or hex key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a CIFS share (data is retained on volume)."""
+    """Delete a CIFS share (data is retained on volume).
+
+    Removes the SMB export only — the underlying directory and files on
+    the volume are kept.
+
+    **Examples:**
+
+        vrg nas cifs delete smb-share
+        vrg nas cifs delete smb-share --yes
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.cifs_shares, share, "CIFS share")
 
@@ -446,7 +492,12 @@ def enable_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="CIFS share name or hex key")],
 ) -> None:
-    """Enable a CIFS share."""
+    """Enable a CIFS share.
+
+    **Examples:**
+
+        vrg nas cifs enable smb-share
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.cifs_shares, share, "CIFS share")
     vctx.client.cifs_shares.enable(key)
@@ -459,7 +510,15 @@ def disable_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="CIFS share name or hex key")],
 ) -> None:
-    """Disable a CIFS share."""
+    """Disable a CIFS share.
+
+    Stops serving the share without deleting it. Data remains on the
+    volume.
+
+    **Examples:**
+
+        vrg nas cifs disable smb-share
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.cifs_shares, share, "CIFS share")
     vctx.client.cifs_shares.disable(key)

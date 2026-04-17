@@ -119,7 +119,14 @@ def list_cmd(
         typer.Option("--status", "-s", help="Filter by status (running or stopped)"),
     ] = None,
 ) -> None:
-    """List all NAS services."""
+    """List all NAS services.
+
+    **Examples:**
+
+        vrg nas service list
+        vrg nas service list --status running
+        vrg -o json nas service list
+    """
     vctx = get_context(ctx)
     if status is not None:
         services = vctx.client.nas_services.list(status=status)
@@ -142,7 +149,13 @@ def get_cmd(
     ctx: typer.Context,
     service: Annotated[str, typer.Argument(help="NAS service name or key")],
 ) -> None:
-    """Get details of a NAS service."""
+    """Get details of a NAS service.
+
+    **Examples:**
+
+        vrg nas service get my-nas
+        vrg -o json nas service get 42
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nas_services, service, "NAS service")
     item = vctx.client.nas_services.get(key)
@@ -168,7 +181,17 @@ def create_cmd(
     cores: Annotated[int, typer.Option("--cores", help="CPU cores")] = 4,
     memory_gb: Annotated[int, typer.Option("--memory-gb", help="RAM in GB")] = 8,
 ) -> None:
-    """Create a new NAS service."""
+    """Create a new NAS service.
+
+    Deploys the VergeOS NAS VM recipe, producing a running service VM that
+    hosts volumes and shares. Sizing defaults to 4 cores / 8 GB RAM; tune
+    for concurrent client count, sync parallelism, and antivirus load.
+
+    **Examples:**
+
+        vrg nas service create --name my-nas --network internal-net
+        vrg nas service create --name my-nas --network internal-net --cores 8 --memory-gb 16
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {
         "name": name,
@@ -218,7 +241,18 @@ def update_cmd(
         typer.Option("--read-ahead-kb", help="Read-ahead buffer (0/64/128/256/512/1024/2048/4096)"),
     ] = None,
 ) -> None:
-    """Update NAS service settings."""
+    """Update NAS service settings.
+
+    `--cpu-cores` / `--memory-gb` changes require a service restart to
+    take effect. `--max-imports` and `--max-syncs` cap concurrent job
+    parallelism (1-10).
+
+    **Examples:**
+
+        vrg nas service update my-nas --max-imports 4 --max-syncs 4
+        vrg nas service update my-nas --cpu-cores 8 --memory-gb 16
+        vrg nas service update my-nas --read-ahead-kb 1024
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nas_services, service, "NAS service")
 
@@ -252,7 +286,19 @@ def delete_cmd(
     ] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a NAS service."""
+    """Delete a NAS service.
+
+    This is destructive: it removes the NAS service VM. `--force` is
+    required when the service still has volumes attached, and deleting a
+    service deletes its volumes and shares. Prompts before acting unless
+    `--yes` is passed.
+
+    **Examples:**
+
+        vrg nas service delete my-nas
+        vrg nas service delete my-nas --yes
+        vrg nas service delete my-nas --force --yes
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nas_services, service, "NAS service")
 
@@ -270,7 +316,15 @@ def power_on_cmd(
     ctx: typer.Context,
     service: Annotated[str, typer.Argument(help="NAS service name or key")],
 ) -> None:
-    """Power on a NAS service."""
+    """Power on a NAS service.
+
+    The service VM must be running before volumes will mount or shares
+    serve traffic.
+
+    **Examples:**
+
+        vrg nas service power-on my-nas
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nas_services, service, "NAS service")
     vctx.client.nas_services.power_on(key)
@@ -284,7 +338,17 @@ def power_off_cmd(
     service: Annotated[str, typer.Argument(help="NAS service name or key")],
     force: Annotated[bool, typer.Option("--force", help="Force power off (hard shutdown)")] = False,
 ) -> None:
-    """Power off a NAS service."""
+    """Power off a NAS service.
+
+    Shares and volumes become unavailable until the service is started
+    again. `--force` performs a hard shutdown instead of a graceful
+    guest-OS shutdown.
+
+    **Examples:**
+
+        vrg nas service power-off my-nas
+        vrg nas service power-off my-nas --force
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nas_services, service, "NAS service")
     vctx.client.nas_services.power_off(key, force=force)
@@ -297,7 +361,15 @@ def restart_cmd(
     ctx: typer.Context,
     service: Annotated[str, typer.Argument(help="NAS service name or key")],
 ) -> None:
-    """Restart a NAS service."""
+    """Restart a NAS service.
+
+    Use this after changing `--cpu-cores` / `--memory-gb` to apply the
+    new VM sizing.
+
+    **Examples:**
+
+        vrg nas service restart my-nas
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nas_services, service, "NAS service")
     vctx.client.nas_services.restart(key)
@@ -310,7 +382,17 @@ def cifs_settings_cmd(
     ctx: typer.Context,
     service: Annotated[str, typer.Argument(help="NAS service name or key")],
 ) -> None:
-    """Display CIFS/SMB settings for a NAS service."""
+    """Display CIFS/SMB settings for a NAS service.
+
+    Shows the server-wide CIFS configuration (workgroup, minimum
+    protocol, guest mapping, AD join status). Per-share settings live on
+    `vrg nas cifs`.
+
+    **Examples:**
+
+        vrg nas service cifs-settings my-nas
+        vrg -o json nas service cifs-settings my-nas
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nas_services, service, "NAS service")
     settings = vctx.client.nas_services.get_cifs_settings(key)
@@ -349,7 +431,18 @@ def set_cifs_settings_cmd(
         typer.Option("--extended-acl/--no-extended-acl", help="Enable extended ACL support"),
     ] = None,
 ) -> None:
-    """Update CIFS/SMB settings for a NAS service."""
+    """Update CIFS/SMB settings for a NAS service.
+
+    These settings are server-wide — they apply to every CIFS share on
+    this service. Set `--min-protocol SMB3` or higher to disable legacy
+    SMBv1/v2 clients.
+
+    **Examples:**
+
+        vrg nas service set-cifs-settings my-nas --workgroup CORP
+        vrg nas service set-cifs-settings my-nas --min-protocol SMB3
+        vrg nas service set-cifs-settings my-nas --extended-acl
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nas_services, service, "NAS service")
 
@@ -373,7 +466,17 @@ def nfs_settings_cmd(
     ctx: typer.Context,
     service: Annotated[str, typer.Argument(help="NAS service name or key")],
 ) -> None:
-    """Display NFS settings for a NAS service."""
+    """Display NFS settings for a NAS service.
+
+    Shows default NFS server settings (NFSv4 on/off, allowed hosts,
+    squash, anon uid/gid). These are defaults applied to exports — per
+    share config is on `vrg nas nfs`.
+
+    **Examples:**
+
+        vrg nas service nfs-settings my-nas
+        vrg -o json nas service nfs-settings my-nas
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nas_services, service, "NAS service")
     settings = vctx.client.nas_services.get_nfs_settings(key)
@@ -426,7 +529,18 @@ def set_nfs_settings_cmd(
         typer.Option("--async/--sync", help="Enable async mode for performance"),
     ] = None,
 ) -> None:
-    """Update NFS settings for a NAS service."""
+    """Update NFS settings for a NAS service.
+
+    Server-wide NFS defaults. Use `--allowed-hosts` to restrict mounts
+    to specific CIDRs; `--allow-all` exports to the world. Squash modes:
+    `root_squash`, `all_squash`, `no_root_squash`.
+
+    **Examples:**
+
+        vrg nas service set-nfs-settings my-nas --enable-nfsv4
+        vrg nas service set-nfs-settings my-nas --allowed-hosts 10.0.0.0/24,10.0.1.0/24
+        vrg nas service set-nfs-settings my-nas --squash root_squash --async
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nas_services, service, "NAS service")
 

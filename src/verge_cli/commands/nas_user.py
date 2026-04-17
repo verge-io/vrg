@@ -127,7 +127,15 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled state"),
     ] = None,
 ) -> None:
-    """List all NAS local users."""
+    """List all NAS local users.
+
+    **Examples:**
+
+        vrg nas user list
+        vrg nas user list --service my-nas
+        vrg nas user list --enabled
+        vrg -o json nas user list
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if service is not None:
@@ -154,7 +162,13 @@ def get_cmd(
     ctx: typer.Context,
     user: Annotated[str, typer.Argument(help="NAS user name or hex key")],
 ) -> None:
-    """Get details of a NAS local user."""
+    """Get details of a NAS local user.
+
+    **Examples:**
+
+        vrg nas user get alice
+        vrg -o json nas user get alice
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_users, user, "NAS user")
     item = vctx.client.nas_users.get(key=key)
@@ -194,7 +208,19 @@ def create_cmd(
         typer.Option("--home-drive", help="Home drive letter (e.g., H)"),
     ] = None,
 ) -> None:
-    """Create a new NAS local user."""
+    """Create a new NAS local user.
+
+    NAS local users authenticate against CIFS shares on this NAS
+    service. They are distinct from VergeOS platform users and from
+    AD/LDAP principals. Pass the password on the CLI only from trusted
+    environments.
+
+    **Examples:**
+
+        vrg nas user create --service my-nas --name alice --password '***'
+        vrg nas user create --service my-nas --name bob --password '***' \\
+            --displayname "Bob Smith" --home-share home-bob --home-drive H
+    """
     vctx = get_context(ctx)
 
     # Resolve service name to key
@@ -249,7 +275,17 @@ def update_cmd(
         typer.Option("--home-drive", help="Home drive letter (e.g., H)"),
     ] = None,
 ) -> None:
-    """Update a NAS local user."""
+    """Update a NAS local user.
+
+    Use `--password` to reset credentials. Other options update profile
+    metadata without re-prompting for the password.
+
+    **Examples:**
+
+        vrg nas user update alice --password '***'
+        vrg nas user update alice --displayname "Alice Jones"
+        vrg nas user update alice --home-share home-alice --home-drive H
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_users, user, "NAS user")
 
@@ -276,7 +312,16 @@ def delete_cmd(
     user: Annotated[str, typer.Argument(help="NAS user name or hex key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a NAS local user."""
+    """Delete a NAS local user.
+
+    Revokes the user's CIFS credentials. Files owned by the user on
+    volumes are not deleted.
+
+    **Examples:**
+
+        vrg nas user delete alice
+        vrg nas user delete alice --yes
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_users, user, "NAS user")
 
@@ -294,7 +339,12 @@ def enable_cmd(
     ctx: typer.Context,
     user: Annotated[str, typer.Argument(help="NAS user name or hex key")],
 ) -> None:
-    """Enable a NAS local user."""
+    """Enable a NAS local user.
+
+    **Examples:**
+
+        vrg nas user enable alice
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_users, user, "NAS user")
     vctx.client.nas_users.enable(key)
@@ -307,7 +357,14 @@ def disable_cmd(
     ctx: typer.Context,
     user: Annotated[str, typer.Argument(help="NAS user name or hex key")],
 ) -> None:
-    """Disable a NAS local user."""
+    """Disable a NAS local user.
+
+    Blocks the user from authenticating without deleting the account.
+
+    **Examples:**
+
+        vrg nas user disable alice
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_users, user, "NAS user")
     vctx.client.nas_users.disable(key)
