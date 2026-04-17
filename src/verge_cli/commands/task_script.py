@@ -104,7 +104,14 @@ def script_list(
         typer.Option("--filter", help="OData filter expression."),
     ] = None,
 ) -> None:
-    """List task scripts."""
+    """List task scripts.
+
+    **Examples:**
+
+        vrg task script list
+
+        vrg -o json task script list
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filter is not None:
@@ -126,7 +133,16 @@ def script_get(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Script ID or name.")],
 ) -> None:
-    """Get a task script by ID or name."""
+    """Get a task script by ID or name.
+
+    Use `-o json` to retrieve the full GCS script body.
+
+    **Examples:**
+
+        vrg task script get cleanup-old-snapshots
+
+        vrg -o json task script get 1234
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.task_scripts, identifier, "TaskScript")
     script = vctx.client.task_scripts.get(key)
@@ -158,7 +174,20 @@ def script_create(
         typer.Option("--settings-json", help="Task settings as JSON string."),
     ] = None,
 ) -> None:
-    """Create a task script."""
+    """Create a task script.
+
+    Pass `--script @path/to/file.gcs` to load from a file, or pass
+    inline GCS code directly.
+
+    **Examples:**
+
+        vrg task script create --name cleanup-old-snapshots \\
+            --script @scripts/cleanup.gcs \\
+            --description 'Prune snapshots older than 30 days'
+
+        vrg task script create --name hello \\
+            --script 'print("hello from gcs");'
+    """
     vctx = get_context(ctx)
     script_code = _read_script_input(script)
     kwargs: dict[str, Any] = {
@@ -195,7 +224,15 @@ def script_update(
         typer.Option("--settings-json", help="Updated task settings as JSON string."),
     ] = None,
 ) -> None:
-    """Update a task script."""
+    """Update a task script.
+
+    **Examples:**
+
+        vrg task script update cleanup-old-snapshots \\
+            --script @scripts/cleanup-v2.gcs
+
+        vrg task script update 1234 --description "Updated cleanup logic"
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.task_scripts, identifier, "TaskScript")
     kwargs: dict[str, Any] = {}
@@ -221,7 +258,14 @@ def script_delete(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Delete a task script."""
+    """Delete a task script.
+
+    **Examples:**
+
+        vrg task script delete cleanup-old-snapshots
+
+        vrg task script delete 1234 --yes
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.task_scripts, identifier, "TaskScript")
     if not confirm_action(f"Delete task script '{identifier}'?", yes=yes):
@@ -240,7 +284,18 @@ def script_run(
         typer.Option("--params-json", help="Execution parameters as JSON string."),
     ] = None,
 ) -> None:
-    """Run a task script."""
+    """Run a task script.
+
+    Starts the script and returns immediately — does not wait for
+    completion. Use `vrg task list` to track execution status.
+
+    **Examples:**
+
+        vrg task script run cleanup-old-snapshots
+
+        vrg task script run cleanup-old-snapshots \\
+            --params-json '{"days": 30}'
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.task_scripts, identifier, "TaskScript")
     params: dict[str, Any] = {}
