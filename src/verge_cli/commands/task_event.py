@@ -15,8 +15,56 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="event",
-    help="Manage task events (event-driven triggers).",
+    help=(
+        "Manage task events — event-driven triggers that fire tasks when"
+        " something happens in VergeOS.\n\n"
+        "A **task event** binds a task (`--task`) to an event (`--event`) on a"
+        " specific table (`--table`, e.g., `vms`, `alarms`, `users`). When the"
+        " event fires on a matching row the linked task executes, with an"
+        " optional filter (`--filters-json`) narrowing which rows qualify and an"
+        " optional `--context-json` payload passed to the task. This is the"
+        " event side of the task engine; for recurring (cron-style) execution"
+        " see `vrg task schedule` and `vrg task trigger`.\n\n"
+        "Use events for reactions like: power on a VM when a user logs in, send"
+        " a webhook when a sync fails, create a snapshot when an alarm raises,"
+        " or run cleanup when a resource is deleted.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all task events\n"
+        "    vrg task event list\n\n"
+        "    # Filter by source table and event type\n"
+        "    vrg task event list --table vms --event powered_on\n\n"
+        "    # List events bound to a specific task\n"
+        "    vrg task event list --task nightly-snapshot\n\n"
+        "    # Get event details as JSON\n"
+        "    vrg -o json task event get 42\n\n"
+        "    # Create an event: fire 'alert-ops' when an alarm is raised\n"
+        "    vrg task event create --task alert-ops --table alarms \\\n"
+        "        --event raised --event-name 'Alarm raised'\n\n"
+        "    # Attach a filter (only fire for critical severity)\n"
+        "    vrg task event create --task alert-ops --table alarms \\\n"
+        "        --event raised \\\n"
+        '        --filters-json \'{"severity": "critical"}\'\n\n'
+        "    # Manually fire an event for testing\n"
+        "    vrg task event trigger 42\n\n"
+        "    # Delete an event binding\n"
+        "    vrg task event delete 42 --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Task events reference tasks by name or key; ambiguous names exit with"
+        " code 7. Events themselves are referenced only by numeric `$key`.\n\n"
+        "Available event names depend on the source `--table` — VergeOS tables"
+        " declare their own named events (e.g., `vms` exposes `powered_on`,"
+        " `powered_off`; `alarms` exposes `raised`, `resolved`). Check the"
+        " table's schema or existing events (`vrg task event list --table"
+        " <table>`) to see what's available.\n\n"
+        "`--filters-json` is a JSON object matched against the source row; only"
+        " matching rows trigger the task. `--context-json` (on create/update)"
+        " sets a default context merged into every firing; `--context-json` on"
+        " `trigger` overrides it for a single manual fire."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
