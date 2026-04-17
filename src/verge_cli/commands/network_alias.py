@@ -122,7 +122,15 @@ def alias_list(
     ctx: typer.Context,
     network: Annotated[str, typer.Argument(help="Network name or key")],
 ) -> None:
-    """List IP aliases for a network."""
+    """List IP aliases for a network.
+
+    **Examples:**
+
+        vrg network alias list internal-prod
+        vrg -o json network alias list internal-prod
+
+    Aliases are referenced from firewall rules as `alias:<name>`.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -148,7 +156,16 @@ def alias_get(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     alias: Annotated[str, typer.Argument(help="Alias name, IP, or key")],
 ) -> None:
-    """Get details of an IP alias."""
+    """Get details of an IP alias.
+
+    **Examples:**
+
+        vrg network alias get internal-prod trusted-admin
+        vrg network alias get internal-prod 10.0.1.5
+        vrg -o json network alias get internal-prod 42
+
+    Aliases are resolved by hostname, IP address, or numeric key.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -177,7 +194,22 @@ def alias_create(
     ],
     description: Annotated[str, typer.Option("--description", "-d", help="Description")] = "",
 ) -> None:
-    """Create a new IP alias."""
+    """Create a new IP alias.
+
+    **Examples:**
+
+        # Single-IP alias for a jumphost
+        vrg network alias create internal-prod --name trusted-admin \\
+            --ip 10.0.1.5 --description 'Ops jumphost'
+
+        # CIDR alias for a monitoring subnet
+        vrg network alias create internal-prod --name monitoring \\
+            --ip 10.0.9.0/24
+
+    Reference the alias from a rule as `alias:<name>`. Run
+    `vrg network apply-rules <network>` on any network whose rules
+    reference the alias for the change to take effect in nftables.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -210,8 +242,20 @@ def alias_update(
 ) -> None:
     """Update an IP alias (delete + create).
 
-    Since the SDK doesn't expose PUT for aliases, this command
-    deletes the existing alias and recreates it with the new values.
+    **Examples:**
+
+        # Change the IP an alias resolves to
+        vrg network alias update internal-prod trusted-admin --ip 10.0.1.6
+
+        # Update the description
+        vrg network alias update internal-prod trusted-admin \\
+            --description 'Primary ops jumphost'
+
+    Since the SDK doesn't expose PUT for aliases, this is implemented
+    as delete + recreate — the numeric key changes but rules that
+    reference `alias:<name>` are unaffected. Run
+    `vrg network apply-rules <network>` on every network whose rules
+    reference the alias for the new address to take effect.
     """
     vctx = get_context(ctx)
 
@@ -254,7 +298,18 @@ def alias_delete(
     alias: Annotated[str, typer.Argument(help="Alias name, IP, or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete an IP alias."""
+    """Delete an IP alias.
+
+    **Examples:**
+
+        vrg network alias delete internal-prod trusted-admin
+        vrg network alias delete internal-prod trusted-admin --yes
+
+    Rules that reference `alias:<name>` will fail to resolve after
+    deletion — update or remove those rules first. Run
+    `vrg network apply-rules <network>` afterwards to rebuild
+    nftables. Prompts for confirmation unless `--yes` is passed.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")

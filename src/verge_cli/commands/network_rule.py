@@ -167,7 +167,18 @@ def rule_list(
         bool | None, typer.Option("--enabled/--disabled", help="Filter by enabled state")
     ] = None,
 ) -> None:
-    """List firewall rules for a network."""
+    """List firewall rules for a network.
+
+    **Examples:**
+
+        vrg network rule list internal-prod
+        vrg network rule list internal-prod --direction incoming
+        vrg network rule list internal-prod --action drop --disabled
+        vrg -o json network rule list internal-prod
+
+    Rules are returned in `orderid` order (processing order). System
+    rules (`system_rule: true`) are platform-generated and read-only.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -202,7 +213,15 @@ def rule_get(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     rule: Annotated[str, typer.Argument(help="Rule name or key")],
 ) -> None:
-    """Get details of a firewall rule."""
+    """Get details of a firewall rule.
+
+    **Examples:**
+
+        vrg network rule get internal-prod allow-https
+        vrg -o json network rule get internal-prod 42
+
+    Rules are scoped to a network and resolved by name or numeric key.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -264,7 +283,29 @@ def rule_create(
     order: Annotated[int | None, typer.Option("--order", help="Rule order position")] = None,
     description: Annotated[str, typer.Option("--description", help="Rule description")] = "",
 ) -> None:
-    """Create a new firewall rule."""
+    """Create a new firewall rule.
+
+    **Examples:**
+
+        # Allow inbound HTTPS
+        vrg network rule create internal-prod --name allow-https \\
+            --direction incoming --action accept --protocol tcp --dest-ports 443
+
+        # Port-forward external 443 to an internal web VM
+        vrg network rule create internal-prod --name https-to-web \\
+            --direction incoming --action translate --protocol tcp \\
+            --dest-ip vnetself --dest-ports 443 \\
+            --target-ip vmnic:web-01.eth0 --target-ports 443
+
+        # Outbound NAT via router
+        vrg network rule create internal-prod --name outbound-nat \\
+            --direction outgoing --action translate --protocol any --target-ip router
+
+    Rule creation is **staged** — run `vrg network apply-rules
+    <network>` to activate. Source/destination fields accept plain
+    IPs, CIDR blocks, ranges, and helpers like `vnetself`, `router`,
+    `vnet:<name>`, `vmnic:<vm>.<nic>`, `alias:<name>`.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -353,7 +394,20 @@ def rule_update(
         str | None, typer.Option("--description", help="Rule description")
     ] = None,
 ) -> None:
-    """Update a firewall rule."""
+    """Update a firewall rule.
+
+    **Examples:**
+
+        # Turn on logging for a rule
+        vrg network rule update internal-prod allow-https --log
+
+        # Change destination port + add stats
+        vrg network rule update internal-prod allow-https --dest-ports 8443 --stats
+
+    Only non-empty options are applied; exits with code 2 if nothing
+    is specified. Changes are **staged** — run `vrg network
+    apply-rules <network>` to activate.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -419,7 +473,17 @@ def rule_delete(
     rule: Annotated[str, typer.Argument(help="Rule name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a firewall rule."""
+    """Delete a firewall rule.
+
+    **Examples:**
+
+        vrg network rule delete internal-prod allow-https
+        vrg network rule delete internal-prod allow-https --yes
+
+    Change is **staged** — run `vrg network apply-rules <network>`
+    to remove the rule from the live ruleset. Prompts for
+    confirmation unless `--yes` is passed.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -445,7 +509,15 @@ def rule_enable(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     rule: Annotated[str, typer.Argument(help="Rule name or key")],
 ) -> None:
-    """Enable a firewall rule."""
+    """Enable a firewall rule.
+
+    **Examples:**
+
+        vrg network rule enable internal-prod allow-https
+
+    Flips the rule's `enabled` flag to true. Change is **staged** —
+    run `vrg network apply-rules <network>` to activate.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -465,7 +537,16 @@ def rule_disable(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     rule: Annotated[str, typer.Argument(help="Rule name or key")],
 ) -> None:
-    """Disable a firewall rule."""
+    """Disable a firewall rule.
+
+    **Examples:**
+
+        vrg network rule disable internal-prod allow-https
+
+    Flips the rule's `enabled` flag to false — preserves the rule's
+    configuration for re-enabling later. Change is **staged** — run
+    `vrg network apply-rules <network>` to deactivate in nftables.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")

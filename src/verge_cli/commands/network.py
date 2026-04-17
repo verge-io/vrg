@@ -113,7 +113,14 @@ def network_list(
         typer.Option("--filter", help="OData filter expression (e.g., \"name eq 'foo'\")"),
     ] = None,
 ) -> None:
-    """List virtual networks."""
+    """List virtual networks.
+
+    **Examples:**
+
+        vrg network list
+        vrg network list --type internal
+        vrg -o json network list --status running
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.networks.list(), _network_to_dict, NETWORK_COLUMNS)
         return
@@ -149,7 +156,16 @@ def network_get(
     ctx: typer.Context,
     network: Annotated[str, typer.Argument(help="Network name or key")],
 ) -> None:
-    """Get details of a virtual network."""
+    """Get details of a virtual network.
+
+    **Examples:**
+
+        vrg network get internal-prod
+        vrg -o json network get 42
+
+    Networks are resolved by name or numeric key. Ambiguous names exit
+    with code 7 — use the numeric key to disambiguate.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -209,7 +225,19 @@ def network_create(
         ),
     ] = None,
 ) -> None:
-    """Create a new virtual network."""
+    """Create a new virtual network.
+
+    **Examples:**
+
+        vrg network create --name app-tier --cidr 10.0.1.0/24
+        vrg network create --name web-dmz --type dmz --cidr 10.0.2.0/24 --dhcp
+        vrg network create --name isolated --cidr 10.10.0.0/24 --dhcp \\
+            --dhcp-start 10.10.0.100 --dhcp-stop 10.10.0.200
+
+    The interface IP is auto-derived from the CIDR if not explicitly
+    set via `--ip`. New networks start in a stopped state — run
+    `vrg network start <name>` to bring them up.
+    """
     vctx = get_context(ctx)
 
     create_kwargs: dict[str, Any] = {
@@ -269,7 +297,16 @@ def network_update(
         typer.Option("--gateway", "-g", help="Default gateway"),
     ] = None,
 ) -> None:
-    """Update a virtual network."""
+    """Update a virtual network.
+
+    **Examples:**
+
+        vrg network update internal-prod --description "Production app tier"
+        vrg network update internal-prod --name app-prod --gateway 10.0.1.1
+
+    Only non-empty options are applied. Exits with code 2 if no
+    updates are specified.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -307,7 +344,17 @@ def network_delete(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a virtual network."""
+    """Delete a virtual network.
+
+    **Examples:**
+
+        vrg network delete test-net
+        vrg network delete test-net --yes
+
+    Destructive — removes the vnet container, its rules, DNS zones, and
+    host overrides. VMs with NICs attached to this network will be
+    disconnected. Prompts for confirmation unless `--yes` is passed.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -327,7 +374,15 @@ def network_start(
     ctx: typer.Context,
     network: Annotated[str, typer.Argument(help="Network name or key")],
 ) -> None:
-    """Start a virtual network."""
+    """Start a virtual network.
+
+    **Examples:**
+
+        vrg network start internal-prod
+
+    Boots the vnet's LXC container, loads firewall rules, and starts
+    DHCP/DNS services. No-op if the network is already running.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -348,7 +403,16 @@ def network_stop(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     force: Annotated[bool, typer.Option("--force", "-f", help="Force stop")] = False,
 ) -> None:
-    """Stop a virtual network."""
+    """Stop a virtual network.
+
+    **Examples:**
+
+        vrg network stop internal-prod
+        vrg network stop internal-prod --force
+
+    Shuts down the vnet container. Traffic in flight is dropped.
+    VMs with NICs on this network lose connectivity until it restarts.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -377,7 +441,18 @@ def network_restart(
     ] = False,
     timeout: Annotated[int, typer.Option("--timeout", "-t", help="Timeout in seconds")] = 300,
 ) -> None:
-    """Restart a virtual network."""
+    """Restart a virtual network.
+
+    **Examples:**
+
+        vrg network restart internal-prod
+        vrg network restart internal-prod --no-apply-rules
+        vrg network restart internal-prod --wait --timeout 120
+
+    Full restart of the vnet container. Prefer `apply-rules` /
+    `apply-dns` for rule and DNS changes — they reload without
+    restarting. Use `--wait` to block until the network is running.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -407,7 +482,17 @@ def network_apply_rules(
     ctx: typer.Context,
     network: Annotated[str, typer.Argument(help="Network name or key")],
 ) -> None:
-    """Apply pending firewall rules to a network."""
+    """Apply pending firewall rules to a network.
+
+    **Examples:**
+
+        vrg network apply-rules internal-prod
+
+    Regenerates and reloads nftables inside the vnet container
+    **without restarting it**. Required after any `vrg network rule`
+    create/update/delete. Network must be running — otherwise exits
+    with code 1 (rules will apply on next start).
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -430,7 +515,17 @@ def network_apply_dns(
     ctx: typer.Context,
     network: Annotated[str, typer.Argument(help="Network name or key")],
 ) -> None:
-    """Apply pending DNS configuration to a network."""
+    """Apply pending DNS configuration to a network.
+
+    **Examples:**
+
+        vrg network apply-dns internal-prod
+
+    Regenerates DNS zone files and reloads BIND (or dnsmasq) inside
+    the vnet container **without restarting it**. Required after any
+    `vrg network dns` or `vrg network host` create/update/delete.
+    Network must be running — otherwise exits with code 1.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -453,7 +548,17 @@ def network_status(
     ctx: typer.Context,
     network: Annotated[str, typer.Argument(help="Network name or key")],
 ) -> None:
-    """Show detailed status of a network including pending changes."""
+    """Show detailed status of a network including pending changes.
+
+    **Examples:**
+
+        vrg network status internal-prod
+        vrg -o json network status internal-prod
+
+    Reports running state plus three pending-change flags:
+    `needs_rule_apply`, `needs_dns_apply`, `needs_restart`. Use this
+    to decide whether to run `apply-rules`, `apply-dns`, or `restart`.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.networks, network, "network")

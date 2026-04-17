@@ -164,10 +164,18 @@ def diag_leases(
 ) -> None:
     """Show DHCP leases for a network.
 
-    Displays active and reserved DHCP leases including MAC address,
-    IP address, hostname, and expiration time.
+    **Examples:**
 
-    Useful for troubleshooting DHCP issues or finding device IPs.
+        vrg network diag leases internal-prod
+        vrg -o json network diag leases internal-prod
+
+        # Find the lease for a specific MAC
+        vrg -o json network diag leases internal-prod \\
+            | jq '.[] | select(.mac == "52:54:00:12:34:56")'
+
+    Reads from dnsmasq's lease file — includes both dynamic leases
+    and static entries (configured via `vrg network host`) once
+    clients have requested them.
     """
     vctx = get_context(ctx)
 
@@ -202,10 +210,13 @@ def diag_addresses(
 ) -> None:
     """Show all network addresses.
 
-    Displays the address table for the network including IP addresses,
-    MAC addresses, interfaces, and address types.
+    **Examples:**
 
-    Useful for viewing what devices are connected to the network.
+        vrg network diag addresses internal-prod
+        vrg -o json network diag addresses internal-prod
+
+    Displays the vnet's address table (IP, MAC, interface, type).
+    Useful for discovering which devices are actually connected.
     """
     vctx = get_context(ctx)
 
@@ -240,10 +251,14 @@ def diag_stats(
 ) -> None:
     """Show network traffic statistics.
 
-    Displays traffic statistics including bytes and packets
-    transmitted and received, as well as error counts.
+    **Examples:**
 
-    Useful for monitoring network performance and identifying issues.
+        vrg network diag stats internal-prod
+        vrg -o json network diag stats external-wan
+
+    Cumulative counters for bytes/packets in and out plus errors.
+    Counters are lifetime-of-container — they reset when the vnet
+    restarts.
     """
     vctx = get_context(ctx)
 
@@ -298,8 +313,14 @@ def diag_quality(
 ) -> None:
     """Show current network quality metrics.
 
-    Displays the most recent monitoring sample including quality
-    percentage, latency, packet loss, and error counts.
+    **Examples:**
+
+        vrg network diag quality external-wan
+        vrg -o json network diag quality external-wan
+
+    Most recent 5-second monitoring sample: quality %, average and
+    peak latency, packet loss, duplicates, bad checksums. Populated
+    only for networks with monitoring enabled.
     """
     vctx = get_context(ctx)
 
@@ -335,8 +356,19 @@ def diag_history(
 ) -> None:
     """Show network monitoring history.
 
-    Displays timestamped quality, latency, and packet loss data.
-    Use --long for aggregated long-term history.
+    **Examples:**
+
+        # Last 20 short-term (raw 5s) samples
+        vrg network diag history external-wan
+
+        # Last 50 short-term samples as JSON
+        vrg -o json network diag history external-wan --limit 50
+
+        # Long-term aggregated (5-minute rollups, longer retention)
+        vrg network diag history external-wan --long --limit 200
+
+    Short-term history is raw 5-second samples; long-term history
+    (`--long`) is 5-minute aggregates with longer retention.
     """
     vctx = get_context(ctx)
 
