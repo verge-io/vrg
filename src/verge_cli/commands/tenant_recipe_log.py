@@ -14,8 +14,40 @@ from verge_cli.utils import resolve_nas_resource
 
 app = typer.Typer(
     name="log",
-    help="View tenant recipe logs.",
+    help=(
+        "View tenant recipe activity logs — the audit trail for tenant"
+        " recipe operations.\n\n"
+        "Every tenant recipe action (download, publish, edit, deploy,"
+        " update) writes an entry capturing the level, message, timestamp,"
+        " and the user who triggered it. Use these logs to diagnose failed"
+        " tenant provisions, trace who edited a recipe, or confirm that a"
+        " deploy ran end-to-end.\n\n"
+        "Logs are read-only — there is no create, update, or delete."
+        " Entries are retained per-recipe and trimmed by the server over"
+        " time, so pull relevant entries promptly when debugging.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Show recent log entries across every tenant recipe\n"
+        "    vrg tenant-recipe log list\n\n"
+        "    # Filter to a single tenant recipe by name or hex key\n"
+        "    vrg tenant-recipe log list --recipe acme-tenant\n\n"
+        "    # Emit JSON for downstream parsing (level, text, timestamp, user)\n"
+        "    vrg -o json tenant-recipe log list --recipe acme-tenant\n\n"
+        "    # Query only warnings and errors with jq-style projection\n"
+        "    vrg -o json tenant-recipe log list --query \"[?level!='message']\"\n\n"
+        "    # Inspect a specific log entry by its numeric key\n"
+        "    vrg tenant-recipe log get 4217\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`--recipe` accepts either a tenant recipe name or its 40-character"
+        " hex key. When a name matches multiple recipes, vrg prints all"
+        " matches and exits with code 7 — use the hex key to disambiguate.\n\n"
+        "Log levels observed: `message`, `warning`, `error`, `critical`."
+        " Timestamps are returned in microseconds by the API and normalized"
+        " to seconds for display."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 TENANT_RECIPE_LOG_COLUMNS: list[ColumnDef] = [
