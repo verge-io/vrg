@@ -14,8 +14,62 @@ from verge_cli.utils import resolve_nas_resource
 
 app = typer.Typer(
     name="files",
-    help="Browse NAS volume files and directories.",
+    help=(
+        "Browse files and directories inside a NAS volume — read-only"
+        " inspection of volume contents without mounting the share from a"
+        " client.\n\n"
+        "This group drives the `volume_browser` endpoint: the NAS service VM"
+        " walks the volume filesystem and returns a listing. It is useful for"
+        " verifying that expected files are present (e.g., after a snapshot"
+        " restore, sync, or migration), auditing share layouts, or locating a"
+        " file before building CIFS/NFS rules around its path. It does **not**"
+        " transfer file contents — there is no `cat`, `download`, `upload`,"
+        " `delete`, or `mkdir`. For data access, mount the share via CIFS or"
+        " NFS on a client.\n\n"
+        "Volumes are referenced by name or 40-char hex `$key`. Ambiguous names"
+        " exit with code 7 — disambiguate with the key. Paths use forward"
+        " slashes with `/` as the volume root (e.g., `/`, `/documents`,"
+        " `/archive/2025`).\n\n"
+        "`--extensions` filters results to matching file extensions"
+        " (comma-separated, no dots — e.g., `txt,log,csv`); it does not affect"
+        " directories. `--sort` reorders results by a field name supported by"
+        " the browser (`name`, `size`, `date`). Use `-o json` to pipe"
+        " directory listings into scripts or agents, and `--query` to extract"
+        " individual fields such as `name`, `type`, `size`, or `modified`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List the root of a volume\n"
+        "    vrg nas files list shared-data\n\n"
+        "    # List a subdirectory by path\n"
+        "    vrg nas files list shared-data --path /documents\n\n"
+        "    # Filter by extension, sort by size\n"
+        "    vrg nas files list shared-data \\\n"
+        "        --path /logs --extensions log,gz --sort size\n\n"
+        "    # JSON output for scripting / agent consumption\n"
+        "    vrg -o json nas files list shared-data --path /archive/2025\n\n"
+        "    # Project just file names with --query\n"
+        "    vrg -o json nas files list shared-data --query '[].name'\n\n"
+        "    # Look up a specific file or directory\n"
+        "    vrg nas files get shared-data /documents/report.pdf\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The parent NAS service VM **must be running** and the volume must be"
+        " `online` (mounted) for browsing to succeed — a stopped service or an"
+        " `offline` volume returns an error. Start the service with"
+        " `vrg nas service start` and enable the volume with"
+        " `vrg nas volume enable` if needed.\n\n"
+        "The volume browser is **asynchronous**: the CLI submits a browse job,"
+        " polls for completion, then returns entries. Large directories may"
+        " take several seconds; the default timeout is 30s. Results are capped"
+        " at 1,000 entries per request — paginate with narrower paths or"
+        " `--extensions` if you need more.\n\n"
+        "Snapshots can be browsed via their auto-mounted path (enable"
+        " **Automatically Mount Snapshots** on the parent volume) — they"
+        " appear as subdirectories that this command can list like any other"
+        " path."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 NAS_FILE_COLUMNS: list[ColumnDef] = [
