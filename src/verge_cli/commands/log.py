@@ -175,7 +175,21 @@ def list_cmd(
         ),
     ] = 100,
 ) -> None:
-    """List system log entries."""
+    """List system log entries.
+
+    Examples:
+
+        vrg log list
+        vrg log list --errors --limit 50
+        vrg log list --type vm --user admin
+        vrg log list --since 2026-04-15T08:00:00 --before 2026-04-15T18:00:00
+        vrg -o json log list --level error
+
+    Useful `--query` fields: `level`, `object_type`, `object_name`,
+    `user`, `text`, `timestamp`. `--before` is only honored on the
+    general listing path; combined with `--errors`/`--level`/`--type`/
+    `--user` in isolation it is ignored with a warning.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.logs.list(), _log_to_dict, LOG_COLUMNS)
         return
@@ -237,7 +251,16 @@ def get(
         typer.Argument(help="Log entry key (numeric ID)."),
     ],
 ) -> None:
-    """Get a log entry by key."""
+    """Get a log entry by key.
+
+    Examples:
+
+        vrg log get 12345
+        vrg -o json log get 12345
+
+    Log entries are addressed by numeric key only. Use `vrg log list`
+    or `vrg log search` to discover keys.
+    """
     vctx = get_context(ctx)
     entry = vctx.client.logs.get(key=key)
     output_result(
@@ -288,7 +311,18 @@ def search(
         ),
     ] = 100,
 ) -> None:
-    """Search log entries by text content."""
+    """Search log entries by text content.
+
+    Examples:
+
+        vrg log search "migration failed"
+        vrg log search "login" --type user --since 2026-04-01
+        vrg log search "timeout" --level error --limit 50
+
+    Performs a server-side substring match against the log message
+    body. Combine with `--level`, `--type`, and `--since` to narrow
+    the result window.
+    """
     vctx = get_context(ctx)
 
     since_dt = _parse_datetime(since) if since else None

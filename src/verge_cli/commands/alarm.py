@@ -176,7 +176,20 @@ def list_cmd(
         ),
     ] = None,
 ) -> None:
-    """List active alarms."""
+    """List active alarms.
+
+    Examples:
+
+        vrg alarm list
+        vrg alarm list --level critical
+        vrg alarm list --owner-type Node --include-snoozed
+        vrg -o json alarm list --query "[?level=='error'].alarm_type"
+
+    Useful `--query` fields: `level`, `alarm_type`, `status`,
+    `owner_type`, `owner_name`, `is_snoozed`, `is_resolvable`.
+    Snoozed alarms are hidden by default — pass `--include-snoozed`
+    to see them.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.alarms.list(), _alarm_to_dict, ALARM_COLUMNS)
         return
@@ -222,7 +235,16 @@ def get(
         typer.Argument(help="Alarm key (numeric ID)."),
     ],
 ) -> None:
-    """Get alarm details by key."""
+    """Get alarm details by key.
+
+    Examples:
+
+        vrg alarm get 412
+        vrg -o json alarm get 412
+
+    Alarms are addressed by numeric key only. Use `vrg alarm list`
+    to discover active keys.
+    """
     vctx = get_context(ctx)
     item = vctx.client.alarms.get(key=alarm)
     output_result(
@@ -252,7 +274,19 @@ def snooze(
         ),
     ] = 24,
 ) -> None:
-    """Snooze an alarm for a specified duration."""
+    """Snooze an alarm for a specified duration.
+
+    Examples:
+
+        vrg alarm snooze 412
+        vrg alarm snooze 412 --hours 4
+        vrg alarm snooze 412 -h 72
+
+    Snoozing suppresses the alarm in the active view until the
+    snooze window passes — it does not resolve the underlying
+    condition. Default is 24 hours; alarm types may cap the maximum
+    duration.
+    """
     vctx = get_context(ctx)
     vctx.client.alarms.snooze(alarm, hours=hours)
     output_success(
@@ -270,7 +304,15 @@ def unsnooze(
         typer.Argument(help="Alarm key (numeric ID)."),
     ],
 ) -> None:
-    """Remove snooze from an alarm."""
+    """Remove snooze from an alarm.
+
+    Examples:
+
+        vrg alarm unsnooze 412
+
+    Returns the alarm to the active view immediately, regardless of
+    remaining snooze time.
+    """
     vctx = get_context(ctx)
     vctx.client.alarms.unsnooze(alarm)
     output_success(
@@ -288,7 +330,18 @@ def resolve(
         typer.Argument(help="Alarm key (numeric ID)."),
     ],
 ) -> None:
-    """Resolve a resolvable alarm."""
+    """Resolve a resolvable alarm.
+
+    Examples:
+
+        vrg alarm resolve 412
+
+    Triggers the alarm type's built-in corrective action (e.g.
+    restart a VM after a config change, apply pending firewall
+    rules). Only alarms with `is_resolvable = true` accept this —
+    non-resolvable alarms clear automatically when their underlying
+    condition is addressed.
+    """
     vctx = get_context(ctx)
     vctx.client.alarms.resolve(alarm)
     output_success(
@@ -302,7 +355,17 @@ def resolve(
 def summary(
     ctx: typer.Context,
 ) -> None:
-    """Show alarm summary with counts by level."""
+    """Show alarm summary with counts by level.
+
+    Examples:
+
+        vrg alarm summary
+        vrg -o json alarm summary
+
+    Returns counts for `critical`, `error`, `warning`, `message`,
+    plus aggregate `active`, `snoozed`, `resolvable`, and `total`.
+    Useful as a one-liner for dashboards or agent pre-flight checks.
+    """
     vctx = get_context(ctx)
     data = vctx.client.alarms.get_summary()
 
