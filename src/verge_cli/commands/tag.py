@@ -16,8 +16,60 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="tag",
-    help="Manage tags and tag categories.",
+    help=(
+        "Manage tags and tag categories on VergeOS.\n\n"
+        "**Tags** are metadata labels attached to platform objects (VMs,"
+        " networks, tenants, nodes, users, volumes, etc.) for classification,"
+        " search, and filtering. Every tag belongs to a **category** that"
+        " controls which object types the tag is allowed to be applied to"
+        " (e.g., a category with `taggable_vms=true` may tag VMs). A category"
+        " with `single_tag_selection=true` enforces mutual exclusivity —"
+        " only one tag from that category may be attached to a given object"
+        " at a time.\n\n"
+        "This group manages tag **definitions** (categories, tags) and"
+        " membership assignments. Use `vrg tag category` for category"
+        " management. Tag attachment is also exposed on individual resource"
+        " commands (e.g., `vrg vm tag <vm> <tag>`).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every tag and its category\n"
+        "    vrg tag list\n\n"
+        "    # Machine-readable output for agents\n"
+        "    vrg -o json tag list\n\n"
+        "    # Narrow to one category\n"
+        "    vrg tag list --category Environment\n\n"
+        "    # Inspect a single tag (name or numeric $key)\n"
+        "    vrg tag get production\n"
+        "    vrg tag get production --category Environment\n\n"
+        "    # Create a tag inside an existing category\n"
+        "    vrg tag create --name production --category Environment \\\n"
+        "        --description 'Production workloads'\n\n"
+        "    # Attach / detach a tag on any taggable resource\n"
+        "    vrg tag assign production vm web-01\n"
+        "    vrg tag unassign production vm web-01\n\n"
+        "    # List every object currently carrying a tag\n"
+        "    vrg tag members production\n"
+        "    vrg tag members production --type vm\n\n"
+        "    # Manage categories\n"
+        "    vrg tag category list\n"
+        "    vrg tag category create --name Owner --taggable-vms\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Tags and categories are referenced by **name** or **numeric key**"
+        " (`$key`). Tag names are unique only within a category — pass"
+        " `--category` on `get` when the same tag name is reused across"
+        " categories. Ambiguous name resolution exits with code 7.\n\n"
+        "Valid resource types for `assign` / `unassign` / `members --type`:"
+        " `vm`, `network`, `node`, `tenant`, `user`, `cluster`, `site`,"
+        " `group`, `volume`. The target category must have the corresponding"
+        " `taggable_*` flag enabled or the assignment will be rejected.\n\n"
+        "Deleting a tag cascades to its membership rows (objects stop"
+        " carrying the tag). Deleting a category cascades to its tags and"
+        " their members. There is no soft-delete — run `vrg tag members"
+        " <tag>` first if you need a reference of what will be affected."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Register tag category as a sub-command
