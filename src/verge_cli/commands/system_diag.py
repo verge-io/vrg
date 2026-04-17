@@ -17,8 +17,52 @@ from verge_cli.utils import confirm_action
 
 app = typer.Typer(
     name="diag",
-    help="Manage system diagnostic bundles.",
+    help=(
+        "Create and manage system diagnostic bundles.\n\n"
+        "A system diagnostic bundle is a comprehensive snapshot of cloud"
+        " state used for troubleshooting and support escalations — system"
+        " and kernel logs, hardware inventory (dmidecode, lspci, lshw,"
+        " SMART data), vSAN cluster and per-node state, network fabric"
+        " details, and container/tenant log collection. Bundles are"
+        " produced by the on-node `diagnostics` tool and stored on the"
+        " cluster under `/vsan/vol/tmp/diags/`. They can be sent directly"
+        " to Verge.io support from the CLI.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `name`, `status`, `timestamp`, `description`, `status_info`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List existing diagnostic bundles (newest first)\n"
+        "    vrg system diag list\n\n"
+        "    # Create a bundle and wait for completion (default)\n"
+        "    vrg system diag create support-2026-04-17 \\\n"
+        '        --description "vSAN rebalance investigation"\n\n'
+        "    # Create and auto-send to Verge.io support\n"
+        "    vrg system diag create support-2026-04-17 \\\n"
+        "        --send-to-support\n\n"
+        "    # Kick off the bundle but don't block\n"
+        "    vrg system diag create support-2026-04-17 --no-wait\n\n"
+        "    # Inspect a bundle's current state\n"
+        "    vrg -o json system diag get support-2026-04-17\n\n"
+        "    # Send an existing bundle to support\n"
+        "    vrg system diag send support-2026-04-17\n\n"
+        "    # Remove a bundle\n"
+        "    vrg system diag delete support-2026-04-17 --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Bundle creation can take several minutes on large clusters — it"
+        " touches every node and collects vSAN, hardware, and log data."
+        " Running without `--no-wait` streams a spinner and returns when"
+        " the bundle reaches a terminal state; the default timeout is 300"
+        " seconds.\n\n"
+        "Diagnostics are resolved by name or numeric key. If multiple"
+        " bundles share a name, name lookup fails with exit code 7"
+        " (conflict) — use the numeric key instead. `--send-to-support`"
+        " requires outbound connectivity from the cloud to Verge.io; on"
+        " air-gap systems, download the bundle from the UI and upload it"
+        " through the support portal."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
