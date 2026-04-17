@@ -155,7 +155,7 @@ def vm_get(
         vrg vm get web-01
         vrg vm get 42
         vrg -o json vm get web-01
-        vrg -o json -q '.status,.node_name' vm get web-01
+        vrg -o json --query status vm get web-01
     """
     vctx = get_context(ctx)
 
