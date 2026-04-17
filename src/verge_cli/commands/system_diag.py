@@ -171,8 +171,8 @@ def diag_delete(
     vctx = get_context(ctx)
     diag = _resolve_diag(vctx, name_or_key)
 
-    if not yes:
-        confirm_action(f"Delete diagnostic '{diag.name}' (key: {diag.key})?")
+    if not confirm_action(f"Delete diagnostic '{diag.name}' (key: {diag.key})?", yes=yes):
+        return
 
     vctx.client.system_diagnostics.delete(diag.key)
 
