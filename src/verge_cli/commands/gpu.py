@@ -21,20 +21,137 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="gpu",
-    help="Manage GPUs and vGPU profiles.",
+    rich_markup_mode="markdown",
+    help=(
+        "Manage GPU hardware and vGPU profile assignments on cluster"
+        " nodes.\n\n"
+        "VergeOS exposes each node's GPU in one of three modes: `none`"
+        " (not configured; host-only), `gpu` (full PCI passthrough — one"
+        " physical GPU bound to one VM with `max_instances = 1`), or"
+        " `nvidia_vgpu` (NVIDIA time-sliced sharing across multiple VMs,"
+        " requires the licensed NVIDIA vGPU host driver). PCI passthrough"
+        " requires IOMMU/VT-d enabled in BIOS and `iommu = true` on the"
+        " node. vGPU mode selects a profile that dictates framebuffer,"
+        " display heads, max resolution, and `max_instances`. This group"
+        " drives both GPU records (mode + profile) and inventories the"
+        " underlying PCI devices; VM attachment happens via"
+        " `vrg vm device`.\n\n"
+        "Use `-o json` for structured output and `--query` to pluck"
+        " fields (e.g., `--query \"[?mode_display=='Passthrough'].name\"`)."
+        " GPUs and profiles resolve by `$key` (numeric) or `name`; an"
+        " ambiguous name yields exit code 7 (multiple matches). Device"
+        " records resolve by numeric `$key` only.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Inventory and filtering\n"
+        "    vrg gpu list\n"
+        "    vrg gpu list --node node-01\n"
+        "    vrg gpu list --mode nvidia_vgpu\n"
+        "    vrg -o json gpu list\n\n"
+        "    # Inspect a specific GPU\n"
+        "    vrg gpu get gpu-a100-01\n"
+        "    vrg gpu stats gpu-a100-01\n"
+        "    vrg gpu instances gpu-a100-01\n\n"
+        "    # Switch to PCI passthrough (one VM, exclusive)\n"
+        "    vrg gpu update gpu-a100-01 --mode gpu --yes\n\n"
+        "    # Switch to NVIDIA vGPU with a C-series (AI/ML) profile\n"
+        "    vrg gpu update gpu-a100-01 --mode nvidia_vgpu \\\n"
+        "        --profile a100-10c --yes\n\n"
+        "    # Disable passthrough (return to host OS)\n"
+        "    vrg gpu update gpu-a100-01 --mode none --yes\n\n"
+        "    # Browse available vGPU profiles and physical devices\n"
+        "    vrg gpu profile list --type C\n"
+        "    vrg gpu device list --node node-01 --type vgpu\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Switching modes may require evacuating VMs that currently hold"
+        " the device. PCI passthrough VMs cannot be live-migrated; vGPU"
+        " live migration is experimental and gated by"
+        " `allow_vgpu_migration`. vGPU profiles are discovered from the"
+        " installed NVIDIA host driver — an empty `gpu profile list`"
+        " generally means the licensed driver is not yet loaded on any"
+        " node. Profile types map to workloads: **A** = virtual apps,"
+        " **B** = VDI desktops, **C** = AI/ML compute, **Q** ="
+        " professional workstation (vWS). `gpu list` honors `--all-profiles`"
+        " / `-A` to fan out across every configured CLI profile."
+    ),
     no_args_is_help=True,
 )
 
 profile_app = typer.Typer(
     name="profile",
-    help="Manage vGPU profiles.",
+    rich_markup_mode="markdown",
+    help=(
+        "List and inspect NVIDIA vGPU profiles discovered on the cluster."
+        "\n\n"
+        "Profiles are enumerated from the licensed NVIDIA vGPU host"
+        " driver. Each profile specifies framebuffer size, display"
+        " heads, maximum resolution, and `max_instances` (how many VMs"
+        " can share a single GPU simultaneously). Profile **type**"
+        " classifies the intended workload: `A` (virtual applications),"
+        " `B` (VDI desktops), `C` (AI/ML compute), `Q` (professional"
+        " workstation / vWS). Pick a profile when setting a GPU to"
+        " `nvidia_vgpu` mode via `vrg gpu update --profile`.\n\n"
+        "Use `-o json` for structured output. Profiles resolve by"
+        " `$key` (numeric) or `name`; an ambiguous name yields exit"
+        " code 7 (multiple matches).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all profiles, or filter by workload type\n"
+        "    vrg gpu profile list\n"
+        "    vrg gpu profile list --type C\n"
+        "    vrg -o json gpu profile list --type Q\n\n"
+        "    # Inspect a profile\n"
+        "    vrg gpu profile get a100-10c\n"
+        "    vrg -o json gpu profile get 42\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "If this list is empty, the licensed NVIDIA vGPU host driver is"
+        " not installed on any node, or it has not yet loaded (custom"
+        " driver installs require a maintenance reboot). `max_instance`"
+        " is the per-GPU ceiling for that profile — smaller framebuffers"
+        " permit more concurrent VMs."
+    ),
     no_args_is_help=True,
 )
 app.add_typer(profile_app)
 
 device_app = typer.Typer(
     name="device",
-    help="Manage physical GPU devices.",
+    rich_markup_mode="markdown",
+    help=(
+        "Inventory physical GPU PCI devices visible on cluster nodes."
+        "\n\n"
+        "Each device record represents a PCI function with its slot,"
+        " vendor, device ID, bound kernel driver, and `max_instances`"
+        " ceiling. The subsystem tracks two device families: `vgpu`"
+        " devices (virtual functions exposed by the NVIDIA vGPU host"
+        " driver) and `host` GPU devices (physical PCI GPUs enumerated"
+        " on the node). This is the low-level view used to debug driver"
+        " binding and IOMMU grouping before assigning a GPU with"
+        " `vrg gpu update`.\n\n"
+        "Use `-o json` for structured output and `--query` to pluck"
+        " fields (e.g., `--query \"[?driver=='vfio-pci'].name\"`)."
+        " Devices are addressable by numeric `$key` only — `get`"
+        " rejects non-numeric input.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Inventory (scopes the union of vgpu + host devices)\n"
+        "    vrg gpu device list\n"
+        "    vrg gpu device list --node node-01\n"
+        "    vrg gpu device list --type host\n"
+        "    vrg -o json gpu device list --type vgpu\n\n"
+        "    # Inspect a single device\n"
+        "    vrg gpu device get 17\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "PCI passthrough requires IOMMU/VT-d enabled in BIOS and"
+        " `iommu = true` on the node record. The `driver` field"
+        " indicates the kernel driver currently bound; `vfio-pci`"
+        " signals the device is claimed for VM passthrough."
+        " `driver_override` can force a specific driver binding when"
+        " auto-detection picks the wrong one."
+    ),
     no_args_is_help=True,
 )
 app.add_typer(device_app)
@@ -201,9 +318,7 @@ def gpu_list(
 ) -> None:
     """List GPU configurations."""
     if ctx.obj.get("all_profiles"):
-        list_all_profiles(
-            ctx, lambda c: c.nodes.all_gpus.list(), _gpu_to_dict, GPU_COLUMNS
-        )
+        list_all_profiles(ctx, lambda c: c.nodes.all_gpus.list(), _gpu_to_dict, GPU_COLUMNS)
         return
     vctx = get_context(ctx)
     if node is not None:
