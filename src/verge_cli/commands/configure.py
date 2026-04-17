@@ -16,7 +16,50 @@ from verge_cli.config import (
 
 app = typer.Typer(
     name="configure",
-    help="Configure Verge CLI settings.",
+    rich_markup_mode="markdown",
+    help=(
+        "Manage CLI credentials and defaults in `~/.vrg/config.toml`.\n\n"
+        "This is where you point `vrg` at a VergeOS cluster and give it"
+        " credentials. A profile holds a host URL, one auth credential"
+        " (bearer token, API key, or username/password), and per-profile"
+        " defaults for output format, SSL verification, and request"
+        " timeout. The file contains a `[default]` section plus zero or"
+        " more named `[profile.<name>]` sections; select a named profile"
+        " at runtime with `--profile <name>` or `VERGE_PROFILE`. If you"
+        " have never run `vrg` before, start here.\n\n"
+        "This group does not call the VergeOS API — it only reads/writes"
+        " the local TOML file. `show` and `list` print tables intended"
+        " for humans; there is no `-o json` support on this group."
+        " `show` masks secrets by default (last-4 redaction); pass"
+        " `--show-secrets` to reveal them.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # First-time setup (prompts for host, auth, defaults)\n"
+        "    vrg configure setup\n\n"
+        "    # Add a second profile for another cluster\n"
+        "    vrg configure setup --profile prod\n\n"
+        "    # List every profile in the config file\n"
+        "    vrg configure list\n\n"
+        "    # Show the effective config (after env-var overrides)\n"
+        "    vrg configure show\n\n"
+        "    # Show a specific profile with secrets revealed\n"
+        "    vrg configure show --profile prod --show-secrets\n\n"
+        "    # Use a named profile for one command without editing config\n"
+        "    vrg --profile prod vm list\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Credential precedence, highest wins: CLI flags (`--host`,"
+        " `--token`, …) > environment variables (`VERGE_HOST`,"
+        " `VERGE_TOKEN`, `VERGE_API_KEY`, `VERGE_USERNAME`,"
+        " `VERGE_PASSWORD`, `VERGE_PROFILE`, `VERGE_VERIFY_SSL`,"
+        " `VERGE_TIMEOUT`, `VERGE_OUTPUT`) > named profile > `[default]`"
+        " profile > interactive prompt (TTY only). Auth priority within"
+        " a profile: bearer token, then API key, then basic auth. The"
+        " config file is plain TOML — secrets are stored unencrypted, so"
+        " protect `~/.vrg/config.toml` like an SSH key and prefer bearer"
+        " tokens or env vars for CI. Exit code 3 means config-file"
+        " error (e.g., unknown profile)."
+    ),
     no_args_is_help=True,
 )
 
