@@ -120,10 +120,14 @@ def _mock_license(
 def _mock_fabric_status(
     is_healthy: bool = True,
     fabric_status: str = "confirmed",
+    max_score: float = 50.0,
+    min_score: float = 50.0,
 ) -> MagicMock:
     f = MagicMock()
     f.is_healthy = is_healthy
     f.fabric_status = fabric_status
+    f.max_score = max_score
+    f.min_score = min_score
     return f
 
 
@@ -155,6 +159,76 @@ def _mock_dimm(
     d.status = status
     d.locator = locator
     return d
+
+
+def _mock_user(
+    name: str = "admin",
+    key: int = 1,
+    physical_access: bool = False,
+    two_factor_enabled: bool = False,
+) -> MagicMock:
+    u = MagicMock()
+    u.key = key
+    u.name = name
+    u.physical_access = physical_access
+    u.two_factor_enabled = two_factor_enabled
+    return u
+
+
+def _mock_network(
+    name: str = "internal",
+    key: int = 1,
+    net_type: str = "internal",
+    mtu: int = 1500,
+    needs_restart: bool = False,
+    needs_rule_apply: bool = False,
+    needs_dns_apply: bool = False,
+    vxlan_multicast: str | None = None,
+) -> MagicMock:
+    n = MagicMock()
+    n.key = key
+    n.name = name
+    n.type = net_type
+    n.mtu = mtu
+    n.needs_restart = needs_restart
+    n.needs_rule_apply = needs_rule_apply
+    n.needs_dns_apply = needs_dns_apply
+    n.get = lambda k, default=None: {"vxlan_multicast": vxlan_multicast}.get(k, default)
+    return n
+
+
+def _mock_lldp_neighbor(
+    node_key: int = 1,
+    nic_key: int = 1,
+    chassis_name: str = "switch1",
+) -> MagicMock:
+    n = MagicMock()
+    n.node_key = node_key
+    n.nic_key = nic_key
+    n.chassis_name = chassis_name
+    return n
+
+
+def _mock_update_package(
+    name: str = "yb",
+    key: int = 1,
+    version: str = "6.2.1",
+) -> MagicMock:
+    p = MagicMock()
+    p.key = key
+    p.name = name
+    p.get = lambda k, default=None: {"version": version}.get(k, default)
+    return p
+
+
+def _mock_snapshot_profile(
+    name: str = "Default",
+    key: int = 1,
+) -> MagicMock:
+    p = MagicMock()
+    p.key = key
+    p.name = name
+    return p
 
 
 def _mock_vsan_query_result(
@@ -220,6 +294,32 @@ def _setup_healthy_client(mock_client: MagicMock) -> None:
     # vSAN queries
     mock_client.vsan_queries.journal_status.return_value = _mock_vsan_query_result()
     mock_client.vsan_queries.tier_status.return_value = _mock_vsan_query_result()
+
+    # Networks (for network_pending / mtu checks)
+    mock_client.networks.list.return_value = [
+        _mock_network("core", 1, net_type="core", mtu=9000, vxlan_multicast="239.0.0.1"),
+        _mock_network("Core Switch", 2, net_type="physical", mtu=9192, vxlan_multicast="239.0.0.1"),
+    ]
+
+    # LLDP neighbors
+    mock_client.node_lldp_neighbors.list.return_value = [
+        _mock_lldp_neighbor(node_key=1, nic_key=1, chassis_name="switch1"),
+        _mock_lldp_neighbor(node_key=1, nic_key=2, chassis_name="switch2"),
+    ]
+
+    # Update source packages (same version as system = no update available)
+    mock_client.update_source_packages.list.return_value = [
+        _mock_update_package("ybos", 1, version="6.2.1"),
+    ]
+
+    # Users
+    mock_client.users.list.return_value = [
+        _mock_user("admin", 1, physical_access=True, two_factor_enabled=False),
+        _mock_user("operator", 2, physical_access=True, two_factor_enabled=True),
+    ]
+
+    # Snapshot profiles
+    mock_client.snapshot_profiles.list.return_value = [_mock_snapshot_profile()]
 
     # Driver reload (nodes already set up — just ensure reload_drivers_required is False)
     for n in mock_client.nodes.list.return_value:
@@ -728,9 +828,316 @@ class TestListChecks:
         assert result.exit_code == 0
 
 
+# ===========================================================================
+# Step 6: Admin & Security
+# ===========================================================================
+
+
+class TestAdminUsers:
+    def test_multiple_admins(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.users.list.return_value = [
+            _mock_user("admin", 1, physical_access=True),
+            _mock_user("operator", 2, physical_access=True),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "admin_users"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_single_admin(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.users.list.return_value = [
+            _mock_user("admin", 1, physical_access=True),
+            _mock_user("regular", 2, physical_access=False),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "admin_users"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+    def test_no_admins(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.users.list.return_value = [
+            _mock_user("regular", 1, physical_access=False),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "admin_users"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+
+class TestMfa:
+    def test_mfa_all_enabled(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.users.list.return_value = [
+            _mock_user("admin", 1, physical_access=True, two_factor_enabled=False),
+            _mock_user("operator", 2, physical_access=True, two_factor_enabled=True),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "mfa"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_mfa_missing_on_non_admin(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.users.list.return_value = [
+            _mock_user("admin", 1, physical_access=True, two_factor_enabled=False),
+            _mock_user("operator", 2, physical_access=True, two_factor_enabled=False),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "mfa"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+        assert "operator" in result.output.lower()
+
+    def test_mfa_admin_exempt(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.users.list.return_value = [
+            _mock_user("admin", 1, physical_access=True, two_factor_enabled=False),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "mfa"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_mfa_no_non_admin_admins(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.users.list.return_value = [
+            _mock_user("regular", 1, physical_access=False),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "mfa"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+
+class TestSnapshotProfiles:
+    def test_profiles_exist(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.snapshot_profiles.list.return_value = [
+            _mock_snapshot_profile("Daily"),
+            _mock_snapshot_profile("Weekly", key=2),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "snapshot_profiles"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_no_profiles(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.snapshot_profiles.list.return_value = []
+        result = cli_runner.invoke(app, ["doctor", "--check", "snapshot_profiles"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+
+# ===========================================================================
+# Step 7: Network Health
+# ===========================================================================
+
+
+class TestNetworkPending:
+    def test_no_pending(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        result = cli_runner.invoke(app, ["doctor", "--check", "network_pending"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_pending_rules(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.networks.list.return_value = [
+            _mock_network("internal-prod", 1, needs_rule_apply=True),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "network_pending"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+    def test_pending_dns(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.networks.list.return_value = [
+            _mock_network("internal-prod", 1, needs_dns_apply=True),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "network_pending"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+    def test_pending_restart(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.networks.list.return_value = [
+            _mock_network("internal-prod", 1, needs_restart=True),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "network_pending"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+    def test_no_networks(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.networks.list.return_value = []
+        result = cli_runner.invoke(app, ["doctor", "--check", "network_pending"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+
+class TestMtu:
+    def test_mtu_correct(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.networks.list.return_value = [
+            _mock_network("core", 1, net_type="core", mtu=9000, vxlan_multicast="239.0.0.1"),
+            _mock_network("Core Switch", 2, net_type="physical", mtu=9192, vxlan_multicast="239.0.0.1"),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "mtu"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_core_mtu_too_low(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.networks.list.return_value = [
+            _mock_network("core", 1, net_type="core", mtu=1500, vxlan_multicast="239.0.0.1"),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "mtu"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+    def test_physical_core_mtu_too_low(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.networks.list.return_value = [
+            _mock_network("core", 1, net_type="core", mtu=9000, vxlan_multicast="239.0.0.1"),
+            _mock_network("Core Switch", 2, net_type="physical", mtu=9000, vxlan_multicast="239.0.0.1"),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "mtu"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+    def test_external_physical_ignored(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        """Physical networks without matching core vxlan_multicast are ignored."""
+        _setup_healthy_client(mock_client)
+        mock_client.networks.list.return_value = [
+            _mock_network("core", 1, net_type="core", mtu=9000, vxlan_multicast="239.0.0.1"),
+            _mock_network("External Bond", 2, net_type="physical", mtu=1500),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "mtu"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_no_core_networks(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.networks.list.return_value = [
+            _mock_network("internal", 1, net_type="internal", mtu=1500),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "mtu"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+
+class TestLldpDiversity:
+    def test_diverse_switches(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.node_lldp_neighbors.list.return_value = [
+            _mock_lldp_neighbor(node_key=1, nic_key=1, chassis_name="switch1"),
+            _mock_lldp_neighbor(node_key=1, nic_key=2, chassis_name="switch2"),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "lldp_diversity"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_same_switch(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.node_lldp_neighbors.list.return_value = [
+            _mock_lldp_neighbor(node_key=1, nic_key=1, chassis_name="switch1"),
+            _mock_lldp_neighbor(node_key=1, nic_key=2, chassis_name="switch1"),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "lldp_diversity"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+    def test_single_nic_per_node(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.node_lldp_neighbors.list.return_value = [
+            _mock_lldp_neighbor(node_key=1, nic_key=1, chassis_name="switch1"),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "lldp_diversity"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_unknown_chassis(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.node_lldp_neighbors.list.return_value = [
+            _mock_lldp_neighbor(node_key=1, nic_key=1, chassis_name=None),
+            _mock_lldp_neighbor(node_key=1, nic_key=2, chassis_name=None),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "lldp_diversity"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+        assert "unknown" in result.output.lower()
+
+    def test_no_lldp_data(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.node_lldp_neighbors.list.return_value = []
+        result = cli_runner.invoke(app, ["doctor", "--check", "lldp_diversity"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_multiple_nodes_mixed(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.node_lldp_neighbors.list.return_value = [
+            # Node 1: diverse
+            _mock_lldp_neighbor(node_key=1, nic_key=1, chassis_name="switch1"),
+            _mock_lldp_neighbor(node_key=1, nic_key=2, chassis_name="switch2"),
+            # Node 2: not diverse
+            _mock_lldp_neighbor(node_key=2, nic_key=3, chassis_name="switch1"),
+            _mock_lldp_neighbor(node_key=2, nic_key=4, chassis_name="switch1"),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "lldp_diversity"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+
+# ===========================================================================
+# Step 9: Updates Available & Fabric Speed
+# ===========================================================================
+
+
+class TestUpdatesAvailable:
+    def test_no_updates_available(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.update_source_packages.list.return_value = [
+            _mock_update_package("ybos", 1, version="6.2.1"),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "updates_available"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_updates_available(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.update_source_packages.list.return_value = [
+            _mock_update_package("ybos", 1, version="6.2.2"),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "updates_available"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+        assert "ybos" in result.output.lower()
+
+
+class TestFabricSpeed:
+    def test_fabric_speed_ok(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        result = cli_runner.invoke(app, ["doctor", "--check", "fabric_speed"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+    def test_fabric_speed_low(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.machine_nic_fabric_status.list.return_value = [
+            _mock_fabric_status(is_healthy=True, fabric_status="confirmed", max_score=50, min_score=25),
+        ]
+        result = cli_runner.invoke(app, ["doctor", "--check", "fabric_speed"])
+        assert result.exit_code == 0
+        assert "warn" in result.output.lower()
+
+    def test_fabric_no_data(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
+        _setup_healthy_client(mock_client)
+        mock_client.machine_nic_fabric_status.list.return_value = []
+        result = cli_runner.invoke(app, ["doctor", "--check", "fabric_speed"])
+        assert result.exit_code == 0
+        assert "pass" in result.output.lower()
+
+
 class TestFullDoctor:
     def test_doctor_all_checks_present(self, cli_runner: CliRunner, mock_client: MagicMock) -> None:
-        """Full vrg doctor shows all 15 checks."""
+        """Full vrg doctor shows all 23 checks."""
         _setup_healthy_client(mock_client)
         result = cli_runner.invoke(app, ["-o", "json", "doctor"])
         import json
@@ -753,5 +1160,13 @@ class TestFullDoctor:
             "dimm_health",
             "vsan_journal",
             "driver_reload",
+            "admin_users",
+            "mfa",
+            "snapshot_profiles",
+            "network_pending",
+            "mtu",
+            "lldp_diversity",
+            "updates_available",
+            "fabric_speed",
         }
         assert names == expected

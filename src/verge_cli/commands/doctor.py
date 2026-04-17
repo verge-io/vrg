@@ -26,8 +26,11 @@ app = typer.Typer(
         " clusters, nodes, storage tiers, active alarms, update state,"
         " version consistency across nodes, fabric links, network"
         " dashboard, certificates, licenses, physical drive SMART and vSAN"
-        " errors, DIMM health, vSAN journal/tier status, and pending driver"
-        " reloads — and reports each as `pass`, `warn`, `fail`, or"
+        " errors, DIMM health, vSAN journal/tier status, pending driver"
+        " reloads, admin account count, MFA status, snapshot"
+        " profiles, available updates, fabric NIC scores, pending network"
+        " changes, MTU configuration, and LLDP switch diversity — and"
+        " reports each as `pass`, `warn`, `fail`, or"
         " `skip`. Use it first when triaging an issue or before a change"
         " window.\n\n"
         "Each check runs in isolation: an exception in one check is"
@@ -575,6 +578,260 @@ def check_vsan_journal(client: VergeClient) -> CheckResult:
     )
 
 
+@_register("admin_users")
+def check_admin_users(client: VergeClient) -> CheckResult:
+    """Check that at least 2 admin accounts exist."""
+    users = client.users.list()
+    admins = [u for u in users if u.physical_access]
+    n = len(admins)
+    if n >= 2:
+        return CheckResult(
+            name="admin_users",
+            status=PASS,
+            message=f"{n} admin account(s)",
+            details={"admins": [u.name for u in admins]},
+        )
+    return CheckResult(
+        name="admin_users",
+        status=WARN,
+        message=f"Only {n} admin account(s) — recommend at least 2",
+        details={"admins": [u.name for u in admins]},
+    )
+
+
+@_register("mfa")
+def check_mfa(client: VergeClient) -> CheckResult:
+    """Check that non-break-glass admin accounts have MFA enabled."""
+    users = client.users.list()
+    non_breakglass = [
+        u for u in users if u.physical_access and u.name.lower() != "admin"
+    ]
+    if not non_breakglass:
+        return CheckResult(name="mfa", status=PASS, message="No non-break-glass admin accounts")
+
+    missing = [u.name for u in non_breakglass if not u.two_factor_enabled]
+    if missing:
+        return CheckResult(
+            name="mfa",
+            status=WARN,
+            message=f"MFA not enabled: {', '.join(missing)}",
+        )
+    return CheckResult(
+        name="mfa",
+        status=PASS,
+        message=f"{len(non_breakglass)} admin account(s) have MFA enabled",
+    )
+
+
+@_register("snapshot_profiles")
+def check_snapshot_profiles(client: VergeClient) -> CheckResult:
+    """Check that snapshot profiles are configured."""
+    profiles = client.snapshot_profiles.list()
+    if not profiles:
+        return CheckResult(
+            name="snapshot_profiles",
+            status=WARN,
+            message="No snapshot profiles configured — no automated backups",
+        )
+    names = [p.name for p in profiles]
+    return CheckResult(
+        name="snapshot_profiles",
+        status=PASS,
+        message=f"{len(profiles)} snapshot profile(s): {', '.join(names)}",
+        details={"profiles": names},
+    )
+
+
+def _version_tuple(v: str) -> tuple[int, ...]:
+    """Parse a version string into a comparable tuple of ints."""
+    parts: list[int] = []
+    for p in v.split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            break
+    return tuple(parts)
+
+
+@_register("updates_available")
+def check_updates_available(client: VergeClient) -> CheckResult:
+    """Check if a newer VergeOS version is available."""
+    current = client.version or ""
+    packages = client.update_source_packages.list()
+    if not packages or not current:
+        return CheckResult(
+            name="updates_available",
+            status=PASS,
+            message="No updates available",
+        )
+
+    # Only the ybos package matters — it's the core OS package
+    current_t = _version_tuple(current)
+    for pkg in packages:
+        if pkg.name != "ybos":
+            continue
+        ver = pkg.get("version") or ""
+        if ver and _version_tuple(ver) > current_t:
+            return CheckResult(
+                name="updates_available",
+                status=WARN,
+                message=f"Update available: ybos {ver} (running {current})",
+            )
+
+    return CheckResult(
+        name="updates_available",
+        status=PASS,
+        message=f"Running latest ({current})",
+    )
+
+
+@_register("fabric_speed")
+def check_fabric_speed(client: VergeClient) -> CheckResult:
+    """Check fabric NIC scores for degradation."""
+    statuses = client.machine_nic_fabric_status.list()
+    if not statuses:
+        return CheckResult(name="fabric_speed", status=PASS, message="No fabric NICs found")
+
+    degraded: list[str] = []
+    for s in statuses:
+        if s.max_score > 0 and s.min_score < s.max_score:
+            degraded.append(
+                f"NIC {s.nic_key}: score {s.min_score}/{s.max_score}"
+            )
+
+    if degraded:
+        return CheckResult(
+            name="fabric_speed",
+            status=WARN,
+            message=f"Fabric score degradation: {'; '.join(degraded)}",
+        )
+    return CheckResult(
+        name="fabric_speed",
+        status=PASS,
+        message=f"{len(statuses)} fabric NIC(s) — scores balanced",
+    )
+
+
+@_register("network_pending")
+def check_network_pending(client: VergeClient) -> CheckResult:
+    """Check for networks with unapplied changes."""
+    nets = client.networks.list()
+    pending: list[str] = []
+    for n in nets:
+        changes: list[str] = []
+        if n.needs_rule_apply:
+            changes.append("rules")
+        if n.needs_dns_apply:
+            changes.append("DNS")
+        if n.needs_restart:
+            changes.append("restart")
+        if changes:
+            pending.append(f"{n.name} ({', '.join(changes)})")
+
+    if pending:
+        return CheckResult(
+            name="network_pending",
+            status=WARN,
+            message=f"Pending changes: {'; '.join(pending)}",
+        )
+    return CheckResult(
+        name="network_pending",
+        status=PASS,
+        message=f"{len(nets)} network(s) — no pending changes",
+    )
+
+
+@_register("mtu")
+def check_mtu(client: VergeClient) -> CheckResult:
+    """Check core and core-physical network MTU configuration."""
+    # Request vxlan_multicast to identify physical networks carrying core traffic
+    extra_fields = [
+        "$key", "name", "type", "mtu", "vxlan_multicast",
+    ]
+    nets = client.networks.list(fields=extra_fields)
+
+    core_nets = [n for n in nets if n.type == "core"]
+    if not core_nets:
+        return CheckResult(name="mtu", status=PASS, message="No core networks found")
+
+    # Collect multicast addresses used by core vnets
+    core_mcasts: set[str] = set()
+    for n in core_nets:
+        mcast = n.get("vxlan_multicast")
+        if mcast:
+            core_mcasts.add(mcast)
+
+    # Physical networks that carry core traffic share the same vxlan_multicast
+    physical_core = [
+        n for n in nets
+        if n.type == "physical" and n.get("vxlan_multicast") in core_mcasts
+    ]
+
+    problems: list[str] = []
+    for n in core_nets:
+        if n.mtu < 9000:
+            problems.append(f"{n.name}: MTU {n.mtu} (expected 9000)")
+    for n in physical_core:
+        if n.mtu <= 9000:
+            problems.append(f"{n.name}: MTU {n.mtu} (expected > 9000 for VXLAN overhead)")
+
+    if problems:
+        return CheckResult(
+            name="mtu",
+            status=WARN,
+            message="; ".join(problems),
+        )
+    return CheckResult(
+        name="mtu",
+        status=PASS,
+        message="Core network MTU correctly configured",
+    )
+
+
+@_register("lldp_diversity")
+def check_lldp_diversity(client: VergeClient) -> CheckResult:
+    """Check that multi-NIC nodes connect to diverse switches."""
+    neighbors = client.node_lldp_neighbors.list()
+    if not neighbors:
+        return CheckResult(name="lldp_diversity", status=PASS, message="No LLDP data available")
+
+    # Group by node, skipping entries with no chassis data
+    by_node: dict[int, set[str]] = {}
+    nic_count: dict[int, int] = {}
+    for n in neighbors:
+        nic_count[n.node_key] = nic_count.get(n.node_key, 0) + 1
+        if n.chassis_name:
+            by_node.setdefault(n.node_key, set()).add(n.chassis_name)
+
+    # Nodes with NICs but no chassis data at all — LLDP not reporting
+    unknown_nodes = [k for k in nic_count if k not in by_node and nic_count[k] >= 2]
+
+    problems: list[str] = []
+    for node_key, switches in by_node.items():
+        if nic_count[node_key] >= 2 and len(switches) == 1:
+            switch = next(iter(switches))
+            problems.append(f"Node {node_key}: all NICs on '{switch}'")
+
+    if problems:
+        return CheckResult(
+            name="lldp_diversity",
+            status=WARN,
+            message="; ".join(problems),
+        )
+    if unknown_nodes:
+        node_list = ", ".join(str(k) for k in unknown_nodes)
+        return CheckResult(
+            name="lldp_diversity",
+            status=PASS,
+            message=f"LLDP chassis data unknown for node(s) {node_list} — cannot verify diversity",
+        )
+    return CheckResult(
+        name="lldp_diversity",
+        status=PASS,
+        message="Fabric NIC switch diversity OK",
+    )
+
+
 @_register("driver_reload")
 def check_driver_reload(client: VergeClient) -> CheckResult:
     """Check if any nodes require a driver reload."""
@@ -610,7 +867,10 @@ def doctor_cmd(
                 "Comma-separated check names to run. "
                 "Available: connectivity, clusters, nodes, storage, alarms, "
                 "updates, versions, fabric, networks, certificates, licenses, "
-                "drive_smart, dimm_health, vsan_journal, driver_reload"
+                "drive_smart, dimm_health, vsan_journal, driver_reload, "
+                "admin_users, mfa, snapshot_profiles, "
+                "updates_available, fabric_speed, "
+                "network_pending, mtu, lldp_diversity"
             ),
         ),
     ] = None,
