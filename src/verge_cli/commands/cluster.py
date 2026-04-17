@@ -17,7 +17,7 @@ app = typer.Typer(
     name="cluster",
     help=(
         "Manage VergeOS clusters — the top-level logical grouping of"
-        " [[node]]s that defines compute scheduling, storage pooling, and"
+        " `node`s that defines compute scheduling, storage pooling, and"
         " availability boundaries.\n\n"
         "A **cluster** is the unit of resource pooling. Each cluster"
         " aggregates CPU, RAM, and (on hyperconverged deployments) vSAN"
