@@ -14,8 +14,29 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="device",
-    help="Manage VM devices (TPM).",
+    help=(
+        "Manage emulated devices attached to a VM.\n\n"
+        "Currently supports TPM (Trusted Platform Module) devices. A TPM"
+        " provides hardware-backed security functions — required by Windows 11"
+        " and useful for disk encryption, secure boot attestation, and key"
+        " storage. Models: `crb` (Command Response Buffer, recommended) or"
+        " `tis` (TIS interface, legacy). Versions: `1` (TPM 1.2) or `2`"
+        " (TPM 2.0, recommended).\n\n"
+        "Use `-o json` for structured output. The first argument to every"
+        " command is the parent VM (name or key).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg vm device list web-01\n\n"
+        "    vrg vm device create web-01\n\n"
+        "    vrg vm device create web-01 --model tis --version 1\n\n"
+        "    vrg vm device delete web-01 tpm-0 --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Devices can be marked `--optional` so the VM still boots if the"
+        " device cannot be provisioned on the target node."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
@@ -59,7 +80,13 @@ def device_list(
     ctx: typer.Context,
     vm: Annotated[str, typer.Argument(help="VM name or key")],
 ) -> None:
-    """List devices on a VM."""
+    """List devices on a VM.
+
+    **Examples:**
+
+        vrg vm device list web-01
+        vrg -o json vm device list web-01
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     devices = vm_obj.devices.list()
     data = [_device_to_dict(d) for d in devices]
@@ -80,7 +107,13 @@ def device_get(
     vm: Annotated[str, typer.Argument(help="VM name or key")],
     device: Annotated[str, typer.Argument(help="Device name or key")],
 ) -> None:
-    """Get details of a VM device."""
+    """Get details of a VM device.
+
+    **Examples:**
+
+        vrg vm device get web-01 tpm-0
+        vrg -o json vm device get web-01 42
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     device_key = _resolve_device(vm_obj, device)
     device_obj = vm_obj.devices.get(device_key)
@@ -102,7 +135,17 @@ def device_create(
     model: Annotated[str, typer.Option("--model", "-m", help="TPM model (tis, crb)")] = "crb",
     version: Annotated[str, typer.Option("--version", "-V", help="TPM version (1, 2)")] = "2",
 ) -> None:
-    """Add a TPM device to a VM."""
+    """Add a TPM device to a VM.
+
+    Defaults to TPM 2.0 with the CRB model. The VM must be stopped to
+    add a device.
+
+    **Examples:**
+
+        vrg vm device create web-01
+        vrg vm device create web-01 --model tis --version 1
+        vrg vm device create win-11 --name tpm-win
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
 
     device_obj = vm_obj.devices.create(
@@ -144,7 +187,15 @@ def device_update(
         str | None, typer.Option("--version", "-V", help="TPM version (1, 2)")
     ] = None,
 ) -> None:
-    """Update a VM device."""
+    """Update a VM device.
+
+    Only the flags you supply are changed.
+
+    **Examples:**
+
+        vrg vm device update web-01 tpm-0 --optional
+        vrg vm device update web-01 tpm-0 --no-enabled
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     device_key = _resolve_device(vm_obj, device)
 
@@ -191,7 +242,15 @@ def device_delete(
     device: Annotated[str, typer.Argument(help="Device name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Remove a device from a VM."""
+    """Remove a device from a VM.
+
+    Prompts for confirmation unless `--yes` is passed.
+
+    **Examples:**
+
+        vrg vm device delete web-01 tpm-0
+        vrg vm device delete web-01 tpm-0 --yes
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     device_key = _resolve_device(vm_obj, device)
 

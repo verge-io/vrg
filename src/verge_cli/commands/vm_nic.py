@@ -14,8 +14,29 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="nic",
-    help="Manage VM network interfaces.",
+    help=(
+        "Manage network interfaces attached to a VM.\n\n"
+        "Each NIC connects the VM to a VergeOS virtual network. NICs have an"
+        " interface type (`virtio`, `e1000`, `rtl8139`), a MAC address"
+        " (auto-generated or manual), and an optional static IP. NICs are"
+        " addressed by **name** or **numeric key** within the parent VM.\n\n"
+        "Use `-o json` for structured output. The first argument to every"
+        " command is the parent VM (name or key).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg vm nic list web-01\n\n"
+        "    vrg -o json vm nic get web-01 nic-0\n\n"
+        "    vrg vm nic create web-01 --network internal-net\n\n"
+        "    vrg vm nic create web-01 --network dmz --ip 10.0.1.50\n\n"
+        "    vrg vm nic update web-01 nic-0 --network external-net\n\n"
+        "    vrg vm nic delete web-01 nic-0 --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The `--network` option accepts a network name or numeric key. When a"
+        " name matches multiple networks, the command exits with code 7."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
@@ -63,7 +84,13 @@ def nic_list(
     ctx: typer.Context,
     vm: Annotated[str, typer.Argument(help="VM name or key")],
 ) -> None:
-    """List network interfaces on a VM."""
+    """List network interfaces on a VM.
+
+    **Examples:**
+
+        vrg vm nic list web-01
+        vrg -o json vm nic list web-01
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     nics = vm_obj.nics.list()
     data = [_nic_to_dict(n) for n in nics]
@@ -84,7 +111,13 @@ def nic_get(
     vm: Annotated[str, typer.Argument(help="VM name or key")],
     nic: Annotated[str, typer.Argument(help="NIC name or key")],
 ) -> None:
-    """Get details of a VM network interface."""
+    """Get details of a VM network interface.
+
+    **Examples:**
+
+        vrg vm nic get web-01 nic-0
+        vrg -o json vm nic get web-01 42
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     nic_key = _resolve_nic(vm_obj, nic)
     nic_obj = vm_obj.nics.get(nic_key)
@@ -111,7 +144,17 @@ def nic_create(
     ip: Annotated[str | None, typer.Option("--ip", help="IP address")] = None,
     description: Annotated[str, typer.Option("--description", help="Description")] = "",
 ) -> None:
-    """Add a network interface to a VM."""
+    """Add a network interface to a VM.
+
+    The `--network` option accepts a network name or numeric key. MAC
+    addresses are auto-generated unless `--mac` is specified.
+
+    **Examples:**
+
+        vrg vm nic create web-01 --network internal-net
+        vrg vm nic create web-01 --network dmz --ip 10.0.1.50
+        vrg vm nic create web-01 --network 42 --interface e1000
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
 
     # Pass network as-is — SDK resolves names internally
@@ -149,7 +192,15 @@ def nic_update(
     network: Annotated[str | None, typer.Option("--network", "-N", help="New network")] = None,
     enabled: Annotated[bool | None, typer.Option("--enabled/--disabled")] = None,
 ) -> None:
-    """Update a VM network interface."""
+    """Update a VM network interface.
+
+    Only the flags you supply are changed.
+
+    **Examples:**
+
+        vrg vm nic update web-01 nic-0 --network external-net
+        vrg vm nic update web-01 nic-0 --disabled
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     nic_key = _resolve_nic(vm_obj, nic)
 
@@ -184,7 +235,15 @@ def nic_delete(
     nic: Annotated[str, typer.Argument(help="NIC name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Remove a network interface from a VM."""
+    """Remove a network interface from a VM.
+
+    Prompts for confirmation unless `--yes` is passed.
+
+    **Examples:**
+
+        vrg vm nic delete web-01 nic-0
+        vrg vm nic delete web-01 nic-0 --yes
+    """
     vctx, vm_obj = _get_vm(ctx, vm)
     nic_key = _resolve_nic(vm_obj, nic)
 
