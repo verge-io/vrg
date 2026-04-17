@@ -15,8 +15,60 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="schedule",
-    help="Manage task schedules.",
+    help=(
+        "Manage task schedules — recurring or one-time triggers that fire"
+        " tasks at specific times.\n\n"
+        "A **schedule** defines *when* a task runs (the event counterpart is"
+        " `vrg task event`). Schedules are reusable: a single schedule can be"
+        " linked to many tasks via `vrg task trigger` so one 'nightly 2 AM'"
+        " definition drives every nightly job. Configure frequency with"
+        " `--repeat-every` (minute/hour/day/week/month/year/never) and"
+        " `--repeat-iteration` (run every N intervals), then constrain by"
+        " time-of-day window (`--start-time`/`--end-time`, seconds from"
+        " midnight), date window (`--start-date`/`--end-date`), weekday"
+        " (`--monday`…`--sunday`), or day-of-month"
+        " (`first`/`last`/`15th`/`start_date`). Set `--repeat-every never`"
+        " for a one-shot schedule.\n\n"
+        "Use `vrg task schedule show <id>` to preview the next N upcoming"
+        " execution times before enabling — cheap way to verify a cron-like"
+        " pattern does what you expect.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List schedules\n"
+        "    vrg task schedule list\n\n"
+        "    # Only enabled daily schedules\n"
+        "    vrg task schedule list --enabled --repeat-every day\n\n"
+        "    # Get schedule details as JSON\n"
+        "    vrg -o json task schedule get nightly-2am\n\n"
+        "    # Create a daily 2 AM weekday-only schedule\n"
+        "    vrg task schedule create --name nightly-2am \\\n"
+        "        --repeat-every day --repeat-iteration 1 \\\n"
+        "        --start-time 7200 --end-time 10800 \\\n"
+        "        --no-saturday --no-sunday\n\n"
+        "    # Create a monthly schedule that fires on the 1st\n"
+        "    vrg task schedule create --name monthly-first \\\n"
+        "        --repeat-every month --day-of-month first\n\n"
+        "    # Preview the next 20 runs\n"
+        "    vrg task schedule show nightly-2am\n\n"
+        "    # Disable temporarily, then re-enable\n"
+        "    vrg task schedule disable nightly-2am\n"
+        "    vrg task schedule enable nightly-2am\n\n"
+        "    # Delete a schedule\n"
+        "    vrg task schedule delete nightly-2am --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Schedules are referenced by name or numeric key (`$key`). When a name"
+        " matches multiple schedules, vrg prints all matches and exits with"
+        " code 7 — use the key to disambiguate.\n\n"
+        "`--start-time` and `--end-time` are integer seconds from midnight"
+        " (0–86400), not clock strings. For 2:00 AM pass `7200`; for 5:00 PM"
+        " pass `61200`. The schedule fires only inside this daily window.\n\n"
+        "Creating a schedule does not run any task — it only defines timing."
+        " Link it to a task with `vrg task trigger create <task> --schedule"
+        " <schedule>` so the task fires on each occurrence."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
