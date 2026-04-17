@@ -15,8 +15,54 @@ from verge_cli.utils import resolve_resource_id
 
 app = typer.Typer(
     name="nic",
-    help="NIC monitoring and statistics.",
+    help=(
+        "Inspect physical NICs on a node — live traffic stats, link state,"
+        " and vSAN fabric reachability.\n\n"
+        "Every VergeOS node enumerates its physical NICs at boot from"
+        " `/boot/active/network-config` and exposes three live views per"
+        " NIC:\n\n"
+        "- **stats** — packets/second and bits/second counters (RX and TX),"
+        " plus cumulative packet and byte totals. Useful for spotting"
+        " hot NICs or idle uplinks.\n"
+        "- **status** — link state reported by the kernel: up/down, speed,"
+        " and duplex. First thing to check when a node looks isolated.\n"
+        "- **fabric** — vSAN fabric reachability status: `confirmed` means"
+        " the NIC has a working path across the core switch fabric,"
+        " `degraded` means partial connectivity, `no_path` means the NIC"
+        " is present but cannot reach peers. Refresh with"
+        " `refresh_fabric_status` on the parent node.\n\n"
+        "These commands are read-only. All three take a **node** (name or"
+        " key) as the first argument and an optional `--nic <key>` to"
+        " restrict output to a single NIC.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Traffic counters for every NIC on node1\n"
+        "    vrg node nic stats node1\n\n"
+        "    # Just one NIC (by its numeric key within the node)\n"
+        "    vrg node nic stats node1 --nic 2\n\n"
+        "    # Link up/down and negotiated speed\n"
+        "    vrg node nic status node1\n\n"
+        "    # Fabric reachability (vSAN path health)\n"
+        "    vrg node nic fabric node1\n\n"
+        "    # JSON output for scripting or agent parsing\n"
+        "    vrg -o json node nic stats node1\n"
+        "    vrg -o json node nic fabric node1 --query '[?status!=`confirmed`]'\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The node argument is resolved by name or numeric key. If a name"
+        " matches multiple nodes, vrg prints all matches and exits with"
+        " code 7 — use the numeric key to disambiguate.\n\n"
+        "NICs that have no cached stats/status/fabric data are silently"
+        " skipped, so an empty result set means either the node has no"
+        " NICs or none have reported in yet. Use `vrg node refresh`"
+        " or the `refresh_fabric_status` action to force a refresh.\n\n"
+        "Use `-o json` (or `-o wide` for extra stats columns) for"
+        " machine-readable output. Useful fields for `--query`:"
+        " `parent_nic`, `status`, `speed`, `txpps`, `rxpps`, `txbps`,"
+        " `rxbps`."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
