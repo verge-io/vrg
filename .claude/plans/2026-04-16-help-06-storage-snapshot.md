@@ -110,7 +110,7 @@ Notes:
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `storage.py`
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `snapshot.py`
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `snapshot_profile.py`
-- [ ] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `snapshot_profile_period.py`
+- [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `snapshot_profile_period.py`
 - [ ] Add examples to leaf command docstrings (Typer reads these as help text for `@app.command()` functions)
 - [ ] Test all help output renders correctly
 - [ ] Commit changes
