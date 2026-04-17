@@ -16,8 +16,60 @@ from verge_cli.utils import confirm_action, resolve_nas_resource
 
 app = typer.Typer(
     name="tenant-recipe",
-    help="Manage tenant recipes.",
+    help=(
+        "Manage tenant recipes — customizable templates for provisioning"
+        " entire tenants.\n\n"
+        "A **tenant recipe** is built from a powered-off tenant that serves as"
+        " the base template. The recipe captures the tenant's settings, VMs,"
+        " and network configuration, then pairs them with **questions** that"
+        " the operator answers at deploy time (admin credentials, hostnames,"
+        " IP addresses, node CPU/RAM, cluster selection, etc.). Deploying a"
+        " recipe creates a fully-configured tenant **instance** — networks,"
+        " VMs, users, DNS/DHCP registrations, and notifications all wired up"
+        " in one shot.\n\n"
+        "Recipes live inside **catalogs** (organized by access and purpose),"
+        " which in turn live inside **repositories**. System questions are"
+        " auto-generated when a recipe is created (the `YB_*` names) and"
+        " cover tenant identity, admin credentials, SSL certs, node resources,"
+        " and network addresses; additional questions can be added for"
+        " tenant-specific values.\n\n"
+        "Tenant recipes differ from VM recipes: they provision an entire"
+        " tenant (with its own DB, users, networks, and VMs), not a single"
+        " VM. Subresources: `vrg tenant-recipe instance` (tenants deployed"
+        " from this recipe), `vrg tenant-recipe log` (deploy/update"
+        " history).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all tenant recipes\n"
+        "    vrg tenant-recipe list\n\n"
+        "    # Inspect a recipe as JSON (shows version, enabled state, etc.)\n"
+        "    vrg -o json tenant-recipe get customer-baseline\n\n"
+        "    # Download a remote tenant recipe from the catalog repository\n"
+        "    vrg tenant-recipe download customer-baseline\n\n"
+        "    # Deploy a tenant from a recipe with question answers\n"
+        "    vrg tenant-recipe deploy customer-baseline --name acme-corp \\\n"
+        "        --set YB_USER_NAME=admin --set YB_USER_PASSWORD=... \\\n"
+        "        --set YB_NET_1_IP=10.50.0.10\n\n"
+        "    # List tenants deployed from a recipe\n"
+        "    vrg tenant-recipe instance list customer-baseline\n\n"
+        "    # Update a recipe's description or version\n"
+        "    vrg tenant-recipe update customer-baseline \\\n"
+        "        --description 'Hardened tenant template' --version 2.0.0\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Tenant recipes are referenced by name or 40-char hex key. When a"
+        " name matches multiple recipes, vrg prints all matches and exits"
+        " with code 7 — use the hex key to disambiguate.\n\n"
+        "Downloaded recipes must be present locally before `deploy` will"
+        " work. `--set KEY=VALUE` provides answers to recipe questions; use"
+        " the web UI or a prior `-o json` deploy to discover which question"
+        " names (variable names) a recipe expects. Missing required answers"
+        " cause the deploy to fail.\n\n"
+        "`--preserve-certs` (on `update`) controls whether SSL certificates"
+        " from the base tenant are copied into deployed instances."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 app.add_typer(tenant_recipe_instance.app, name="instance")
