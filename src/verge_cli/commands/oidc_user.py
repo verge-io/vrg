@@ -14,7 +14,37 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="user",
-    help="Manage OIDC application allowed users (ACL).",
+    help=(
+        "Manage the allowed-users ACL on an OIDC application.\n\n"
+        "When an OIDC application has `restrict_access` enabled, only users"
+        " on this whitelist (or members of an allowed group) may authenticate"
+        " through it. The ACL has no effect while `restrict_access` is off.\n\n"
+        "Use `-o json` for machine-readable output. `--query` on fields like"
+        " `user_key`, `user_display`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List allowed users on an application\n"
+        "    vrg oidc user list partner-portal\n\n"
+        "    # Add a user by name or key\n"
+        "    vrg oidc user add partner-portal deploy-bot\n"
+        "    vrg oidc user add partner-portal 42\n\n"
+        "    # Remove a user (prompts for confirmation)\n"
+        "    vrg oidc user remove partner-portal deploy-bot\n\n"
+        "    # Dump the ACL as JSON\n"
+        "    vrg -o json oidc user list partner-portal\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "**Turn on `restrict_access` first.** Adding a user to the ACL while"
+        " `restrict_access` is off has no gating effect — the whitelist is"
+        " only consulted when restriction is enabled. Enable it with"
+        " `vrg oidc update <app> --restrict-access`.\n\n"
+        "**`remove` accepts user name, user key, or ACL entry key.** The"
+        " command resolves whichever form you provide to the underlying ACL"
+        " entry and deletes it.\n\n"
+        "**Name resolution**: the `<oidc-app>` and `<user>` arguments accept"
+        " names or numeric keys. Ambiguous names exit with code 7.\n"
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 

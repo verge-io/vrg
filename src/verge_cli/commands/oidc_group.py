@@ -14,7 +14,39 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="group",
-    help="Manage OIDC application allowed groups (ACL).",
+    help=(
+        "Manage the allowed-groups ACL on an OIDC application.\n\n"
+        "When an OIDC application has `restrict_access` enabled, any member"
+        " of a group on this whitelist may authenticate through it (in"
+        " addition to any individually allowed users). The ACL has no"
+        " effect while `restrict_access` is off. Groups provisioned from an"
+        " upstream auth source are eligible just like local groups.\n\n"
+        "Use `-o json` for machine-readable output. `--query` on fields like"
+        " `group_key`, `group_display`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List allowed groups on an application\n"
+        "    vrg oidc group list partner-portal\n\n"
+        "    # Add a group by name or key\n"
+        "    vrg oidc group add partner-portal platform-eng\n"
+        "    vrg oidc group add partner-portal 12\n\n"
+        "    # Remove a group (prompts for confirmation)\n"
+        "    vrg oidc group remove partner-portal platform-eng\n\n"
+        "    # Dump the ACL as JSON\n"
+        "    vrg -o json oidc group list partner-portal\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "**Turn on `restrict_access` first.** Adding a group while"
+        " `restrict_access` is off has no gating effect — the whitelist is"
+        " only consulted when restriction is enabled. Enable it with"
+        " `vrg oidc update <app> --restrict-access`.\n\n"
+        "**`remove` accepts group name, group key, or ACL entry key.** The"
+        " command resolves whichever form you provide to the underlying ACL"
+        " entry and deletes it.\n\n"
+        "**Name resolution**: the `<oidc-app>` and `<group>` arguments"
+        " accept names or numeric keys. Ambiguous names exit with code 7.\n"
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
