@@ -159,7 +159,18 @@ def _settings_to_dict(settings: Any) -> dict[str, Any]:
 @app.command("settings")
 @handle_errors()
 def settings_cmd(ctx: typer.Context) -> None:
-    """Display current update settings."""
+    """Display current update settings.
+
+    Examples:
+
+        vrg update settings
+        vrg -o json update settings
+        vrg -o json update settings --query "{src:source,branch:branch,auto:auto_update}"
+
+    Useful `--query` fields: `source`, `branch`, `auto_refresh`,
+    `auto_update`, `auto_reboot`, `installed`, `reboot_required`,
+    `applying_updates`, `max_vsan_usage`.
+    """
     vctx = get_context(ctx)
     settings = vctx.client.update_settings.get()
     output_result(
@@ -242,7 +253,20 @@ def configure_cmd(
         typer.Option("--password", help="Update server password (for licensing)."),
     ] = None,
 ) -> None:
-    """Configure update settings."""
+    """Configure update settings.
+
+    Examples:
+
+        vrg update configure --source 1 --branch 2
+        vrg update configure --auto-refresh --auto-update --update-time 03:00
+        vrg update configure --snapshot-on-update --snapshot-expire 86400
+        vrg update configure --no-warm-reboot --max-vsan-usage 75
+
+    Only the flags you pass are changed — every other setting is left
+    alone. `--auto-refresh/--no-auto-refresh` disables `auto_update`
+    when refresh is off. Use `--user`/`--password` to set licensing
+    credentials against the configured update server.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if source is not None:
@@ -288,7 +312,17 @@ def configure_cmd(
 @app.command("check")
 @handle_errors()
 def check_cmd(ctx: typer.Context) -> None:
-    """Check for available updates."""
+    """Check for available updates.
+
+    Examples:
+
+        vrg update check
+        vrg -o json update check
+
+    Queries the active update source for the selected branch and
+    refreshes the candidate list visible through `vrg update available
+    list`. Does not download or install anything.
+    """
     vctx = get_context(ctx)
     result = vctx.client.update_settings.check()
     if result:
@@ -305,7 +339,18 @@ def check_cmd(ctx: typer.Context) -> None:
 @app.command("download")
 @handle_errors()
 def download_cmd(ctx: typer.Context) -> None:
-    """Download available updates."""
+    """Download available updates.
+
+    Examples:
+
+        vrg update download
+        vrg -o json update download
+
+    Pulls the ybpkg binaries for every candidate package reported by
+    the last `vrg update check` to local storage. Run
+    `vrg update install` afterwards to apply them, or use
+    `vrg update apply` for the full pipeline in one step.
+    """
     vctx = get_context(ctx)
     result = vctx.client.update_settings.download()
     if result:
@@ -328,7 +373,19 @@ def install_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Install downloaded updates."""
+    """Install downloaded updates.
+
+    Examples:
+
+        vrg update install
+        vrg update install --yes
+
+    Destructive: writes the new OS payload to the `backup` boot slot
+    and stages a reboot. Confirm before running in production — the
+    reboot promotes the new slot to `active` and unaffected nodes fall
+    back on failure. Take a cloud snapshot first, or enable
+    `snapshot_on_update` via `vrg update configure`.
+    """
     from verge_cli.utils import confirm_action
 
     vctx = get_context(ctx)
@@ -359,7 +416,19 @@ def apply_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Check, download, and install updates in one step."""
+    """Check, download, and install updates in one step.
+
+    Examples:
+
+        vrg update apply --yes
+        vrg update apply --force --yes
+
+    Destructive: runs `check` → `download` → `install` end-to-end and
+    may reboot nodes to promote the new boot slot. `--force` reruns the
+    pipeline even when the system already reports as up to date. Take a
+    cloud snapshot before applying to production, or configure
+    `snapshot_on_update` so the system does it for you.
+    """
     from verge_cli.utils import confirm_action
 
     vctx = get_context(ctx)
@@ -410,7 +479,18 @@ def _dashboard_to_dict(dashboard: Any) -> dict[str, Any]:
 @app.command("status")
 @handle_errors()
 def status_cmd(ctx: typer.Context) -> None:
-    """Display the update dashboard summary."""
+    """Display the update dashboard summary.
+
+    Examples:
+
+        vrg update status
+        vrg -o json update status
+        vrg -o wide update status
+
+    Shows node, event, and task counts for the update subsystem. Pair
+    with `vrg update log list --level error` to investigate failures
+    surfaced by the counters.
+    """
     vctx = get_context(ctx)
     dashboard = vctx.client.update_dashboard.get()
     output_result(

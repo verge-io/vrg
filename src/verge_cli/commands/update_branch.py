@@ -72,7 +72,18 @@ def list_cmd(
         typer.Option("--filter", help="OData filter expression."),
     ] = None,
 ) -> None:
-    """List update branches."""
+    """List update branches.
+
+    Examples:
+
+        vrg update branch list
+        vrg -o json update branch list
+        vrg update branch list --filter "name eq 'stable'"
+
+    Useful `--query` fields: `name`, `description`, `created`. The
+    active branch is whichever one is currently referenced in
+    `update_settings.branch`.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filter_expr is not None:
@@ -95,7 +106,18 @@ def get_cmd(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Branch key or name.")],
 ) -> None:
-    """Get an update branch by key or name."""
+    """Get an update branch by key or name.
+
+    Examples:
+
+        vrg update branch get stable
+        vrg update branch get 2
+        vrg -o json update branch get stable
+
+    Name lookups exit 6 (not found) or exit 7 (multiple matches) when
+    the same branch name is published by more than one source — pass
+    the numeric `$key` to disambiguate.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.update_branches, identifier, "Update branch")
     branch = vctx.client.update_branches.get(key=key)

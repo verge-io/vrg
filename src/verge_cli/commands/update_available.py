@@ -105,7 +105,21 @@ def list_cmd(
         typer.Option("--pending", help="Show only pending (not downloaded) packages."),
     ] = False,
 ) -> None:
-    """List available update packages from sources."""
+    """List available update packages from sources.
+
+    Examples:
+
+        vrg update available list
+        vrg update available list --pending
+        vrg update available list --downloaded
+        vrg update available list --source 1 --branch 2
+        vrg -o json update available list --query "[?downloaded=='Y'].name"
+
+    Reflects the candidate set from the last `vrg update check`.
+    `--downloaded` and `--pending` are mutually exclusive. Useful
+    `--query` fields: `name`, `version`, `downloaded`, `optional`,
+    `branch`, `source`.
+    """
     vctx = get_context(ctx)
 
     if downloaded and pending:
@@ -140,7 +154,18 @@ def get_cmd(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Package key or name.")],
 ) -> None:
-    """Get an available update package by key or name."""
+    """Get an available update package by key or name.
+
+    Examples:
+
+        vrg update available get verge-os
+        vrg update available get 42
+        vrg -o json update available get verge-os
+
+    Name lookups exit 6 when nothing matches or exit 7 when the same
+    name appears on multiple sources/branches — pass the numeric
+    `$key` to disambiguate.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.update_source_packages, identifier, "Available package")
     pkg = vctx.client.update_source_packages.get(key=key)
