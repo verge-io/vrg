@@ -34,7 +34,7 @@ app = typer.Typer(
         "    # Emit JSON for downstream parsing (level, text, timestamp, user)\n"
         "    vrg -o json tenant-recipe log list --recipe acme-tenant\n\n"
         "    # Query only warnings and errors with jq-style projection\n"
-        "    vrg -o json tenant-recipe log list --query \"[?level!='message']\"\n\n"
+        "    vrg -o json tenant-recipe log list | jq '.[] | select(.level != \"message\")'\n\n"
         "    # Inspect a specific log entry by its numeric key\n"
         "    vrg tenant-recipe log get 4217\n\n"
         "---\n\n"
@@ -88,7 +88,7 @@ def list_cmd(
 
         vrg tenant-recipe log list
         vrg tenant-recipe log list --recipe customer-baseline
-        vrg -o json tenant-recipe log list --query "[?level!='message']"
+        vrg -o json tenant-recipe log list | jq '.[] | select(.level != "message")'
 
     Log levels: `message`, `warning`, `error`, `critical`. Timestamps
     are normalized to seconds. Without `--recipe`, returns entries

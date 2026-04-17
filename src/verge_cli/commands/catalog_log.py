@@ -78,7 +78,7 @@ def list_cmd(
         vrg catalog log list
         vrg catalog log list --catalog windows-server
         vrg catalog log list --level error
-        vrg -o json catalog log list --query "[?level!='message']"
+        vrg -o json catalog log list | jq '.[] | select(.level != "message")'
 
     Log levels: `message`, `warning`, `error`, `critical`. `--catalog`
     accepts a name or SHA-1 hex key. Timestamps are normalized to

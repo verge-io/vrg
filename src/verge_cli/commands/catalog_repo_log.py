@@ -83,7 +83,7 @@ def list_cmd(
         vrg catalog repo log list
         vrg catalog repo log list --repo MarketPlace
         vrg catalog repo log list --level error
-        vrg -o json catalog repo log list --query "[?level!='message']"
+        vrg -o json catalog repo log list | jq '.[] | select(.level != "message")'
 
     Log levels: `message`, `warning`, `error`, `critical`. `--repo`
     accepts a name or integer key. Useful for diagnosing failed

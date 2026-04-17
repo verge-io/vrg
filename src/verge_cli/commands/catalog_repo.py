@@ -159,7 +159,7 @@ def list_cmd(
 
         vrg catalog repo list
         vrg catalog repo list --type remote --enabled
-        vrg -o json catalog repo list --query "[?auto_refresh].name"
+        vrg -o json catalog repo list | jq '.[] | select(.auto_refresh) | .name'
 
     Useful `--query` fields: `name`, `type`, `enabled`, `auto_refresh`,
     `url`, `last_refreshed`. `--type` accepts `local`, `remote`,

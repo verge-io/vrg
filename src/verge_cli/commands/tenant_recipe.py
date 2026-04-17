@@ -131,7 +131,7 @@ def list_cmd(
 
         vrg tenant-recipe list
         vrg -o json tenant-recipe list
-        vrg -o json tenant-recipe list --query "[?enabled].name"
+        vrg -o json tenant-recipe list | jq '.[] | select(.enabled) | .name'
 
     Useful `--query` fields: `name`, `enabled`, `description`, `version`.
     Use `--all-profiles` to list tenant recipes across every configured
