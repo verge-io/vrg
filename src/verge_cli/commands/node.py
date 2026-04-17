@@ -146,7 +146,16 @@ def node_list(
         typer.Option("--cluster", "-c", help="Filter by cluster name"),
     ] = None,
 ) -> None:
-    """List all nodes."""
+    """List all nodes.
+
+    Examples:
+
+        vrg node list
+        vrg node list --cluster default
+        vrg -o json node list --query "[?status!='online']"
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.nodes.list(), _node_to_dict, NODE_COLUMNS)
         return
@@ -175,7 +184,16 @@ def node_get(
     ctx: typer.Context,
     node: Annotated[str, typer.Argument(help="Node name or key")],
 ) -> None:
-    """Get details of a node."""
+    """Get details of a node.
+
+    Examples:
+
+        vrg node get node1
+        vrg -o json node get node1
+        vrg -o json node get 3 --query "{ram: ram_gb, status: status}"
+
+    Resolves `node` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.nodes, node, "Node")
@@ -204,7 +222,21 @@ def node_maintenance(
         typer.Option("--disable", help="Disable maintenance mode"),
     ] = False,
 ) -> None:
-    """Enable or disable maintenance mode on a node."""
+    """Enable or disable maintenance mode on a node.
+
+    Examples:
+
+        # Drain the node (live-migrates running VMs to peers)
+        vrg node maintenance node1 --enable
+
+        # Return the node to normal scheduling
+        vrg node maintenance node1 --disable
+
+    Exactly one of --enable / --disable is required (exits 2 otherwise).
+    Enabling maintenance triggers live migration of running VMs. If the
+    cluster does not have capacity elsewhere the operation fails rather
+    than stopping VMs.
+    """
     if enable == disable:
         # Both True (impossible via CLI, but defensive) or both False
         typer.echo("Error: Specify exactly one of --enable or --disable.", err=True)
@@ -228,7 +260,21 @@ def node_restart(
     node: Annotated[str, typer.Argument(help="Node name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Restart a node."""
+    """Restart a node.
+
+    Examples:
+
+        # Interactive confirm
+        vrg node restart node1
+
+        # Skip confirmation (scripts and agents)
+        vrg node restart node1 -y
+
+    Destructive. Prefer `maintenance --enable` first so running VMs are
+    evacuated cleanly. Restarting a controller node affects the management
+    plane — if only one controller is online, `vrg` itself may become
+    temporarily unavailable.
+    """
     vctx = get_context(ctx)
 
     key = resolve_resource_id(vctx.client.nodes, node, "Node")
@@ -247,7 +293,17 @@ def node_pci_list(
     ctx: typer.Context,
     node: Annotated[str, typer.Argument(help="Node name or key")],
 ) -> None:
-    """List PCI devices on a node."""
+    """List PCI devices on a node.
+
+    Examples:
+
+        vrg node pci-list node1
+        vrg -o json node pci-list node1 --query "[?contains(device, 'Ethernet')]"
+
+    Shows every PCI function VergeOS enumerates on the node — useful for
+    confirming NICs, HBAs, and accelerator cards before setting up
+    passthrough via `vrg resource-group`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nodes, node, "Node")
     devices = vctx.client.nodes.pci_devices(key).list()
@@ -268,7 +324,17 @@ def node_gpu_list(
     ctx: typer.Context,
     node: Annotated[str, typer.Argument(help="Node name or key")],
 ) -> None:
-    """List GPU devices on a node."""
+    """List GPU devices on a node.
+
+    Examples:
+
+        vrg node gpu-list node1
+        vrg -o json node gpu-list node1 --query "[?max_instances>`1`]"
+
+    Lists physical GPUs plus their mdev / vGPU instance limits. Use this
+    to confirm a node has GPUs available before assigning one to a VM or
+    recipe.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nodes, node, "Node")
     gpus = vctx.client.nodes.gpus(key).list()
@@ -289,7 +355,17 @@ def node_stats(
     ctx: typer.Context,
     node: Annotated[str, typer.Argument(help="Node name or key")],
 ) -> None:
-    """Display statistics for a node."""
+    """Display statistics for a node.
+
+    Examples:
+
+        vrg node stats node1
+        vrg -o json node stats node1
+        vrg -o json node stats node1 --query cpu_usage
+
+    Live readings: CPU usage, RAM usage, running VM count, temperature.
+    Snapshot in time — poll repeatedly for a trend.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.nodes, node, "Node")
     node_obj = vctx.client.nodes.get(key)

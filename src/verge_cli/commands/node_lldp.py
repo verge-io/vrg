@@ -40,7 +40,7 @@ app = typer.Typer(
         "    vrg node lldp list node1 --nic 2\n\n"
         "    # JSON for scripts and agents\n"
         "    vrg -o json node lldp list node1\n\n"
-        "    # Find NICs whose upstream switch name contains \"core\"\n"
+        '    # Find NICs whose upstream switch name contains "core"\n'
         "    vrg -o json node lldp list node1 --query \"[?contains(chassis_name, 'core')]\"\n\n"
         "---\n\n"
         "**Notes:**\n\n"
@@ -87,6 +87,21 @@ def lldp_list(
 
     Shows neighboring network devices discovered via LLDP protocol
     on the node's physical NICs.
+
+    Examples:
+
+        # Every peer visible on node1
+        vrg node lldp list node1
+
+        # Just the peer on NIC 2
+        vrg node lldp list node1 --nic 2
+
+        # JSON, filter to neighbors on "core" switches
+        vrg -o json node lldp list node1 --query "[?contains(chassis_name, 'core')]"
+
+    Empty output means LLDP is disabled on the node or no peers are
+    advertising — check the node's `lldp` setting and confirm the upstream
+    switch has LLDP enabled.
     """
     vctx = get_context(ctx)
     node_key = resolve_resource_id(vctx.client.nodes, node, "node")
