@@ -16,8 +16,60 @@ from verge_cli.utils import confirm_action, resolve_nas_resource, resolve_resour
 
 app = typer.Typer(
     name="catalog",
-    help="Manage catalog repositories and catalogs.",
+    help=(
+        "Manage catalogs — named collections of VM and tenant recipes inside"
+        " a repository.\n\n"
+        "A **catalog** groups related recipes within a repository so operators"
+        " can organize templates by purpose (e.g., one catalog for Windows VM"
+        " recipes, another for Linux, another for tenant recipes). Every"
+        " catalog belongs to exactly one **repository** (`vrg catalog repo`)"
+        " and controls who can see its recipes through a **publishing scope**."
+        "\n\n"
+        "Hierarchy: **Repository → Catalog → Recipe → Section → Question**."
+        " Use `vrg catalog repo` for repositories, `vrg recipe` / `vrg"
+        " tenant-recipe` for the recipes themselves, and `vrg catalog log`"
+        " for per-catalog audit entries.\n\n"
+        "Publishing scope controls visibility:\n\n"
+        "- `private` — only this VergeOS system can see the recipes\n"
+        "- `tenant` — this system and its own tenants\n"
+        "- `global` — this system, its tenants, and external federated systems\n"
+        "- `none` — disabled, not available anywhere\n\n"
+        "A system supports up to 5,000 catalogs across all repositories.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List catalogs across all repositories\n"
+        "    vrg catalog list\n\n"
+        "    # Filter to one repository\n"
+        "    vrg catalog list --repo MarketPlace\n\n"
+        "    # Inspect a catalog as JSON (shows repo, scope, enabled state)\n"
+        "    vrg -o json catalog get windows-server\n\n"
+        "    # Create a private catalog in the default Local repository\n"
+        "    vrg catalog create --name internal-templates --repo Local \\\n"
+        "        --description 'Hardened internal VM recipes'\n\n"
+        "    # Share an existing catalog with tenants\n"
+        "    vrg catalog update windows-server --publishing-scope tenant\n\n"
+        "    # Disable a catalog without deleting it\n"
+        "    vrg catalog disable windows-server\n\n"
+        "    # Manage repositories (the parent containers)\n"
+        "    vrg catalog repo list\n"
+        "    vrg catalog repo refresh MarketPlace\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Catalog keys are SHA-1-derived **hex strings**, not integers — a"
+        " catalog identified by name resolves to a hex key internally. Pass"
+        " either the catalog name or the hex key to `get`/`update`/`delete`."
+        " When a name matches multiple catalogs vrg prints all matches and"
+        " exits with code 7 — use the hex key to disambiguate.\n\n"
+        "The `repository` field is **read-only after creation** — a catalog"
+        " cannot be moved to a different repository. Delete and recreate it"
+        " in the target repository instead.\n\n"
+        "Remote repositories (type `remote`, `remote-git`, `yottabyte`,"
+        " `provider`) are managed on the source system — catalogs discovered"
+        " through them appear in `list` but must be modified at the source."
+        " Local catalogs live in repositories of type `local`."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Register sub-commands
