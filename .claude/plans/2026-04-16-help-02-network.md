@@ -126,7 +126,7 @@ Notes:
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `network_dns.py` (emphasize apply-dns workflow)
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `network_host.py`
 - [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `network_alias.py`
-- [ ] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `network_diag.py`
+- [x] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `network_diag.py`
 - [ ] Update `help=` and add `rich_markup_mode="markdown"` on `typer.Typer()` in `network_query.py`
 - [ ] Add examples to leaf command docstrings (Typer reads these as help text for `@app.command()` functions)
 - [ ] Test all help output renders correctly
