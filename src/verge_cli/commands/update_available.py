@@ -14,8 +14,44 @@ from verge_cli.utils import resolve_resource_id
 
 app = typer.Typer(
     name="available",
-    help="View available update packages from sources.",
+    help=(
+        "View available update packages discovered on the active source.\n\n"
+        "An *available package* is one entry in `update_source_packages` —"
+        " the package list returned by the remote update source for the"
+        " currently selected branch. Entries appear after `vrg update check`"
+        " queries the source; until then this list is empty or stale.\n\n"
+        "Each entry has a `downloaded` flag indicating whether its binary"
+        " files have been fetched locally. Pending packages still need to"
+        " be pulled with `vrg update download` before `vrg update install`"
+        " can apply them. Use `--downloaded` and `--pending` to split the"
+        " list, or `--source` / `--branch` to scope to a specific origin"
+        " when more than one source is configured.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `name`, `version`, `downloaded`, `optional`, `branch`, `source`."
+        " Looking up by name returns exit 6 (not found) or exit 7 (multiple"
+        " matches) when ambiguous — pass the numeric `$key` to disambiguate.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every available package on the active source\n"
+        "    vrg update available list\n\n"
+        "    # Show only packages still pending download\n"
+        "    vrg update available list --pending\n\n"
+        "    # Show packages already downloaded but not yet installed\n"
+        "    vrg update available list --downloaded\n\n"
+        "    # Filter by a specific source and branch\n"
+        "    vrg update available list --source 1 --branch 2\n\n"
+        "    # Inspect one package as JSON\n"
+        "    vrg -o json update available get verge-os\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Run `vrg update check` to refresh this list against the remote"
+        " source. The list reflects what was last reported by the source —"
+        " it does not auto-poll on every command.\n\n"
+        "`vrg update available` is read-only. To act on a package, use"
+        " `vrg update download`, `vrg update install`, or `vrg update apply`."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 AVAILABLE_COLUMNS: list[ColumnDef] = [
