@@ -120,7 +120,7 @@ def list_cmd(
 
         vrg site list
         vrg site list --status online --enabled
-        vrg -o json site list --query "[?status!='online'].name"
+        vrg -o json site list | jq '.[] | select(.status != "online") | .name'
 
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     Useful `--query` fields include `name`, `status`, `enabled`,

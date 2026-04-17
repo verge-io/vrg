@@ -42,7 +42,7 @@ app = typer.Typer(
         "    vrg doctor\n\n"
         "    # Structured output for agents / scripts\n"
         "    vrg -o json doctor\n"
-        "    vrg -o json doctor --query \"[?status=='fail']\"\n\n"
+        "    vrg -o json doctor | jq '.[] | select(.status == \"fail\")'\n\n"
         "    # Pre-flight: only run the fast checks\n"
         "    vrg doctor --check connectivity,alarms,updates\n\n"
         "    # Hardware triage: drives, memory, vSAN journal\n"

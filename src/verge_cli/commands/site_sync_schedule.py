@@ -104,7 +104,7 @@ def list_cmd(
 
         vrg site sync schedule list
         vrg site sync schedule list --sync production-sync
-        vrg -o json site sync schedule list --query "[?do_not_expire]"
+        vrg -o json site sync schedule list | jq '.[] | select(.do_not_expire)'
 
     Useful `--query` fields include `sync_name`, `profile_period_name`,
     `retention`, `priority`, `do_not_expire`, and `destination_prefix`.

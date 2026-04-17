@@ -100,7 +100,7 @@ def diag_list(ctx: typer.Context) -> None:
 
         vrg system diag list
         vrg -o json system diag list
-        vrg -o json system diag list --query "[?status=='error']"
+        vrg -o json system diag list | jq '.[] | select(.status == "error")'
 
     Lists bundles newest-first. Useful `--query` fields: `name`,
     `status`, `timestamp`, `description`, `status_info`.
