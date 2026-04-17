@@ -20,8 +20,51 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="snapshot",
-    help="Manage cloud snapshots.",
+    help=(
+        "Manage VergeOS cloud snapshots (system-wide point-in-time captures).\n\n"
+        "A **cloud snapshot** (also called a *system snapshot*) captures the"
+        " entire VergeOS system state — every VM, tenant, and storage volume —"
+        " at a single point in time. Cloud snapshots are the unit of data"
+        " transported by site syncs and the basis for disaster recovery. They"
+        " also support local recovery without any sync involvement. System"
+        " limit: **2,048 snapshots** at any time.\n\n"
+        "For structured output, pair any `list` or `get` with `-o json`. Useful"
+        " fields to `--query`: `name`, `status`, `created`, `expires`,"
+        " `immutable`, `private`. Name resolution applies to `get`, `delete`,"
+        " `vms`, `tenants`, `restore-vm`, and `restore-tenant` — ambiguous"
+        " names raise exit code 7 (multiple matches).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List current cloud snapshots\n"
+        "    vrg snapshot list\n\n"
+        "    # Include expired snapshots in the list\n"
+        "    vrg snapshot list --include-expired\n\n"
+        "    # Take a manual snapshot before a risky change\n"
+        "    vrg snapshot create --name before-upgrade --immutable\n\n"
+        "    # Get snapshot details as JSON\n"
+        "    vrg -o json snapshot get before-upgrade\n\n"
+        "    # Inspect which VMs a snapshot captured\n"
+        "    vrg snapshot vms before-upgrade\n\n"
+        "    # Restore a single VM from a snapshot with a new name\n"
+        "    vrg snapshot restore-vm before-upgrade --vm web-01 --new-name web-01-restored\n\n"
+        "    # Delete a snapshot (non-immutable) without confirmation\n"
+        "    vrg snapshot delete 42 --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Cloud snapshots capture the entire system. For per-VM snapshots use"
+        " `vrg vm snapshot`; for NAS volume snapshots use"
+        " `vrg nas volume-snapshot`; for tenant-scoped snapshots use"
+        " `vrg tenant snapshot`.\n\n"
+        "Snapshot names must be unique system-wide. Without `--name`, VergeOS"
+        " auto-generates one using the `Snapshot_%Y%m%d_%H%M` pattern.\n\n"
+        "`--retention` (seconds) and `--never-expire` are mutually exclusive."
+        " `--immutable` locks the snapshot against deletion until its immutable"
+        " lock expires; deletion is blocked while locked.\n\n"
+        "Automated snapshot scheduling lives under `vrg snapshot profile`"
+        " (with periods defining cadence and retention)."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 app.add_typer(snapshot_profile.app, name="profile")
