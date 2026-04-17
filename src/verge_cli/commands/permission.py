@@ -125,7 +125,7 @@ def permission_list(
         vrg permission list
         vrg permission list --user alice
         vrg permission list --group engineering --table vms
-        vrg -o json permission list --table vms --query "[?has_full_control].identity_name"
+        vrg -o json permission list --table vms | jq '.[] | select(.has_full_control) | .identity_name'
 
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     Useful `--query` fields: `identity_name`, `table`, `row_key`,

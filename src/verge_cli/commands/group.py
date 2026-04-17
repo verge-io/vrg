@@ -155,7 +155,7 @@ def group_list(
 
         vrg group list
         vrg group list --enabled
-        vrg -o json group list --query "[?member_count > `0`].name"
+        vrg -o json group list | jq '.[] | select(.member_count > 0) | .name'
 
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     Useful `--query` fields include `name`, `enabled`, `email`,
@@ -411,7 +411,7 @@ def member_list(
         vrg group member list engineering
         vrg -o json group member list engineering
         vrg -o json group member list engineering \\
-            --query "[?member_type=='group'].member_name"
+            | jq '.[] | select(.member_type == "group") | .member_name'
 
     Lists both users and nested groups. Useful `--query` fields include
     `member_name`, `member_type` (`user` or `group`), and `member_key`.

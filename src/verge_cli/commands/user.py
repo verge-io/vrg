@@ -117,7 +117,7 @@ def user_list(
 
         vrg user list
         vrg user list --enabled --type api
-        vrg -o json user list --query "[?two_factor_enabled].name"
+        vrg -o json user list | jq '.[] | select(.two_factor_enabled) | .name'
 
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     Useful `--query` fields include `name`, `user_type`, `enabled`, `email`,

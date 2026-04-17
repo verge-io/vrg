@@ -155,7 +155,7 @@ def oidc_list(
 
         vrg oidc list
         vrg oidc list --enabled
-        vrg -o json oidc list --query "[?restrict_access].name"
+        vrg -o json oidc list | jq '.[] | select(.restrict_access) | .name'
 
     Use `-A` / `--all-profiles` to fan out across every configured profile.
     `--enabled` and `--disabled` are mutually exclusive (exits 2 together).
