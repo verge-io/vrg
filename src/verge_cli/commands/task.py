@@ -133,7 +133,18 @@ def task_list(
         ),
     ] = None,
 ) -> None:
-    """List tasks."""
+    """List tasks.
+
+    **Examples:**
+
+        vrg task list
+
+        vrg task list --running
+
+        vrg task list --enabled
+
+        vrg -o json task list --filter "table eq 'vms'"
+    """
     if ctx.obj.get("all_profiles"):
         list_all_profiles(ctx, lambda c: c.tasks.list(), _task_to_dict, TASK_COLUMNS)
         return
@@ -164,7 +175,14 @@ def task_get(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Task ID or name.")],
 ) -> None:
-    """Get a task by ID or name."""
+    """Get a task by ID or name.
+
+    **Examples:**
+
+        vrg task get nightly-snapshot
+
+        vrg -o json task get 1234
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     task = vctx.client.tasks.get(key)
@@ -208,7 +226,15 @@ def task_create(
         typer.Option("--settings-json", help="Task settings as JSON string."),
     ] = None,
 ) -> None:
-    """Create a new task."""
+    """Create a new task.
+
+    **Examples:**
+
+        vrg task create --name daily-snap --owner 42 --action snapshot --table vms
+
+        vrg task create --name cleanup --owner 1 --action poweron --table vms \\
+            --delete-after-run
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {
         "name": name,
@@ -256,7 +282,14 @@ def task_update(
         typer.Option("--settings-json", help="Task settings as JSON string."),
     ] = None,
 ) -> None:
-    """Update a task."""
+    """Update a task.
+
+    **Examples:**
+
+        vrg task update nightly-snapshot --description "Nightly VM snapshots"
+
+        vrg task update 1234 --name weekly-snap --enabled
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     kwargs: dict[str, Any] = {}
@@ -288,7 +321,14 @@ def task_delete(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Delete a task."""
+    """Delete a task.
+
+    **Examples:**
+
+        vrg task delete nightly-snapshot
+
+        vrg task delete 1234 --yes
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     if not confirm_action(f"Delete task '{identifier}'?", yes=yes):
@@ -303,7 +343,12 @@ def task_enable(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Task ID or name.")],
 ) -> None:
-    """Enable a task."""
+    """Enable a task.
+
+    **Examples:**
+
+        vrg task enable nightly-snapshot
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     vctx.client.tasks.enable(key)
@@ -316,7 +361,12 @@ def task_disable(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Task ID or name.")],
 ) -> None:
-    """Disable a task."""
+    """Disable a task.
+
+    **Examples:**
+
+        vrg task disable nightly-snapshot
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     vctx.client.tasks.disable(key)
@@ -341,7 +391,19 @@ def task_run(
         typer.Option("--params-json", help="Execution parameters as JSON string."),
     ] = None,
 ) -> None:
-    """Execute a task immediately."""
+    """Execute a task immediately.
+
+    Dispatches the task and returns. Use `--wait` to block until the
+    task finishes or `--timeout` elapses.
+
+    **Examples:**
+
+        vrg task run nightly-snapshot
+
+        vrg task run nightly-snapshot --wait
+
+        vrg task run 1234 --wait --timeout 600
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     params: dict[str, Any] = {}
@@ -365,7 +427,14 @@ def task_cancel(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Task ID or name.")],
 ) -> None:
-    """Cancel a running task."""
+    """Cancel a running task.
+
+    **Examples:**
+
+        vrg task cancel nightly-snapshot
+
+        vrg task cancel 1234
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tasks, identifier, "Task")
     vctx.client.tasks.cancel(key)
