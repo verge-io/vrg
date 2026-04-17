@@ -15,8 +15,54 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="category",
-    help="Manage tag categories.",
+    help=(
+        "Manage tag categories on VergeOS.\n\n"
+        "Tag **categories** are the schema layer above individual tags. Every"
+        " tag must belong to a category, and the category controls **which"
+        " object types** the tag may be applied to (VMs, networks, volumes,"
+        " nodes, tenants, users, clusters, sites, groups) via its"
+        " `taggable_*` flags. A category with `single_tag_selection=true`"
+        " enforces mutual exclusivity — a given object may carry at most one"
+        " tag from that category at a time (e.g., an `Environment` category"
+        " where a VM is either `prod`, `staging`, or `dev` but never"
+        " two).\n\n"
+        "Use this group to create the category first, then create tags"
+        " inside it with `vrg tag create --category <name>`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every category and what it can tag\n"
+        "    vrg tag category list\n\n"
+        "    # Machine-readable output for agents\n"
+        "    vrg -o json tag category list\n\n"
+        "    # Inspect a single category (name or numeric $key)\n"
+        "    vrg tag category get Environment\n\n"
+        "    # Create an exclusive category that applies only to VMs\n"
+        "    vrg tag category create --name Environment \\\n"
+        "        --taggable-vms --single-selection\n\n"
+        "    # Create a multi-target category (VMs and networks)\n"
+        "    vrg tag category create --name Owner \\\n"
+        "        --taggable-vms --taggable-networks \\\n"
+        "        --description 'Team ownership labels'\n\n"
+        "    # Widen an existing category to also tag tenants\n"
+        "    vrg tag category update Owner --taggable-tenants\n\n"
+        "    # Delete a category (cascades — see notes)\n"
+        "    vrg tag category delete Owner\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Categories are referenced by **name** or **numeric key** (`$key`)."
+        " Ambiguous name resolution exits with code 7.\n\n"
+        "A category's `taggable_*` flags must match the target resource at"
+        " assignment time. Attempting `vrg tag assign mytag vm web-01` when"
+        " the tag's category does not have `taggable_vms=true` is"
+        " rejected.\n\n"
+        "Deleting a category **cascades** to every tag inside it and every"
+        " membership row attached to those tags (objects stop carrying the"
+        " tags). There is no soft-delete — inspect `vrg tag list --category"
+        " <name>` and `vrg tag members <tag>` first if you need a reference"
+        " of what will be removed."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 TAG_CATEGORY_COLUMNS: list[ColumnDef] = [
