@@ -16,7 +16,46 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="profile",
-    help="Manage snapshot profiles.",
+    help=(
+        "Manage snapshot profiles (automated schedules for snapshot creation"
+        " and retention).\n\n"
+        "A **snapshot profile** is a named schedule that drives automatic"
+        " snapshot creation and expiration. Each profile contains one or more"
+        " *periods* (hourly, daily, weekly, monthly) with their own retention"
+        " settings. The same profile can be attached to VMs, NAS volumes,"
+        " outgoing site syncs, antivirus scans, and the system itself —"
+        " giving a single place to define DR and backup cadence across"
+        " workloads. VergeOS ships default profiles (System Snapshots, SOX,"
+        " HIPAA, NAS Volume Syncs, Volume Antivirus Scan); custom profiles"
+        " can be added alongside them.\n\n"
+        "For structured output, pair any `list` or `get` with `-o json`."
+        " Useful fields to `--query`: `name`, `description`, `$key`. Name"
+        " resolution applies to `get`, `update`, and `delete` — ambiguous"
+        " names raise exit code 7 (multiple matches). Manage a profile's"
+        " periods (the actual schedule entries) via `vrg snapshot profile"
+        " period ...`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List snapshot profiles\n"
+        "    vrg snapshot profile list\n\n"
+        "    # Inspect the default system profile as JSON\n"
+        "    vrg -o json snapshot profile get System\\ Snapshots\n\n"
+        "    # Create a custom profile, then add periods to it\n"
+        "    vrg snapshot profile create --name webservers --description 'Web tier DR'\n"
+        "    vrg snapshot profile period list webservers\n\n"
+        "    # Rename a profile\n"
+        "    vrg snapshot profile update webservers --name web-tier\n\n"
+        "    # Delete a profile (detaches it from any resources that reference it)\n"
+        "    vrg snapshot profile delete web-tier --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "A profile with no periods will never fire snapshots — add periods"
+        " before assigning it to a workload. Profiles can be attached to"
+        " VMs, NAS volumes, outgoing syncs, and antivirus scans; deleting a"
+        " profile removes those schedule bindings but does not delete"
+        " previously captured snapshots."
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
