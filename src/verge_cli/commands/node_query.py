@@ -299,7 +299,7 @@ def query_arp(
     Examples:
 
         vrg node query arp node1
-        vrg -o json node query arp node1 --query "[?state=='REACHABLE']"
+        vrg -o json node query arp node1 | jq '.[] | select(.state == "REACHABLE")'
 
     Snapshot of the node's L2 neighbor table. Use `arp-scan` to actively
     probe for unknown peers.
@@ -552,7 +552,7 @@ def query_ipmi_sensor(
     Examples:
 
         vrg node query ipmi-sensor node1
-        vrg -o json node query ipmi-sensor node1 --query "[?contains(name, 'Temp')]"
+        vrg -o json node query ipmi-sensor node1 | jq '.[] | select(.name | contains("Temp"))'
 
     Live temperatures, fan speeds, and voltages from the BMC. Empty
     output usually means no reachable BMC or missing IPMI credentials.
@@ -593,7 +593,7 @@ def query_ipmi_sel(
     Examples:
 
         vrg node query ipmi-sel node1
-        vrg -o json node query ipmi-sel node1 --query "[?severity=='critical']"
+        vrg -o json node query ipmi-sel node1 | jq '.[] | select(.severity == "critical")'
 
     BMC-persisted event history: thermal events, ECC errors, power
     transitions. Clear it through the BMC interface, not this CLI.

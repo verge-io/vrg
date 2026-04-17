@@ -41,7 +41,7 @@ app = typer.Typer(
         "    # JSON for scripts and agents\n"
         "    vrg -o json node lldp list node1\n\n"
         '    # Find NICs whose upstream switch name contains "core"\n'
-        "    vrg -o json node lldp list node1 --query \"[?contains(chassis_name, 'core')]\"\n\n"
+        "    vrg -o json node lldp list node1 | jq '.[] | select(.chassis_name | contains(\"core\"))'\n\n"
         "---\n\n"
         "**Notes:**\n\n"
         "Node is resolved by name or numeric key. Ambiguous names exit 7"
@@ -97,7 +97,7 @@ def lldp_list(
         vrg node lldp list node1 --nic 2
 
         # JSON, filter to neighbors on "core" switches
-        vrg -o json node lldp list node1 --query "[?contains(chassis_name, 'core')]"
+        vrg -o json node lldp list node1 | jq '.[] | select(.chassis_name | contains("core"))'
 
     Empty output means LLDP is disabled on the node or no peers are
     advertising — check the node's `lldp` setting and confirm the upstream
