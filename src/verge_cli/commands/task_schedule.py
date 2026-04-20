@@ -15,8 +15,60 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="schedule",
-    help="Manage task schedules.",
+    help=(
+        "Manage task schedules — recurring or one-time triggers that fire"
+        " tasks at specific times.\n\n"
+        "A **schedule** defines *when* a task runs (the event counterpart is"
+        " `vrg task event`). Schedules are reusable: a single schedule can be"
+        " linked to many tasks via `vrg task trigger` so one 'nightly 2 AM'"
+        " definition drives every nightly job. Configure frequency with"
+        " `--repeat-every` (minute/hour/day/week/month/year/never) and"
+        " `--repeat-iteration` (run every N intervals), then constrain by"
+        " time-of-day window (`--start-time`/`--end-time`, seconds from"
+        " midnight), date window (`--start-date`/`--end-date`), weekday"
+        " (`--monday`…`--sunday`), or day-of-month"
+        " (`first`/`last`/`15th`/`start_date`). Set `--repeat-every never`"
+        " for a one-shot schedule.\n\n"
+        "Use `vrg task schedule show <id>` to preview the next N upcoming"
+        " execution times before enabling — cheap way to verify a cron-like"
+        " pattern does what you expect.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List schedules\n"
+        "    vrg task schedule list\n\n"
+        "    # Only enabled daily schedules\n"
+        "    vrg task schedule list --enabled --repeat-every day\n\n"
+        "    # Get schedule details as JSON\n"
+        "    vrg -o json task schedule get nightly-2am\n\n"
+        "    # Create a daily 2 AM weekday-only schedule\n"
+        "    vrg task schedule create --name nightly-2am \\\n"
+        "        --repeat-every day --repeat-iteration 1 \\\n"
+        "        --start-time 7200 --end-time 10800 \\\n"
+        "        --no-saturday --no-sunday\n\n"
+        "    # Create a monthly schedule that fires on the 1st\n"
+        "    vrg task schedule create --name monthly-first \\\n"
+        "        --repeat-every month --day-of-month first\n\n"
+        "    # Preview the next 20 runs\n"
+        "    vrg task schedule show nightly-2am\n\n"
+        "    # Disable temporarily, then re-enable\n"
+        "    vrg task schedule disable nightly-2am\n"
+        "    vrg task schedule enable nightly-2am\n\n"
+        "    # Delete a schedule\n"
+        "    vrg task schedule delete nightly-2am --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Schedules are referenced by name or numeric key (`$key`). When a name"
+        " matches multiple schedules, vrg prints all matches and exits with"
+        " code 7 — use the key to disambiguate.\n\n"
+        "`--start-time` and `--end-time` are integer seconds from midnight"
+        " (0–86400), not clock strings. For 2:00 AM pass `7200`; for 5:00 PM"
+        " pass `61200`. The schedule fires only inside this daily window.\n\n"
+        "Creating a schedule does not run any task — it only defines timing."
+        " Link it to a task with `vrg task trigger create <task> --schedule"
+        " <schedule>` so the task fires on each occurrence."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
@@ -76,7 +128,16 @@ def schedule_list(
         ),
     ] = None,
 ) -> None:
-    """List task schedules."""
+    """List task schedules.
+
+    **Examples:**
+
+        vrg task schedule list
+
+        vrg task schedule list --enabled --repeat-every day
+
+        vrg -o json task schedule list
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filter:
@@ -102,7 +163,14 @@ def schedule_get(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Schedule ID or name.")],
 ) -> None:
-    """Get a task schedule by ID or name."""
+    """Get a task schedule by ID or name.
+
+    **Examples:**
+
+        vrg task schedule get nightly-2am
+
+        vrg -o json task schedule get 1234
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.task_schedules, identifier, "TaskSchedule")
     schedule = vctx.client.task_schedules.get(key)
@@ -173,7 +241,18 @@ def schedule_create(
     saturday: Annotated[bool, typer.Option("--saturday/--no-saturday")] = True,
     sunday: Annotated[bool, typer.Option("--sunday/--no-sunday")] = True,
 ) -> None:
-    """Create a new task schedule."""
+    """Create a new task schedule.
+
+    **Examples:**
+
+        vrg task schedule create --name nightly-2am \\
+            --repeat-every day --repeat-iteration 1 \\
+            --start-time 7200 --end-time 10800 \\
+            --no-saturday --no-sunday
+
+        vrg task schedule create --name monthly-first \\
+            --repeat-every month --day-of-month first
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {
         "name": name,
@@ -262,7 +341,15 @@ def schedule_update(
     saturday: Annotated[bool | None, typer.Option("--saturday/--no-saturday")] = None,
     sunday: Annotated[bool | None, typer.Option("--sunday/--no-sunday")] = None,
 ) -> None:
-    """Update a task schedule."""
+    """Update a task schedule.
+
+    **Examples:**
+
+        vrg task schedule update nightly-2am --repeat-iteration 2
+
+        vrg task schedule update 1234 --name weekly-backup \\
+            --repeat-every week
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.task_schedules, identifier, "TaskSchedule")
     kwargs: dict[str, Any] = {}
@@ -314,7 +401,14 @@ def schedule_delete(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Delete a task schedule."""
+    """Delete a task schedule.
+
+    **Examples:**
+
+        vrg task schedule delete nightly-2am
+
+        vrg task schedule delete 1234 --yes
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.task_schedules, identifier, "TaskSchedule")
     if not confirm_action(f"Delete schedule '{identifier}'?", yes=yes):
@@ -329,7 +423,12 @@ def schedule_enable(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Schedule ID or name.")],
 ) -> None:
-    """Enable a task schedule."""
+    """Enable a task schedule.
+
+    **Examples:**
+
+        vrg task schedule enable nightly-2am
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.task_schedules, identifier, "TaskSchedule")
     vctx.client.task_schedules.enable(key)
@@ -342,7 +441,12 @@ def schedule_disable(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Schedule ID or name.")],
 ) -> None:
-    """Disable a task schedule."""
+    """Disable a task schedule.
+
+    **Examples:**
+
+        vrg task schedule disable nightly-2am
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.task_schedules, identifier, "TaskSchedule")
     vctx.client.task_schedules.disable(key)
@@ -367,7 +471,17 @@ def schedule_show(
         typer.Option("--end-time", help="End of time window (datetime)."),
     ] = None,
 ) -> None:
-    """Show upcoming scheduled execution times."""
+    """Show upcoming scheduled execution times.
+
+    Previews the next N occurrences so you can verify a schedule
+    before enabling it.
+
+    **Examples:**
+
+        vrg task schedule show nightly-2am
+
+        vrg task schedule show nightly-2am --max-results 50
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.task_schedules, identifier, "TaskSchedule")
     kwargs: dict[str, Any] = {"max_results": max_results}

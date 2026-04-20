@@ -15,8 +15,80 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="rule",
-    help="Manage network firewall rules.",
+    help=(
+        "Manage per-network firewall, NAT/PAT, and routing rules.\n\n"
+        "Every VergeOS virtual network has its own independent **nftables**"
+        " ruleset evaluated inside the vnet container. Rules are processed"
+        " top-to-bottom in `orderid` order and the **first match wins** — "
+        "a broad `drop` above a specific `accept` will block the traffic."
+        " Each rule combines a direction (`incoming`/`outgoing`), protocol,"
+        " source/destination IP and port filters, and an action.\n\n"
+        "**Actions:**\n\n"
+        "- `accept` — allow traffic to pass\n"
+        "- `drop` — silently discard\n"
+        "- `reject` — discard with ICMP unreachable reply\n"
+        "- `translate` — NAT/PAT (destination or source translation, with"
+        " `--target-ip` / `--target-ports`)\n"
+        "- `route` — route traffic to a specific target\n\n"
+        "Rules can be disabled without deletion (`enable`/`disable`), and"
+        " per-rule logging, statistics, and tracing can be toggled on creation"
+        " or update. Source/destination fields accept plain IPs, CIDR blocks,"
+        " ranges (`10.0.0.1-10.0.0.10`), and helpers like `vnetself`, `router`,"
+        " `vnet:<name>`, `vmnic:<vm>.<nic>`, and `alias:<name>`.\n\n"
+        "Rules are identified by **name** or **numeric key** within a given"
+        " network. Use `-o json` for machine-readable output; the `packets`"
+        " and `bytes` counters are populated when the rule has `--stats`"
+        " enabled.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List rules for a network (JSON for agents)\n"
+        "    vrg -o json network rule list internal-prod\n\n"
+        "    # Filter by direction, action, or enabled state\n"
+        "    vrg network rule list internal-prod --direction incoming\n"
+        "    vrg network rule list internal-prod --action drop\n"
+        "    vrg network rule list internal-prod --disabled\n\n"
+        "    # Get details for a single rule\n"
+        "    vrg -o json network rule get internal-prod allow-https\n\n"
+        "    # Allow inbound HTTPS\n"
+        "    vrg network rule create internal-prod --name allow-https"
+        " --direction incoming --action accept --protocol tcp"
+        " --dest-ports 443\n\n"
+        "    # Port-forward external 443 to an internal web VM\n"
+        "    vrg network rule create internal-prod --name https-to-web"
+        " --direction incoming --action translate --protocol tcp"
+        " --dest-ip vnetself --dest-ports 443"
+        " --target-ip vmnic:web-01.eth0 --target-ports 443\n\n"
+        "    # Outbound NAT (masquerade through router)\n"
+        "    vrg network rule create internal-prod --name outbound-nat"
+        " --direction outgoing --action translate --protocol any"
+        " --target-ip router\n\n"
+        "    # Temporarily disable a rule, then re-enable\n"
+        "    vrg network rule disable internal-prod allow-https\n"
+        "    vrg network rule enable internal-prod allow-https\n\n"
+        "    # Update an existing rule (e.g. add logging)\n"
+        "    vrg network rule update internal-prod allow-https --log\n\n"
+        "    # Delete a rule (skip prompt with -y)\n"
+        "    vrg network rule delete internal-prod allow-https -y\n\n"
+        "    # Apply staged changes (activate in the container)\n"
+        "    vrg network apply-rules internal-prod\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Rule changes are **staged**, not live. `create`, `update`, `delete`,"
+        " `enable`, and `disable` all set a pending-changes flag on the"
+        " network — traffic continues to flow under the previously-loaded"
+        " ruleset until you run `vrg network apply-rules <network>`, which"
+        " regenerates and reloads nftables **without restarting the"
+        " container**. If the network is stopped, changes apply on next start.\n\n"
+        "Use `vrg network status <network>` to check whether a network has"
+        " pending rule changes waiting to be applied.\n\n"
+        "Rules are referenced by name or numeric key (`$key`) scoped to a"
+        " single network. When a name matches multiple rules, vrg prints all"
+        " matches and exits with code 7 — use the numeric key to disambiguate."
+        " System rules (`system_rule: true`) are platform-generated and"
+        " read-only."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 
@@ -74,6 +146,7 @@ def _rule_to_dict(rule: Any) -> dict[str, Any]:
         "enabled": rule.get("enabled", True),
         "log": rule.get("log", False),
         "statistics": rule.get("statistics", False),
+        "trace": rule.get("trace", False),
         "order": rule.get("orderid", 0),
         "system_rule": rule.get("system_rule", False),
         "packets": rule.get("packets", 0),
@@ -94,7 +167,18 @@ def rule_list(
         bool | None, typer.Option("--enabled/--disabled", help="Filter by enabled state")
     ] = None,
 ) -> None:
-    """List firewall rules for a network."""
+    """List firewall rules for a network.
+
+    **Examples:**
+
+        vrg network rule list internal-prod
+        vrg network rule list internal-prod --direction incoming
+        vrg network rule list internal-prod --action drop --disabled
+        vrg -o json network rule list internal-prod
+
+    Rules are returned in `orderid` order (processing order). System
+    rules (`system_rule: true`) are platform-generated and read-only.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -129,7 +213,15 @@ def rule_get(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     rule: Annotated[str, typer.Argument(help="Rule name or key")],
 ) -> None:
-    """Get details of a firewall rule."""
+    """Get details of a firewall rule.
+
+    **Examples:**
+
+        vrg network rule get internal-prod allow-https
+        vrg -o json network rule get internal-prod 42
+
+    Rules are scoped to a network and resolved by name or numeric key.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -191,7 +283,29 @@ def rule_create(
     order: Annotated[int | None, typer.Option("--order", help="Rule order position")] = None,
     description: Annotated[str, typer.Option("--description", help="Rule description")] = "",
 ) -> None:
-    """Create a new firewall rule."""
+    """Create a new firewall rule.
+
+    **Examples:**
+
+        # Allow inbound HTTPS
+        vrg network rule create internal-prod --name allow-https \\
+            --direction incoming --action accept --protocol tcp --dest-ports 443
+
+        # Port-forward external 443 to an internal web VM
+        vrg network rule create internal-prod --name https-to-web \\
+            --direction incoming --action translate --protocol tcp \\
+            --dest-ip vnetself --dest-ports 443 \\
+            --target-ip vmnic:web-01.eth0 --target-ports 443
+
+        # Outbound NAT via router
+        vrg network rule create internal-prod --name outbound-nat \\
+            --direction outgoing --action translate --protocol any --target-ip router
+
+    Rule creation is **staged** — run `vrg network apply-rules
+    <network>` to activate. Source/destination fields accept plain
+    IPs, CIDR blocks, ranges, and helpers like `vnetself`, `router`,
+    `vnet:<name>`, `vmnic:<vm>.<nic>`, `alias:<name>`.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -280,7 +394,20 @@ def rule_update(
         str | None, typer.Option("--description", help="Rule description")
     ] = None,
 ) -> None:
-    """Update a firewall rule."""
+    """Update a firewall rule.
+
+    **Examples:**
+
+        # Turn on logging for a rule
+        vrg network rule update internal-prod allow-https --log
+
+        # Change destination port + add stats
+        vrg network rule update internal-prod allow-https --dest-ports 8443 --stats
+
+    Only non-empty options are applied; exits with code 2 if nothing
+    is specified. Changes are **staged** — run `vrg network
+    apply-rules <network>` to activate.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -346,7 +473,17 @@ def rule_delete(
     rule: Annotated[str, typer.Argument(help="Rule name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a firewall rule."""
+    """Delete a firewall rule.
+
+    **Examples:**
+
+        vrg network rule delete internal-prod allow-https
+        vrg network rule delete internal-prod allow-https --yes
+
+    Change is **staged** — run `vrg network apply-rules <network>`
+    to remove the rule from the live ruleset. Prompts for
+    confirmation unless `--yes` is passed.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -372,7 +509,15 @@ def rule_enable(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     rule: Annotated[str, typer.Argument(help="Rule name or key")],
 ) -> None:
-    """Enable a firewall rule."""
+    """Enable a firewall rule.
+
+    **Examples:**
+
+        vrg network rule enable internal-prod allow-https
+
+    Flips the rule's `enabled` flag to true. Change is **staged** —
+    run `vrg network apply-rules <network>` to activate.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")
@@ -392,7 +537,16 @@ def rule_disable(
     network: Annotated[str, typer.Argument(help="Network name or key")],
     rule: Annotated[str, typer.Argument(help="Rule name or key")],
 ) -> None:
-    """Disable a firewall rule."""
+    """Disable a firewall rule.
+
+    **Examples:**
+
+        vrg network rule disable internal-prod allow-https
+
+    Flips the rule's `enabled` flag to false — preserves the rule's
+    configuration for re-enabling later. Change is **staged** — run
+    `vrg network apply-rules <network>` to deactivate in nftables.
+    """
     vctx = get_context(ctx)
 
     net_key = resolve_resource_id(vctx.client.networks, network, "network")

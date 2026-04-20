@@ -11,13 +11,71 @@ from verge_cli.columns import SITE_COLUMNS
 from verge_cli.commands import site_sync
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="site",
-    help="Manage remote sites.",
+    help=(
+        "Manage remote VergeOS sites and the site syncs that replicate data"
+        " between them.\n\n"
+        "A **site** is a trusted peer VergeOS system, typically at a different"
+        " geographic location. Site records pair two clusters so they can"
+        " replicate cloud snapshots, share statistics, and manage each other's"
+        " resources. Sites are the foundation for disaster recovery,"
+        " multi-site monitoring, and centralized management across"
+        " geographically distributed deployments.\n\n"
+        "Replication is **directional** and operates at the cloud-snapshot"
+        " level. An **outgoing sync** on the source pushes cloud snapshots to"
+        " a remote site; an **incoming sync** on the destination receives"
+        " them. Outgoing and incoming syncs are paired via a registration"
+        " code generated on the destination.\n\n"
+        "Subresources have their own groups: `vrg site sync outgoing`"
+        " (outbound replication jobs), `vrg site sync incoming` (inbound"
+        " receivers), and `vrg site sync schedule` (per-sync scheduling"
+        " overrides).\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List configured sites\n"
+        "    vrg site list\n\n"
+        "    # Get site details as JSON\n"
+        "    vrg -o json site get dr-east\n\n"
+        "    # Create a site connection (one-time auth handshake)\n"
+        "    vrg site create --name dr-east --url https://dr.example.com \\\n"
+        "        --username admin --password 's3cret' \\\n"
+        "        --cloud-snapshots both\n\n"
+        "    # Re-authenticate after a credential rotation\n"
+        "    vrg site reauth dr-east --username admin --password 'new-s3cret'\n\n"
+        "    # Temporarily disable replication to a site without deleting it\n"
+        "    vrg site disable dr-east\n"
+        "    vrg site enable dr-east\n\n"
+        "    # Inspect syncs to / from a site\n"
+        "    vrg site sync outgoing list\n"
+        "    vrg site sync incoming list\n\n"
+        "    # JSON output for scripting / agents\n"
+        "    vrg -o json site list\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Site connectivity requires network reachability between the two"
+        " VergeOS systems on both the API URL and the vSAN data plane"
+        " (default port 14201). The initial site-create call performs a"
+        " one-time authentication handshake; the temporary credentials are"
+        " not stored after setup — ongoing replication uses a dedicated"
+        " service account.\n\n"
+        "Each site has four independently configurable capability flags"
+        " (cloud snapshots, statistics, management, repair server), each with"
+        " `disabled` / `send` / `receive` / `both` options. The"
+        " `--cloud-snapshots` flag controls the replication direction for"
+        " snapshot data.\n\n"
+        "System limit: **1,000 sites** per system. Sites are referenced by"
+        " name or numeric key (`$key`). When a name matches multiple sites,"
+        " vrg prints all matches and exits with code 7 — use the numeric key"
+        " to disambiguate. Use `-o json` for machine-readable output suitable"
+        " for automation and agents."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 app.add_typer(site_sync.app, name="sync")
@@ -56,7 +114,21 @@ def list_cmd(
         ),
     ] = None,
 ) -> None:
-    """List all registered sites."""
+    """List all registered sites.
+
+    Examples:
+
+        vrg site list
+        vrg site list --status online --enabled
+        vrg -o json site list | jq '.[] | select(.status != "online") | .name'
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    Useful `--query` fields include `name`, `status`, `enabled`,
+    `authentication_status`, and `config_cloud_snapshots`.
+    """
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(ctx, lambda c: c.sites.list(), _site_to_dict, SITE_COLUMNS)
+        return
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if status is not None:
@@ -81,7 +153,16 @@ def get_cmd(
     ctx: typer.Context,
     site: Annotated[str, typer.Argument(help="Site name or key")],
 ) -> None:
-    """Get details of a site."""
+    """Get details of a site.
+
+    Examples:
+
+        vrg site get dr-east
+        vrg -o json site get 3
+        vrg -o json site get dr-east --query "{status: status, url: url}"
+
+    Resolves `site` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
     item = vctx.client.sites.get(key)
@@ -121,7 +202,23 @@ def create_cmd(
         typer.Option("--auto-create-syncs/--no-auto-create-syncs", help="Auto-create sync configs"),
     ] = True,
 ) -> None:
-    """Create a new site connection."""
+    """Create a new site connection.
+
+    Examples:
+
+        vrg site create --name dr-east --url https://dr.example.com \\
+            --username admin --password 's3cret' --cloud-snapshots both
+
+        vrg site create --name offsite --url https://offsite.example.com \\
+            --username svc-sync --password 'pw' \\
+            --cloud-snapshots send --no-auto-create-syncs
+
+    Performs a one-time authentication handshake; the supplied credentials
+    are not stored after setup — ongoing replication uses a dedicated
+    service account. `--cloud-snapshots` accepts `disabled`, `send`,
+    `receive`, or `both`. Use `--allow-insecure` only for pairings over
+    self-signed TLS.
+    """
     vctx = get_context(ctx)
 
     kwargs: dict[str, Any] = {
@@ -163,7 +260,17 @@ def update_cmd(
         ),
     ] = None,
 ) -> None:
-    """Update a site's settings."""
+    """Update a site's settings.
+
+    Examples:
+
+        vrg site update dr-east --description "DR pair in us-east"
+        vrg site update dr-east --cloud-snapshots both
+        vrg site update 3 --name dr-east-primary
+
+    Resolves `site` by name or numeric key. Ambiguous names exit 7. Only
+    fields passed are updated.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
 
@@ -186,7 +293,18 @@ def delete_cmd(
     site: Annotated[str, typer.Argument(help="Site name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a site."""
+    """Delete a site.
+
+    Examples:
+
+        vrg site delete dr-east
+        vrg site delete 3 --yes
+
+    Destructive. Removes the pairing from this system; the remote site's
+    record of this pairing must be cleaned up separately. Existing
+    outgoing/incoming syncs tied to the site are affected — review them
+    first with `vrg site sync outgoing list --site <site>`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
 
@@ -204,7 +322,16 @@ def enable_cmd(
     ctx: typer.Context,
     site: Annotated[str, typer.Argument(help="Site name or key")],
 ) -> None:
-    """Enable a disabled site."""
+    """Enable a disabled site.
+
+    Examples:
+
+        vrg site enable dr-east
+        vrg site enable 3
+
+    Re-activates a site previously paused with `vrg site disable`. Does not
+    re-authenticate — if authentication has expired, use `vrg site reauth`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
     vctx.client.sites.enable(key)
@@ -217,7 +344,17 @@ def disable_cmd(
     ctx: typer.Context,
     site: Annotated[str, typer.Argument(help="Site name or key")],
 ) -> None:
-    """Disable a site without deleting it."""
+    """Disable a site without deleting it.
+
+    Examples:
+
+        vrg site disable dr-east
+        vrg site disable 3
+
+    Pauses replication and management traffic to the site while preserving
+    the pairing, credentials, and configured syncs. Re-enable with
+    `vrg site enable`.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
     vctx.client.sites.disable(key)
@@ -232,7 +369,17 @@ def reauth_cmd(
     username: Annotated[str, typer.Option("--username", help="New username")],
     password: Annotated[str, typer.Option("--password", help="New password")],
 ) -> None:
-    """Re-authenticate with updated credentials."""
+    """Re-authenticate with updated credentials.
+
+    Examples:
+
+        vrg site reauth dr-east --username admin --password 'new-s3cret'
+        vrg site reauth 3 --username svc-sync --password 'rotated-pw'
+
+    Use after rotating the remote admin password or when the pairing has
+    drifted out of sync. The supplied credentials are used for a single
+    handshake only; they are not persisted.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
     vctx.client.sites.reauthenticate(key, username, password)
@@ -245,7 +392,17 @@ def refresh_cmd(
     ctx: typer.Context,
     site: Annotated[str, typer.Argument(help="Site name or key")],
 ) -> None:
-    """Refresh site connection and metadata."""
+    """Refresh site connection and metadata.
+
+    Examples:
+
+        vrg site refresh dr-east
+        vrg site refresh 3
+
+    Forces the local system to re-probe the remote site, updating status,
+    version, and capability metadata. Useful after a remote upgrade or when
+    `status` is stale.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.sites, site, "Site")
     vctx.client.sites.refresh_site(key)

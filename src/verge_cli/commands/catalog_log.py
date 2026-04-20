@@ -14,8 +14,24 @@ from verge_cli.utils import resolve_nas_resource
 
 app = typer.Typer(
     name="log",
-    help="View catalog operation logs.",
+    help=(
+        "View catalog operation logs — download, sync, and refresh"
+        " activity.\n\n"
+        "Catalog logs record events from recipe downloads, catalog"
+        " refreshes, and version checks. Each entry has a **level**"
+        " (`message`, `warning`, `error`, `critical`) and a timestamp.\n\n"
+        "Use `-o json` for machine-readable output. Filter with `--catalog`"
+        " (name or hex key) and `--level`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg catalog log list\n"
+        "    vrg catalog log list --catalog windows-server\n"
+        "    vrg catalog log list --level error\n"
+        "    vrg -o json catalog log list\n\n"
+        "---"
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 CATALOG_LOG_COLUMNS: list[ColumnDef] = [
@@ -55,7 +71,19 @@ def list_cmd(
         typer.Option("--level", help="Filter by log level."),
     ] = None,
 ) -> None:
-    """List catalog operation logs."""
+    """List catalog operation logs.
+
+    Examples:
+
+        vrg catalog log list
+        vrg catalog log list --catalog windows-server
+        vrg catalog log list --level error
+        vrg -o json catalog log list | jq '.[] | select(.level != "message")'
+
+    Log levels: `message`, `warning`, `error`, `critical`. `--catalog`
+    accepts a name or SHA-1 hex key. Timestamps are normalized to
+    seconds for display.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if catalog is not None:
@@ -85,7 +113,15 @@ def get_cmd(
     ctx: typer.Context,
     log: Annotated[str, typer.Argument(help="Log entry key.")],
 ) -> None:
-    """Get a catalog log entry by key."""
+    """Get a catalog log entry by key.
+
+    Examples:
+
+        vrg catalog log get 4217
+        vrg -o json catalog log get 4217
+
+    `log` must be a numeric key (found via `vrg catalog log list`).
+    """
     vctx = get_context(ctx)
     key = int(log)
     item = vctx.client.catalog_logs.get(key=key)

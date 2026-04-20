@@ -100,11 +100,54 @@ Warmup / read-only tests. Use existing config or create one.
 - [ ] `vrg node gpu-list <name>` — lists GPU devices on a node (may be empty if no GPUs)
 - [ ] `vrg node stats <name>` — shows node statistics (CPU, RAM, temp)
 
+### Node Query Commands
+
+- [ ] `vrg node query ping node1 8.8.8.8` — ping from physical node
+- [ ] `vrg node query dns node1 example.com` — DNS resolution from node
+- [ ] `vrg node query traceroute node1 8.8.8.8` — traceroute from node
+- [ ] `vrg node query arp node1` — ARP table for node
+- [ ] `vrg node query lsblk node1` — list block devices
+- [ ] `vrg node query dmidecode node1` — hardware info
+- [ ] `vrg node query smartctl node1 /dev/sda` — SMART health data
+- [ ] `vrg node query ipmi-sensor node1` — IPMI sensor readings
+- [ ] `vrg node query ipmi-chassis node1` — IPMI chassis status
+- [ ] `vrg node query run node1 whatsmyip` — generic query escape hatch
+- [ ] `vrg -o json node query ping node1 8.8.8.8` — JSON output with metadata
+
+### Node LLDP
+
+- [ ] `vrg node lldp list node1` — list LLDP neighbors
+- [ ] `vrg node lldp list node1 --nic 5` — filter by NIC key
+
+### System Diagnostics
+
+- [ ] `vrg system diag list` — list diagnostic bundles (may be empty)
+
 ### Storage
 
 - [ ] `vrg storage list` — lists all storage tiers
 - [ ] `vrg storage get <tier>` — shows tier details (capacity, used, available)
 - [ ] `vrg storage summary` — shows aggregate storage across tiers
+
+### Doctor (System Health Check)
+
+- [ ] `vrg doctor` — runs all 15 checks, outputs summary table with pass/warn/fail/skip statuses
+- [ ] `vrg doctor --check connectivity` — runs only the connectivity check (verifies auth + system version)
+- [ ] `vrg doctor --check clusters,nodes,storage` — runs a subset of infrastructure checks
+- [ ] `vrg doctor --check alarms` — alarm check (fail if critical, warn if error-level)
+- [ ] `vrg doctor --check updates` — update state check (warn if reboot required)
+- [ ] `vrg doctor --check versions` — version consistency across nodes
+- [ ] `vrg doctor --check fabric` — NIC fabric health
+- [ ] `vrg doctor --check networks` — network dashboard health
+- [ ] `vrg doctor --check certificates` — certificate expiry (warn if <30 days)
+- [ ] `vrg doctor --check licenses` — license validity
+- [ ] `vrg doctor --check drive_smart` — physical drive SMART health (pass if no warnings)
+- [ ] `vrg doctor --check dimm_health` — DIMM health across all nodes
+- [ ] `vrg doctor --check vsan_journal` — vSAN journal and tier status
+- [ ] `vrg doctor --check driver_reload` — node driver reload state
+- [ ] `vrg doctor --list-checks` — prints all available check names
+- [ ] `vrg -o json doctor` — JSON output with name, status, message, details for each check
+- [ ] Verify exit code is 0 when all checks pass/warn/skip, 1 if any check fails
 
 ---
 
@@ -170,6 +213,23 @@ Warmup / read-only tests. Use existing config or create one.
 - [ ] `vrg network diag leases shakedown-net` — shows DHCP leases (may be empty)
 - [ ] `vrg network diag addresses shakedown-net` — shows IP addresses in use
 - [ ] `vrg network diag stats shakedown-net` — shows network statistics
+
+### Network Monitor Quality
+
+- [ ] `vrg network diag quality External` — shows quality %, latency, packet loss
+- [ ] `vrg network diag history External --limit 5` — shows recent monitoring history
+- [ ] `vrg network diag history External --long --limit 5` — shows long-term history
+
+### Network Query Commands
+
+- [ ] `vrg network query ping External 8.8.8.8` — ping from network router
+- [ ] `vrg network query dns External example.com` — DNS resolution from network
+- [ ] `vrg network query traceroute External 8.8.8.8` — traceroute from network
+- [ ] `vrg network query arp External` — ARP table for network
+- [ ] `vrg network query firewall External` — nftables rules for network
+- [ ] `vrg network query tcp-connect External 8.8.8.8 443` — TCP connectivity test
+- [ ] `vrg network query run External whatsmyip` — generic query escape hatch
+- [ ] `vrg -o json network query ping External 8.8.8.8` — JSON output with metadata
 
 ### Network Dashboard
 

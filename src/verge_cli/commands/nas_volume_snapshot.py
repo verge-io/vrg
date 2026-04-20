@@ -14,8 +14,64 @@ from verge_cli.utils import confirm_action, resolve_nas_resource
 
 app = typer.Typer(
     name="snapshot",
-    help="Manage NAS volume snapshots.",
+    help=(
+        "Manage NAS volume snapshots — point-in-time copies of a volume's"
+        " filesystem data.\n\n"
+        "Snapshots use copy-on-write (COW): taking one is instantaneous and"
+        " consumes no extra vSAN space initially. As the source volume diverges"
+        " from the snapshot, preserved original blocks accumulate in a shadow"
+        " volume, so storage cost grows with write activity — not with logical"
+        " volume size. Read-heavy workloads snapshot almost for free;"
+        " write-heavy ones should keep retention short.\n\n"
+        "Snapshots only apply to volumes of `type=local`. A volume holds a"
+        " maximum of 1,000 snapshots and they cascade-delete with the parent"
+        " volume. `--quiesce` freezes filesystem I/O via `fsfreeze` for the"
+        " duration of the snapshot, producing an application-consistent copy"
+        " (required for databases) at the cost of a brief I/O pause.\n\n"
+        "Default expiry is 3 days (72 hours). `--never-expires` disables"
+        " automatic cleanup — use sparingly, as long-lived snapshots on"
+        " write-heavy volumes accumulate significant vSAN usage. Automated"
+        " snapshot schedules live on the parent volume's `snapshot_profile`"
+        " — this command group is for manual snapshots.\n\n"
+        "Snapshots are addressed by name or numeric key within a volume;"
+        " ambiguous names exit with code 7 — use the numeric key to"
+        " disambiguate. Use `-o json` for machine-readable output.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List snapshots on a volume (name or hex key)\n"
+        "    vrg nas volume snapshot list shared-data\n\n"
+        "    # Get one snapshot as JSON for scripting / agents\n"
+        "    vrg -o json nas volume snapshot get shared-data nightly\n\n"
+        "    # Take a manual snapshot (default 3-day expiry)\n"
+        "    vrg nas volume snapshot create shared-data --name nightly\n\n"
+        "    # Application-consistent snapshot for a database volume\n"
+        "    vrg nas volume snapshot create db-data \\\n"
+        "        --name pre-migration --quiesce --expires-days 7\n\n"
+        "    # Permanent milestone snapshot (manual deletion required)\n"
+        "    vrg nas volume snapshot create shared-data \\\n"
+        "        --name baseline --never-expires \\\n"
+        "        --description 'Clean baseline for restore testing'\n\n"
+        "    # Delete a snapshot (skip prompt for scripts / agents)\n"
+        "    vrg nas volume snapshot delete shared-data nightly --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Snapshot creation is **near-instant** but `--quiesce` adds a brief"
+        " I/O pause (typically sub-second) while the filesystem is frozen."
+        " Schedule quiesced snapshots on latency-sensitive volumes during"
+        " maintenance windows.\n\n"
+        "Expired snapshots are removed by a background reaper; you may see a"
+        " snapshot persist briefly after its `expires` timestamp. Explicit"
+        " `delete` is immediate.\n\n"
+        "Restoring a volume from a snapshot is **not exposed here** — it lives"
+        " under `vrg nas volume` (volume-level action). Cloning and"
+        " restore-to-new flows use the snapshot as the source of truth; see"
+        " the volume commands for those operations.\n\n"
+        "Snapshot storage cost is invisible in logical volume size — monitor"
+        " **vSAN tier consumption** when tuning retention, not the volume's"
+        " reported used space."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 NAS_VOLUME_SNAPSHOT_COLUMNS: list[ColumnDef] = [
@@ -74,7 +130,13 @@ def snapshot_list(
     ctx: typer.Context,
     volume: Annotated[str, typer.Argument(help="NAS volume name or hex key")],
 ) -> None:
-    """List snapshots for a NAS volume."""
+    """List snapshots for a NAS volume.
+
+    **Examples:**
+
+        vrg nas volume snapshot list shared-data
+        vrg -o json nas volume snapshot list shared-data
+    """
     vctx, volume_key = _resolve_volume(ctx, volume)
     snap_mgr = vctx.client.nas_volumes.snapshots(volume_key)
     snapshots = snap_mgr.list()
@@ -96,7 +158,13 @@ def snapshot_get(
     volume: Annotated[str, typer.Argument(help="NAS volume name or hex key")],
     snapshot: Annotated[str, typer.Argument(help="Snapshot name or key")],
 ) -> None:
-    """Get details of a NAS volume snapshot."""
+    """Get details of a NAS volume snapshot.
+
+    **Examples:**
+
+        vrg nas volume snapshot get shared-data nightly
+        vrg -o json nas volume snapshot get shared-data 42
+    """
     vctx, volume_key = _resolve_volume(ctx, volume)
     snap_key = _resolve_snapshot(vctx, volume_key, snapshot)
     snap_mgr = vctx.client.nas_volumes.snapshots(volume_key)
@@ -133,7 +201,18 @@ def snapshot_create(
         typer.Option("--description", "-d", help="Snapshot description"),
     ] = None,
 ) -> None:
-    """Create a snapshot of a NAS volume."""
+    """Create a snapshot of a NAS volume.
+
+    Snapshots are copy-on-write and near-instant. Default retention is
+    3 days; use `--never-expires` for manual management. `--quiesce`
+    attempts a filesystem sync for application-consistent captures.
+
+    **Examples:**
+
+        vrg nas volume snapshot create shared-data --name nightly
+        vrg nas volume snapshot create shared-data --name pre-upgrade --never-expires
+        vrg nas volume snapshot create shared-data --name app-consistent --quiesce
+    """
     # Mutual exclusion check
     if never_expires and expires_days != 3:
         typer.echo("Error: --never-expires and --expires-days are mutually exclusive.", err=True)
@@ -171,7 +250,13 @@ def snapshot_delete(
     snapshot: Annotated[str, typer.Argument(help="Snapshot name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a NAS volume snapshot."""
+    """Delete a NAS volume snapshot.
+
+    **Examples:**
+
+        vrg nas volume snapshot delete shared-data nightly
+        vrg nas volume snapshot delete shared-data nightly --yes
+    """
     vctx, volume_key = _resolve_volume(ctx, volume)
     snap_key = _resolve_snapshot(vctx, volume_key, snapshot)
 

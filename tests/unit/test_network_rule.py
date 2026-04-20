@@ -38,6 +38,10 @@ def mock_rule():
             "enabled": True,
             "orderid": 1,
             "system_rule": False,
+            "statistics": True,
+            "trace": False,
+            "packets": 12345,
+            "bytes": 6789012,
         }
         return data.get(key, default)
 
@@ -206,3 +210,65 @@ def test_rule_update_description(cli_runner, mock_client):
     assert result.exit_code == 0
     call_kwargs = mock_net.rules.update.call_args[1]
     assert call_kwargs["description"] == "New description"
+
+
+def test_rule_list_wide_includes_stats(cli_runner, mock_client, mock_network_for_rules, mock_rule):
+    """Wide output shows packets/bytes/statistics/trace columns."""
+    mock_client.networks.list.return_value = [mock_network_for_rules]
+    mock_client.networks.get.return_value = mock_network_for_rules
+    mock_network_for_rules.rules.list.return_value = [mock_rule]
+
+    result = cli_runner.invoke(app, ["-o", "wide", "network", "rule", "list", "test-network"])
+
+    assert result.exit_code == 0
+    # Headers may be truncated in table output; check for partial matches
+    assert "Pa" in result.output  # Packets
+    assert "St" in result.output  # Stats
+    assert "12" in result.output  # 12345 packets value
+
+
+def test_rule_json_includes_stats(cli_runner, mock_client, mock_network_for_rules, mock_rule):
+    """JSON output includes statistics, trace, packets, bytes."""
+    import json
+
+    mock_client.networks.list.return_value = [mock_network_for_rules]
+    mock_client.networks.get.return_value = mock_network_for_rules
+    mock_network_for_rules.rules.list.return_value = [mock_rule]
+
+    result = cli_runner.invoke(app, ["-o", "json", "network", "rule", "list", "test-network"])
+
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert len(data) == 1
+    assert data[0]["statistics"] is True
+    assert data[0]["trace"] is False
+    assert data[0]["packets"] == 12345
+    assert data[0]["bytes"] == 6789012
+
+
+def test_rule_stats_defaults(cli_runner, mock_client, mock_network_for_rules):
+    """Missing fields default to False/0, not None."""
+    import json
+
+    # Rule with no stats fields
+    rule = MagicMock()
+    rule.key = 200
+    rule.name = "Bare-Rule"
+
+    def mock_get(key: str, default=None):
+        return {"name": "Bare-Rule", "direction": "incoming", "action": "accept"}.get(key, default)
+
+    rule.get = mock_get
+
+    mock_client.networks.list.return_value = [mock_network_for_rules]
+    mock_client.networks.get.return_value = mock_network_for_rules
+    mock_network_for_rules.rules.list.return_value = [rule]
+
+    result = cli_runner.invoke(app, ["-o", "json", "network", "rule", "list", "test-network"])
+
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data[0]["statistics"] is False
+    assert data[0]["trace"] is False
+    assert data[0]["packets"] == 0
+    assert data[0]["bytes"] == 0

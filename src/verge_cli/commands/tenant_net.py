@@ -22,20 +22,122 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 net_block_app = typer.Typer(
     name="net-block",
-    help="Manage tenant network blocks.",
+    help=(
+        "Manage network blocks (CIDR allocations) assigned to a tenant.\n\n"
+        "A **network block** is a CIDR range from a host network that is"
+        " delegated to a tenant for its own use. The tenant may subdivide or"
+        " assign the block inside its nested VergeOS instance, and the host"
+        " retains the routing relationship to the upstream network. Blocks"
+        " are a routed delegation — they are distinct from `ext-ip` (single"
+        " external IPs) and `l2` (Layer 2 VLAN pass-through).\n\n"
+        "Blocks are referenced by **numeric key** or by CIDR-derived name."
+        " Use `-o json` for machine-readable output; the `$key`, `cidr`, and"
+        " `network_name` fields are the most useful targets for `--query`."
+        " Name lookups that match multiple blocks exit with code 7 — pass a"
+        " numeric key to disambiguate.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List network blocks for a tenant\n"
+        "    vrg tenant net-block list acme-corp\n\n"
+        "    # JSON output for agents\n"
+        "    vrg -o json tenant net-block list acme-corp\n\n"
+        "    # Allocate a /24 from host network key 42 to the tenant\n"
+        "    vrg tenant net-block create acme-corp --cidr 10.42.10.0/24"
+        " --network 42\n\n"
+        "    # Delete a block (skip confirmation with -y)\n"
+        "    vrg tenant net-block delete acme-corp 7 -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Block allocation must fit inside the parent host network's"
+        " addressable range; the host routes traffic for the block to the"
+        " tenant's primary vNet. Deletion removes the delegation but does"
+        " not reclaim addresses the tenant has already assigned internally."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 ext_ip_app = typer.Typer(
     name="ext-ip",
-    help="Manage tenant external IPs.",
+    help=(
+        "Manage external (public) IP addresses assigned to a tenant.\n\n"
+        "An **external IP** is a virtual IP on a host external network that"
+        " is owned by the tenant, giving tenant workloads external reach"
+        " (internet or upstream routed networks). Assignment records the"
+        " tenant as owner on the host's `vnet_addresses` table and routing"
+        " rules are created automatically. External IPs are distinct from"
+        " `net-block` (routed CIDR delegations) and `l2` (Layer 2"
+        " pass-through).\n\n"
+        "IPs are referenced by **numeric key** or by IP-derived name."
+        " Use `-o json` for machine-readable output; the `$key`,"
+        " `ip_address`, `network_name`, and `hostname` fields are the most"
+        " useful targets for `--query`. Name lookups that match multiple"
+        " addresses exit with code 7 — pass a numeric key to disambiguate.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List external IPs assigned to a tenant\n"
+        "    vrg tenant ext-ip list acme-corp\n\n"
+        "    # JSON output for agents\n"
+        "    vrg -o json tenant ext-ip list acme-corp\n\n"
+        "    # Assign a public IP from external network key 5\n"
+        "    vrg tenant ext-ip create acme-corp --ip 198.51.100.42"
+        " --network 5 --hostname web.acme.example\n\n"
+        "    # Release an external IP\n"
+        "    vrg tenant ext-ip delete acme-corp 198.51.100.42 -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "After assigning or releasing an external IP, run"
+        " `vrg network apply-rules <network>` on the host external network"
+        " and on the tenant network dashboard so the staged routing rules"
+        " take effect. The `hostname` field is optional and only drives"
+        " reverse DNS / friendly naming — it does not configure anything"
+        " inside the tenant."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 l2_app = typer.Typer(
     name="l2",
-    help="Manage tenant L2 networks.",
+    help=(
+        "Manage Layer 2 (VLAN) pass-through connections into a tenant.\n\n"
+        "A **tenant Layer 2 network** passes a host VLAN directly into the"
+        " tenant, giving tenant workloads transparent Layer 2 access to the"
+        " underlying physical network segment. Creating an L2 network"
+        " automatically provisions a NIC on each tenant node, a Physical"
+        " network, and a matching External network inside the tenant."
+        " Eligible host network types are internal, external, BGP, VPN, and"
+        " physical-bridged networks; VLANs 1 and 100–102 are reserved and"
+        " cannot be passed through. Up to **28** Layer 2 extensions are"
+        " supported per tenant.\n\n"
+        "L2 networks are referenced by **numeric key** or by"
+        " `network_name`. Use `-o json` for machine-readable output; the"
+        " `$key`, `network_name`, `network_type`, and `is_enabled` fields"
+        " are the most useful targets for `--query`. Name lookups that"
+        " match multiple extensions exit with code 7 — pass a numeric key"
+        " to disambiguate.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List Layer 2 networks passed into a tenant\n"
+        "    vrg tenant l2 list acme-corp\n\n"
+        "    # JSON output for agents\n"
+        "    vrg -o json tenant l2 list acme-corp\n\n"
+        "    # Pass an external Layer 2 VLAN network into the tenant\n"
+        "    vrg tenant l2 create acme-corp --network-name ext-vlan-400\n\n"
+        "    # Remove a Layer 2 pass-through\n"
+        "    vrg tenant l2 delete acme-corp ext-vlan-400 -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Deleting the host-side L2 extension removes the tenant-node NIC"
+        " automatically, but the auto-created Physical and External"
+        " networks **inside** the tenant must be cleaned up manually (and"
+        " the External network must be deleted before the Physical"
+        " network, because it references it). Do not add a VLAN tag to the"
+        " tenant-side External network — the host NIC is already tagged,"
+        " and double-tagging breaks connectivity."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 

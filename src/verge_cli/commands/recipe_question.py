@@ -14,8 +14,63 @@ from verge_cli.utils import confirm_action, resolve_nas_resource, resolve_resour
 
 app = typer.Typer(
     name="question",
-    help="Manage recipe questions.",
+    help=(
+        "Manage VM recipe questions — the input fields users answer when"
+        " deploying a recipe.\n\n"
+        "Each **question** collects one piece of data at deploy time and"
+        " stores the answer under its `name`, which scripts and cloud-init"
+        " templates reference as a variable. Question `type` controls how"
+        " the value is entered and validated: `string`, `bool`, `num`,"
+        " `password`, `list`, `hidden`, and several database-backed types."
+        " Every question belongs to a **section** (see `vrg recipe section`)"
+        " that groups related inputs on the form.\n\n"
+        "Some questions — such as drive size and NIC selection — are"
+        " created automatically from the recipe's base VM. Additional"
+        " questions are added to collect application-specific values like"
+        " usernames, license keys, or cloud-init URLs.\n\n"
+        "After editing questions, the parent recipe must be republished"
+        " before remote systems and tenants see the changes. See"
+        " `vrg recipe republish`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every question on a recipe\n"
+        "    vrg recipe question list ubuntu-server\n\n"
+        "    # Filter to questions in a single section\n"
+        "    vrg recipe question list ubuntu-server --section networking\n\n"
+        "    # Inspect a question as JSON (includes type, default, validation)\n"
+        "    vrg -o json recipe question get ubuntu-server admin_password\n\n"
+        "    # Add a required string question in the `general` section\n"
+        "    vrg recipe question create ubuntu-server \\\n"
+        "      --name hostname --section general --type string \\\n"
+        "      --display 'Hostname' --required\n\n"
+        "    # Add a dropdown with preset options\n"
+        "    vrg recipe question create ubuntu-server \\\n"
+        "      --name tier --section general --type list \\\n"
+        "      --display 'Service Tier' \\\n"
+        "      --list-options 'small=Small,medium=Medium,large=Large'\n\n"
+        "    # Change a question's default value and reorder it\n"
+        "    vrg recipe question update ubuntu-server hostname \\\n"
+        "      --default web-01 --order 10\n\n"
+        "    # Delete a question\n"
+        "    vrg recipe question delete ubuntu-server old_field --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The first argument is always the recipe (name or 40-character hex"
+        " key). Questions are then addressed by their `name` or numeric key."
+        " When a recipe or question name matches multiple records, vrg"
+        " prints the matches and exits with code 7 — use the key to"
+        " disambiguate.\n\n"
+        "`--name` is the scripting variable and must be alpha-numeric (no"
+        " spaces or punctuation). `--display` is the UI label shown to"
+        " users; `--hint` is placeholder text inside the field; `--note`"
+        " renders below the field; `--help-text` is the hover tooltip.\n\n"
+        "`--list-options` takes comma-separated `key=value` pairs — the key"
+        " is stored as the answer, the value is shown in the dropdown."
+        " `--min`/`--max` apply to numeric types, and `--regex` applies a"
+        " validation pattern to string input."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 RECIPE_QUESTION_COLUMNS: list[ColumnDef] = [
@@ -80,7 +135,19 @@ def list_cmd(
         typer.Option("--section", help="Filter by section name or key."),
     ] = None,
 ) -> None:
-    """List questions for a recipe."""
+    """List questions for a recipe.
+
+    Examples:
+
+        vrg recipe question list ubuntu-server
+        vrg recipe question list ubuntu-server --section networking
+        vrg -o json recipe question list ubuntu-server \\
+            | jq '.[] | select(.required) | .name'
+
+    Useful `--query` fields: `name`, `display`, `type`, `required`,
+    `default`, `hint`. Question `name` is the variable used in scripts
+    and cloud-init templates.
+    """
     vctx = get_context(ctx)
     recipe_key = _resolve_recipe(vctx, recipe)
     recipe_ref = f"vm_recipes/{recipe_key}"
@@ -107,7 +174,16 @@ def get_cmd(
     recipe: Annotated[str, typer.Argument(help="Recipe name or key.")],
     question: Annotated[str, typer.Argument(help="Question name or key.")],
 ) -> None:
-    """Get a recipe question by name or key."""
+    """Get a recipe question by name or key.
+
+    Examples:
+
+        vrg recipe question get ubuntu-server hostname
+        vrg -o json recipe question get ubuntu-server admin_password
+
+    Both arguments resolve by name or key. Ambiguous names exit with
+    code 7 — use keys to disambiguate.
+    """
     vctx = get_context(ctx)
     _resolve_recipe(vctx, recipe)  # Validate recipe exists
     question_key = resolve_resource_id(vctx.client.recipe_questions, question, "recipe question")
@@ -155,7 +231,28 @@ def create_cmd(
         typer.Option("--list-options", help="Comma-separated key=value pairs for list type."),
     ] = None,
 ) -> None:
-    """Create a new recipe question."""
+    """Create a new recipe question.
+
+    Examples:
+
+        vrg recipe question create ubuntu-server \\
+            --name hostname --section general --type string \\
+            --display 'Hostname' --required
+
+        vrg recipe question create ubuntu-server \\
+            --name tier --section general --type list \\
+            --display 'Service Tier' \\
+            --list-options 'small=Small,medium=Medium,large=Large'
+
+        vrg recipe question create ubuntu-server \\
+            --name cpu_count --section resources --type num \\
+            --display 'vCPUs' --default 2 --min 1 --max 16
+
+    `--name` is the variable name used by scripts and must be
+    alpha-numeric. `--type` accepts `string`, `bool`, `num`, `password`,
+    `list`, `hidden`, and database-backed types. The recipe must be
+    republished for changes to reach tenants.
+    """
     vctx = get_context(ctx)
     recipe_key = _resolve_recipe(vctx, recipe)
     recipe_ref = f"vm_recipes/{recipe_key}"
@@ -222,7 +319,19 @@ def update_cmd(
     max_value: Annotated[int | None, typer.Option("--max", help="New maximum.")] = None,
     order: Annotated[int | None, typer.Option("--order", help="Display order.")] = None,
 ) -> None:
-    """Update a recipe question."""
+    """Update a recipe question.
+
+    Examples:
+
+        vrg recipe question update ubuntu-server hostname \\
+            --default web-01 --order 10
+        vrg recipe question update ubuntu-server admin_password \\
+            --required
+        vrg recipe question update ubuntu-server cpu_count --min 2 --max 32
+
+    Only flags you pass are changed. Republish the recipe after edits
+    for tenants to see the new question configuration.
+    """
     vctx = get_context(ctx)
     _resolve_recipe(vctx, recipe)  # Validate recipe exists
     question_key = resolve_resource_id(vctx.client.recipe_questions, question, "recipe question")
@@ -270,7 +379,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a recipe question."""
+    """Delete a recipe question.
+
+    Examples:
+
+        vrg recipe question delete ubuntu-server old_field
+        vrg recipe question delete ubuntu-server old_field --yes
+
+    Deployed instances that answered this question keep their stored
+    answer, but new deploys will no longer prompt for it. Republish the
+    recipe after deletion.
+    """
     vctx = get_context(ctx)
     _resolve_recipe(vctx, recipe)  # Validate recipe exists
     question_key = resolve_resource_id(vctx.client.recipe_questions, question, "recipe question")

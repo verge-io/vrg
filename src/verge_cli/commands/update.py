@@ -20,8 +20,67 @@ from verge_cli.output import output_result, output_success
 
 app = typer.Typer(
     name="update",
-    help="Manage system updates.",
+    help=(
+        "Manage VergeOS system updates.\n\n"
+        "VergeOS delivers OS and package updates through a pipeline of"
+        " **update sources** (remote servers) → **update branches**"
+        " (release trains like `stable` or `beta`) → **update packages**"
+        " (individual `ybpkg` units). The system runs on A/B boot slots:"
+        " the running OS uses the `active` slot while updates write to the"
+        " `backup` slot. A reboot switches slots atomically, and the"
+        " previous slot remains available for rollback via the boot menu.\n\n"
+        "The full cycle is **check → download → install → reboot**. Use"
+        " `vrg update apply` to run all four in one step, or use the"
+        " individual `check`, `download`, and `install` commands for finer"
+        " control. Use `vrg update status` for a dashboard snapshot and"
+        " `vrg update settings` to inspect the singleton configuration.\n\n"
+        "Subresources have their own groups: `vrg update source`,"
+        " `vrg update branch`, `vrg update package`, `vrg update available`,"
+        " and `vrg update log`.\n\n"
+        "Use `-o json` on any command for structured output. Useful fields"
+        " to `--query`: `installed`, `reboot_required`, `applying_updates`,"
+        " `source`, `branch`, `update_time`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Check for available updates\n"
+        "    vrg update available list\n\n"
+        "    # View configured sources and branches\n"
+        "    vrg update source list\n"
+        "    vrg update branch list\n\n"
+        "    # View installed packages\n"
+        "    vrg update package list\n\n"
+        "    # View update history\n"
+        "    vrg update log list\n\n"
+        "    # Dashboard summary as JSON\n"
+        "    vrg -o json update status\n\n"
+        "    # Inspect current update settings\n"
+        "    vrg update settings\n\n"
+        "    # Enable pre-update cloud snapshot with 24h retention\n"
+        "    vrg update configure --snapshot-on-update \\\n"
+        "        --snapshot-expire 86400\n\n"
+        "    # Run the full pipeline (check + download + install)\n"
+        "    vrg update apply --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Updates are atomic via A/B boot slots. The new kernel and initrd"
+        " are written to the `backup` slot; a reboot promotes them to"
+        " `active`. If the update fails to boot, select **Verge.io OS"
+        " Previous** from the GRUB/SYSLINUX menu to roll back.\n\n"
+        "Always take a cloud snapshot before applying updates. Enable"
+        " `--snapshot-on-update` in `vrg update configure` to automate this."
+        " The default 6-hour snapshot retention may be too short for"
+        " production validation — consider `--snapshot-expire 86400` (24h)"
+        " or longer.\n\n"
+        "`auto_refresh = false` automatically disables `auto_update`. Both"
+        " must be `true` for fully automated updates. The `max_vsan_usage`"
+        " threshold (default 80%) blocks auto-updates when vSAN is under"
+        " storage pressure.\n\n"
+        "`warm_reboot = true` uses `kexec` to skip the firmware cycle for"
+        " faster reboots, but is hardware-dependent. Use `false` for a"
+        " standard BIOS/EFI reboot if kexec causes issues."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Register sub-commands
@@ -100,7 +159,18 @@ def _settings_to_dict(settings: Any) -> dict[str, Any]:
 @app.command("settings")
 @handle_errors()
 def settings_cmd(ctx: typer.Context) -> None:
-    """Display current update settings."""
+    """Display current update settings.
+
+    Examples:
+
+        vrg update settings
+        vrg -o json update settings
+        vrg -o json update settings --query "{src:source,branch:branch,auto:auto_update}"
+
+    Useful `--query` fields: `source`, `branch`, `auto_refresh`,
+    `auto_update`, `auto_reboot`, `installed`, `reboot_required`,
+    `applying_updates`, `max_vsan_usage`.
+    """
     vctx = get_context(ctx)
     settings = vctx.client.update_settings.get()
     output_result(
@@ -183,7 +253,20 @@ def configure_cmd(
         typer.Option("--password", help="Update server password (for licensing)."),
     ] = None,
 ) -> None:
-    """Configure update settings."""
+    """Configure update settings.
+
+    Examples:
+
+        vrg update configure --source 1 --branch 2
+        vrg update configure --auto-refresh --auto-update --update-time 03:00
+        vrg update configure --snapshot-on-update --snapshot-expire 86400
+        vrg update configure --no-warm-reboot --max-vsan-usage 75
+
+    Only the flags you pass are changed — every other setting is left
+    alone. `--auto-refresh/--no-auto-refresh` disables `auto_update`
+    when refresh is off. Use `--user`/`--password` to set licensing
+    credentials against the configured update server.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if source is not None:
@@ -229,7 +312,17 @@ def configure_cmd(
 @app.command("check")
 @handle_errors()
 def check_cmd(ctx: typer.Context) -> None:
-    """Check for available updates."""
+    """Check for available updates.
+
+    Examples:
+
+        vrg update check
+        vrg -o json update check
+
+    Queries the active update source for the selected branch and
+    refreshes the candidate list visible through `vrg update available
+    list`. Does not download or install anything.
+    """
     vctx = get_context(ctx)
     result = vctx.client.update_settings.check()
     if result:
@@ -246,7 +339,18 @@ def check_cmd(ctx: typer.Context) -> None:
 @app.command("download")
 @handle_errors()
 def download_cmd(ctx: typer.Context) -> None:
-    """Download available updates."""
+    """Download available updates.
+
+    Examples:
+
+        vrg update download
+        vrg -o json update download
+
+    Pulls the ybpkg binaries for every candidate package reported by
+    the last `vrg update check` to local storage. Run
+    `vrg update install` afterwards to apply them, or use
+    `vrg update apply` for the full pipeline in one step.
+    """
     vctx = get_context(ctx)
     result = vctx.client.update_settings.download()
     if result:
@@ -269,7 +373,19 @@ def install_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Install downloaded updates."""
+    """Install downloaded updates.
+
+    Examples:
+
+        vrg update install
+        vrg update install --yes
+
+    Destructive: writes the new OS payload to the `backup` boot slot
+    and stages a reboot. Confirm before running in production — the
+    reboot promotes the new slot to `active` and unaffected nodes fall
+    back on failure. Take a cloud snapshot first, or enable
+    `snapshot_on_update` via `vrg update configure`.
+    """
     from verge_cli.utils import confirm_action
 
     vctx = get_context(ctx)
@@ -300,7 +416,19 @@ def apply_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Check, download, and install updates in one step."""
+    """Check, download, and install updates in one step.
+
+    Examples:
+
+        vrg update apply --yes
+        vrg update apply --force --yes
+
+    Destructive: runs `check` → `download` → `install` end-to-end and
+    may reboot nodes to promote the new boot slot. `--force` reruns the
+    pipeline even when the system already reports as up to date. Take a
+    cloud snapshot before applying to production, or configure
+    `snapshot_on_update` so the system does it for you.
+    """
     from verge_cli.utils import confirm_action
 
     vctx = get_context(ctx)
@@ -351,7 +479,18 @@ def _dashboard_to_dict(dashboard: Any) -> dict[str, Any]:
 @app.command("status")
 @handle_errors()
 def status_cmd(ctx: typer.Context) -> None:
-    """Display the update dashboard summary."""
+    """Display the update dashboard summary.
+
+    Examples:
+
+        vrg update status
+        vrg -o json update status
+        vrg -o wide update status
+
+    Shows node, event, and task counts for the update subsystem. Pair
+    with `vrg update log list --level error` to investigate failures
+    surfaced by the counters.
+    """
     vctx = get_context(ctx)
     dashboard = vctx.client.update_dashboard.get()
     output_result(

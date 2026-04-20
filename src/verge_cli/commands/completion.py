@@ -7,7 +7,35 @@ from typer._completion_shared import Shells, get_completion_script
 
 SHELL_NAMES = {s.value for s in Shells}
 
-app = typer.Typer(help="Generate shell completion scripts.")
+app = typer.Typer(
+    name="completion",
+    rich_markup_mode="markdown",
+    help=(
+        "Emit shell completion scripts for `vrg`.\n\n"
+        "Prints a shell-specific script to stdout that, once sourced by"
+        " your shell, enables tab completion for commands, options, and"
+        " arguments. Supported shells: bash, zsh, fish, powershell.\n\n"
+        "This is a utility group — no API calls, no profile needed, and"
+        " no structured output. Agents don't typically need this; it's"
+        " for interactive humans tuning their shell. Scripts go to stdout"
+        " so you redirect them yourself.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # bash\n"
+        "    vrg completion show bash >> ~/.bashrc\n\n"
+        "    # zsh (into your fpath)\n"
+        '    vrg completion show zsh > "${fpath[1]}/_vrg"\n\n'
+        "    # fish\n"
+        "    vrg completion show fish > ~/.config/fish/completions/vrg.fish\n\n"
+        "    # PowerShell\n"
+        "    vrg completion show powershell >> $PROFILE\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Passing an unknown shell exits with code 2 (usage). Reload your"
+        " shell (or `source` the rc file) after installing the script."
+    ),
+    no_args_is_help=True,
+)
 
 
 @app.command("show")
@@ -25,6 +53,8 @@ def show(
         vrg completion show fish > ~/.config/fish/completions/vrg.fish
 
         vrg completion show powershell >> $PROFILE
+
+    Exits with code 2 if the shell name is unknown.
     """
     shell_lower = shell.lower()
     if shell_lower not in SHELL_NAMES:

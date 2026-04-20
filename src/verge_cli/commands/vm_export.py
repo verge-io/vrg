@@ -15,8 +15,28 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="export",
-    help="Manage VM exports.",
+    help=(
+        "Manage VM export configurations and jobs.\n\n"
+        "VM exports create portable copies of VMs from a vSAN volume. An"
+        " export configuration defines which volume to export from and how"
+        " many exports to retain. Use `start` to kick off an export job and"
+        " `stats` to monitor progress.\n\n"
+        "Use `-o json` for structured output.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg vm export list\n\n"
+        "    vrg vm export create --volume 5 --quiesced\n\n"
+        "    vrg vm export start my-export --name nightly-2026-04-16\n\n"
+        "    vrg vm export stop my-export\n\n"
+        "    vrg vm export cleanup my-export\n\n"
+        "    vrg vm export delete my-export --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Export jobs run asynchronously. Use `vrg vm export stats` to check"
+        " progress and status of export runs."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 app.add_typer(vm_export_stats.app, name="stats")
@@ -49,7 +69,13 @@ def _export_to_dict(exp: Any) -> dict[str, Any]:
 def list_cmd(
     ctx: typer.Context,
 ) -> None:
-    """List VM exports."""
+    """List VM export configurations.
+
+    **Examples:**
+
+        vrg vm export list
+        vrg -o json vm export list
+    """
     vctx = get_context(ctx)
     exports = vctx.client.volume_vm_exports.list()
     data = [_export_to_dict(e) for e in exports]
@@ -69,7 +95,13 @@ def get_cmd(
     ctx: typer.Context,
     export: Annotated[str, typer.Argument(help="VM export name or key.")],
 ) -> None:
-    """Get a VM export by name or key."""
+    """Get a VM export configuration by name or key.
+
+    **Examples:**
+
+        vrg vm export get my-export
+        vrg -o json vm export get 42
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.volume_vm_exports, export, "VM export")
     item = vctx.client.volume_vm_exports.get(key=key)
@@ -104,7 +136,13 @@ def create_cmd(
         typer.Option("--max-exports", help="Maximum number of exports to retain."),
     ] = None,
 ) -> None:
-    """Create a new VM export configuration."""
+    """Create a new VM export configuration.
+
+    **Examples:**
+
+        vrg vm export create --volume 5
+        vrg vm export create --volume 5 --quiesced --max-exports 7
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {
         "volume": volume,
@@ -139,7 +177,16 @@ def start_cmd(
         typer.Option("--vms", help="Comma-separated list of VM keys to export."),
     ] = None,
 ) -> None:
-    """Start a VM export job."""
+    """Start a VM export job.
+
+    Runs asynchronously. Use `vrg vm export stats` to monitor progress.
+
+    **Examples:**
+
+        vrg vm export start my-export
+        vrg vm export start my-export --name nightly-2026-04-16
+        vrg vm export start my-export --vms 1,2,3
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.volume_vm_exports, export, "VM export")
     kwargs: dict[str, Any] = {}
@@ -157,7 +204,12 @@ def stop_cmd(
     ctx: typer.Context,
     export: Annotated[str, typer.Argument(help="VM export name or key.")],
 ) -> None:
-    """Stop a running VM export job."""
+    """Stop a running VM export job.
+
+    **Examples:**
+
+        vrg vm export stop my-export
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.volume_vm_exports, export, "VM export")
     vctx.client.volume_vm_exports.stop_export(int(key))
@@ -174,7 +226,13 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a VM export configuration."""
+    """Delete a VM export configuration.
+
+    **Examples:**
+
+        vrg vm export delete my-export
+        vrg vm export delete my-export --yes
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.volume_vm_exports, export, "VM export")
     if not confirm_action(f"Delete VM export '{export}'?", yes=yes):
@@ -189,7 +247,15 @@ def cleanup_cmd(
     ctx: typer.Context,
     export: Annotated[str, typer.Argument(help="VM export name or key.")],
 ) -> None:
-    """Clean up exported files for a VM export."""
+    """Clean up exported files for a VM export.
+
+    Removes the exported files from storage without deleting the
+    export configuration itself.
+
+    **Examples:**
+
+        vrg vm export cleanup my-export
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.volume_vm_exports, export, "VM export")
     vctx.client.volume_vm_exports.cleanup_exports(int(key))

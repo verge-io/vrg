@@ -14,8 +14,47 @@ from verge_cli.utils import confirm_action, resolve_nas_resource, resolve_resour
 
 app = typer.Typer(
     name="section",
-    help="Manage recipe sections.",
+    help=(
+        "Manage VM recipe sections — the logical groupings that arrange"
+        " recipe questions on the deployment form.\n\n"
+        "A **section** is a labeled container for recipe questions. When a"
+        " user deploys a recipe, questions appear on the form grouped by"
+        " section, which keeps long question lists organized (for example:"
+        " Networking, Credentials, Storage). VergeOS creates some sections"
+        " automatically — additional sections can be added for"
+        " recipe-specific questions.\n\n"
+        "Sections are scoped to a single recipe and are ordered by the"
+        " `orderid` field. Deleting a section cascades to every question"
+        " inside it, so move questions to another section first if you want"
+        " to keep them.\n\n"
+        "After editing sections, the parent recipe must be republished"
+        " before remote systems and tenants see the changes. See"
+        " `vrg recipe republish`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List sections on a recipe\n"
+        "    vrg recipe section list ubuntu-server\n\n"
+        "    # Inspect a section as JSON\n"
+        "    vrg -o json recipe section get ubuntu-server networking\n\n"
+        "    # Create a new section\n"
+        "    vrg recipe section create ubuntu-server \\\n"
+        "      --name credentials --description 'Admin account settings'\n\n"
+        "    # Rename a section and move it up in the form\n"
+        "    vrg recipe section update ubuntu-server credentials \\\n"
+        "      --name admin --order 10\n\n"
+        "    # Delete a section (cascades to its questions)\n"
+        "    vrg recipe section delete ubuntu-server old-section --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The first argument is always the recipe (name or 40-character hex"
+        " key). Sections are then addressed by their `name` or numeric key."
+        " When a recipe or section name matches multiple records, vrg prints"
+        " the matches and exits with code 7 — use the key to disambiguate.\n\n"
+        "`delete` removes the section and every question inside it."
+        " Confirmation is required unless `--yes` is supplied."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 RECIPE_SECTION_COLUMNS: list[ColumnDef] = [
@@ -51,7 +90,17 @@ def list_cmd(
     ctx: typer.Context,
     recipe: Annotated[str, typer.Argument(help="Recipe name or key.")],
 ) -> None:
-    """List sections for a recipe."""
+    """List sections for a recipe.
+
+    Examples:
+
+        vrg recipe section list ubuntu-server
+        vrg -o json recipe section list ubuntu-server \\
+            --query "sort_by(@, &orderid)[].name"
+
+    Useful `--query` fields: `name`, `description`, `orderid`. Sections
+    are presented in `orderid` order on the deployment form.
+    """
     vctx = get_context(ctx)
     recipe_key = _resolve_recipe(vctx, recipe)
     recipe_ref = f"vm_recipes/{recipe_key}"
@@ -74,7 +123,16 @@ def get_cmd(
     recipe: Annotated[str, typer.Argument(help="Recipe name or key.")],
     section: Annotated[str, typer.Argument(help="Section name or key.")],
 ) -> None:
-    """Get a recipe section by name or key."""
+    """Get a recipe section by name or key.
+
+    Examples:
+
+        vrg recipe section get ubuntu-server networking
+        vrg -o json recipe section get ubuntu-server 42
+
+    Both arguments resolve by name or key. Ambiguous names exit with
+    code 7 — use keys to disambiguate.
+    """
     vctx = get_context(ctx)
     _resolve_recipe(vctx, recipe)  # Validate recipe exists
     section_key = resolve_resource_id(vctx.client.recipe_sections, section, "recipe section")
@@ -100,7 +158,18 @@ def create_cmd(
         typer.Option("--description", "-d", help="Section description."),
     ] = None,
 ) -> None:
-    """Create a new recipe section."""
+    """Create a new recipe section.
+
+    Examples:
+
+        vrg recipe section create ubuntu-server --name credentials
+        vrg recipe section create ubuntu-server \\
+            --name credentials --description 'Admin account settings'
+
+    Add questions to the new section with `vrg recipe question create
+    <recipe> --section <name>`. Republish the recipe for tenants to see
+    the section on their deploy form.
+    """
     vctx = get_context(ctx)
     recipe_key = _resolve_recipe(vctx, recipe)
     recipe_ref = f"vm_recipes/{recipe_key}"
@@ -142,7 +211,18 @@ def update_cmd(
         typer.Option("--order", help="Display order."),
     ] = None,
 ) -> None:
-    """Update a recipe section."""
+    """Update a recipe section.
+
+    Examples:
+
+        vrg recipe section update ubuntu-server credentials --name admin
+        vrg recipe section update ubuntu-server networking --order 10
+        vrg recipe section update ubuntu-server storage \\
+            --description 'Disk and volume configuration'
+
+    Only flags you pass are changed. Lower `--order` values appear
+    higher on the deployment form.
+    """
     vctx = get_context(ctx)
     _resolve_recipe(vctx, recipe)  # Validate recipe exists
     section_key = resolve_resource_id(vctx.client.recipe_sections, section, "recipe section")
@@ -176,7 +256,17 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a recipe section (cascades to questions)."""
+    """Delete a recipe section (cascades to questions).
+
+    Examples:
+
+        vrg recipe section delete ubuntu-server old-section
+        vrg recipe section delete ubuntu-server old-section --yes
+
+    Deleting a section also deletes every question inside it. Move
+    questions to another section first if you want to keep them.
+    Confirmation is required unless `--yes` is supplied.
+    """
     vctx = get_context(ctx)
     _resolve_recipe(vctx, recipe)  # Validate recipe exists
     section_key = resolve_resource_id(vctx.client.recipe_sections, section, "recipe section")

@@ -14,7 +14,53 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="period",
-    help="Manage snapshot profile periods.",
+    help=(
+        "Manage the schedule entries inside a snapshot profile.\n\n"
+        "A **period** is a single scheduled rule on a parent"
+        " [snapshot profile](#) — it fires snapshots at a given frequency"
+        " and controls how long those snapshots are kept. A profile with"
+        " no periods never fires, so periods are where the actual cadence"
+        " and retention live. Frequencies are `hourly`, `daily`, `weekly`,"
+        " `monthly`, or `yearly`; `retention` is expressed in seconds"
+        " (e.g., 86400 for 1 day). Fields ignored by lower frequencies"
+        " (e.g., `hour` on an hourly period) are forced to defaults.\n\n"
+        "Every command takes the parent profile as its first argument"
+        " (name or numeric key). Pair any `list` or `get` with `-o json`"
+        " for structured output; useful fields to `--query`: `name`,"
+        " `frequency`, `retention`, `min_snapshots`, `max_tier`,"
+        " `quiesce`, `immutable`. Period name resolution on `get`,"
+        " `update`, and `delete` raises exit code 7 when a name matches"
+        " more than one period — use the numeric `$key` in that case.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List periods on the default system profile\n"
+        "    vrg snapshot profile period list System\\ Snapshots\n\n"
+        "    # Inspect a single period as JSON\n"
+        "    vrg -o json snapshot profile period get webservers Hourly\n\n"
+        "    # Add an hourly period: fires at :00, keeps for 24h, keeps >=2\n"
+        "    vrg snapshot profile period create webservers \\\n"
+        "      --name Hourly --frequency hourly --retention 86400 \\\n"
+        "      --min-snapshots 2\n\n"
+        "    # Add a weekly period on Sunday at 03:00, retained 30 days\n"
+        "    vrg snapshot profile period create webservers \\\n"
+        "      --name Weekly --frequency weekly --retention 2592000 \\\n"
+        "      --day-of-week sun --hour 3 --minute 0\n\n"
+        "    # Toggle quiesce (application-consistent VM snapshots)\n"
+        "    vrg snapshot profile period update webservers Daily --quiesce\n\n"
+        "    # Remove a period\n"
+        "    vrg snapshot profile period delete webservers Hourly --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`quiesce` and `max_tier` apply only to VM and NAS volume"
+        " snapshots — they are ignored on system (cloud) snapshot"
+        " profiles. `immutable` applies only to system snapshot periods."
+        " `quiesce` requires the VergeOS guest agent inside the VM; when"
+        " the agent is absent the snapshot proceeds as crash-consistent."
+        " `min_snapshots` overrides `retention` — the minimum count is"
+        " kept even after expiration. Deleting a period stops future"
+        " firings but does not delete snapshots already created by it."
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
@@ -70,7 +116,16 @@ def period_list(
     ctx: typer.Context,
     profile: Annotated[str, typer.Argument(help="Profile name or key")],
 ) -> None:
-    """List periods for a snapshot profile."""
+    """List periods for a snapshot profile.
+
+    Examples:
+
+        vrg snapshot profile period list webservers
+        vrg -o json snapshot profile period list System\\ Snapshots
+        vrg -o json snapshot profile period list webservers --query "[].{name: name, freq: frequency}"
+
+    Resolves `profile` by name or numeric key. Ambiguous names exit 7.
+    """
     vctx, profile_key = _get_profile(ctx, profile)
     periods = vctx.client.snapshot_profiles.periods(profile_key).list()
     data = [_period_to_dict(p) for p in periods]
@@ -91,7 +146,18 @@ def period_get(
     profile: Annotated[str, typer.Argument(help="Profile name or key")],
     period: Annotated[str, typer.Argument(help="Period name or key")],
 ) -> None:
-    """Get details of a snapshot profile period."""
+    """Get details of a snapshot profile period.
+
+    Examples:
+
+        vrg snapshot profile period get webservers Hourly
+        vrg -o json snapshot profile period get webservers Weekly
+        vrg -o json snapshot profile period get webservers 12 --query "retention"
+
+    Both `profile` and `period` resolve by name or numeric key. If a
+    period name matches more than one entry, the command exits 7 — pass
+    the numeric `$key` to disambiguate.
+    """
     vctx, profile_key = _get_profile(ctx, profile)
     period_mgr = vctx.client.snapshot_profiles.periods(profile_key)
     period_key = _resolve_period(period_mgr, period)
@@ -153,7 +219,29 @@ def period_create(
         typer.Option("--skip-missed", help="Skip missed snapshot windows"),
     ] = False,
 ) -> None:
-    """Create a period in a snapshot profile."""
+    """Create a period in a snapshot profile.
+
+    Examples:
+
+        # Hourly firing at :00, retained 24h, keep at least 2
+        vrg snapshot profile period create webservers \\
+          --name Hourly --frequency hourly --retention 86400 --min-snapshots 2
+
+        # Weekly Sunday at 03:00, retained 30 days
+        vrg snapshot profile period create webservers \\
+          --name Weekly --frequency weekly --retention 2592000 \\
+          --day-of-week sun --hour 3 --minute 0
+
+        # Monthly immutable period on the 1st at 04:00
+        vrg snapshot profile period create compliance \\
+          --name Monthly --frequency monthly --retention 31536000 \\
+          --day-of-month 1 --hour 4 --immutable
+
+    `retention` is in seconds (0 = never expires). `quiesce` and
+    `max_tier` apply only to VM / NAS volume snapshot profiles;
+    `immutable` applies only to system snapshot profiles. Fields that
+    don't apply to the chosen frequency are forced to defaults.
+    """
     vctx, profile_key = _get_profile(ctx, profile)
     period_mgr = vctx.client.snapshot_profiles.periods(profile_key)
 
@@ -228,7 +316,24 @@ def period_update(
         typer.Option("--skip-missed/--no-skip-missed", help="Skip missed windows"),
     ] = None,
 ) -> None:
-    """Update a snapshot profile period."""
+    """Update a snapshot profile period.
+
+    Examples:
+
+        # Enable quiesce on an existing daily period
+        vrg snapshot profile period update webservers Daily --quiesce
+
+        # Extend retention to 60 days
+        vrg snapshot profile period update webservers Weekly --retention 5184000
+
+        # Move the weekly period to Saturday at 02:30
+        vrg snapshot profile period update webservers Weekly \\
+          --day-of-week sat --hour 2 --minute 30
+
+    Only fields supplied are updated. If no options are given the command
+    exits 2. Period name collisions exit 7 — use the numeric `$key` to
+    disambiguate.
+    """
     vctx, profile_key = _get_profile(ctx, profile)
     period_mgr = vctx.client.snapshot_profiles.periods(profile_key)
     period_key = _resolve_period(period_mgr, period)
@@ -275,7 +380,17 @@ def period_delete(
     period: Annotated[str, typer.Argument(help="Period name or key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a snapshot profile period."""
+    """Delete a snapshot profile period.
+
+    Examples:
+
+        vrg snapshot profile period delete webservers Hourly --yes
+        vrg snapshot profile period delete webservers 12
+
+    This is a destructive operation. Deleting a period stops future
+    firings but does not delete snapshots already captured by it.
+    Ambiguous period names exit 7.
+    """
     vctx, profile_key = _get_profile(ctx, profile)
     period_mgr = vctx.client.snapshot_profiles.periods(profile_key)
     period_key = _resolve_period(period_mgr, period)

@@ -14,8 +14,67 @@ from verge_cli.utils import confirm_action, resolve_nas_resource, resolve_resour
 
 app = typer.Typer(
     name="volume",
-    help="Manage NAS volumes.",
+    help=(
+        "Manage NAS volumes — the filesystems hosted by a NAS service VM.\n\n"
+        "A volume is a filesystem entity scoped to exactly one NAS service."
+        " Block storage is backed by the vSAN; the NAS service VM mounts it,"
+        " runs the filesystem driver, and exposes it through CIFS/SMB or NFS"
+        " shares. Volumes are thin-provisioned: `maxsize` is the logical"
+        " ceiling, actual vSAN consumption grows as data is written.\n\n"
+        "Filesystem type (`fs_type`) and `encrypt` are set at creation and are"
+        " **immutable** afterwards. Supported types include `ext4` (default,"
+        " general purpose), `ybfsv2` (VergeOS-native distributed), and remote"
+        " `cifs` / `nfs` mounts. Encryption uses AES-XTS and requires the"
+        " passphrase every time the volume is brought online — lose it and the"
+        " data is unrecoverable.\n\n"
+        "Storage tier (`--tier`, 1-5) is advisory: the vSAN attempts the"
+        " preferred tier first and falls back if capacity is unavailable."
+        " Snapshot profiles automate copy-on-write snapshots; attach one at"
+        " creation or via `update`.\n\n"
+        "Volumes are referenced by name or hex `$key`. Ambiguous names exit"
+        " with code 7 — disambiguate with the key. Use `-o json` for"
+        " machine-readable output.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List volumes, optionally scoped to a service\n"
+        "    vrg nas volume list\n"
+        "    vrg nas volume list --service my-nas\n"
+        "    vrg nas volume list --service my-nas --fs-type ext4\n\n"
+        "    # Get one volume as JSON for scripting / agents\n"
+        "    vrg -o json nas volume get shared-data\n\n"
+        "    # Create a 100 GB ext4 volume on tier 2\n"
+        "    vrg nas volume create \\\n"
+        "        --service my-nas --name shared-data \\\n"
+        "        --size-gb 100 --tier 2\n\n"
+        "    # Attach a snapshot profile and mark read-only\n"
+        "    vrg nas volume update shared-data \\\n"
+        "        --snapshot-profile nightly --read-only\n\n"
+        "    # Lifecycle — enable/disable/reset\n"
+        "    vrg nas volume disable shared-data\n"
+        "    vrg nas volume enable shared-data\n"
+        "    vrg nas volume reset shared-data\n\n"
+        "    # Delete a volume (irreversible — also deletes all shares and snapshots)\n"
+        "    vrg nas volume delete shared-data --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The parent NAS service VM **must be running** for a volume to mount"
+        " and serve I/O. Starting a stopped service transitions its volumes"
+        " through `initializing` → `online`; use `vrg nas service start` to"
+        " bring the service up first.\n\n"
+        "Volumes are **bound to a NAS service at creation** and cannot be"
+        " migrated to a different service. `fs_type` and `encrypt` are likewise"
+        " fixed at creation. Plan these choices up front.\n\n"
+        "Deleting a volume is **irreversible** and cascade-deletes every"
+        " child: all CIFS and NFS shares on the volume, all volume snapshots"
+        " (including COW shadow volumes), antivirus config and stats, and any"
+        " VM exports. Snapshot or verify backups first.\n\n"
+        "`disable` cleanly unmounts the filesystem — disconnect NFS/CIFS"
+        " clients before disabling. `reset` clears error conditions on a stuck"
+        " volume. Volume snapshots are managed under `vrg nas volume snapshot`;"
+        " remote-target sync is under `vrg nas sync`."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 NAS_VOLUME_COLUMNS: list[ColumnDef] = [
@@ -70,7 +129,15 @@ def list_cmd(
         typer.Option("--fs-type", help="Filter by filesystem type (ext4, cifs, nfs, ybfs)"),
     ] = None,
 ) -> None:
-    """List all NAS volumes."""
+    """List all NAS volumes.
+
+    **Examples:**
+
+        vrg nas volume list
+        vrg nas volume list --service my-nas
+        vrg nas volume list --fs-type ext4
+        vrg -o json nas volume list --service my-nas
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if service is not None:
@@ -101,7 +168,13 @@ def get_cmd(
     ctx: typer.Context,
     volume: Annotated[str, typer.Argument(help="NAS volume name or hex key")],
 ) -> None:
-    """Get details of a NAS volume."""
+    """Get details of a NAS volume.
+
+    **Examples:**
+
+        vrg nas volume get shared-data
+        vrg -o json nas volume get shared-data
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_volumes, volume, "NAS volume")
     item = vctx.client.nas_volumes.get(key)
@@ -136,7 +209,19 @@ def create_cmd(
         str | None, typer.Option("--snapshot-profile", help="Snapshot profile name or key")
     ] = None,
 ) -> None:
-    """Create a new NAS volume."""
+    """Create a new NAS volume.
+
+    A volume is a filesystem on the NAS service (default `ext4`). Volumes
+    are bound to one service and cannot be migrated. `fs_type` and
+    `encrypt` flags are immutable after creation.
+
+    **Examples:**
+
+        vrg nas volume create --service my-nas --name shared-data --size-gb 100
+        vrg nas volume create --service my-nas --name archive --size-gb 500 --tier 3
+        vrg nas volume create --service my-nas --name media --size-gb 2000 \\
+            --snapshot-profile nightly
+    """
     vctx = get_context(ctx)
 
     # Resolve service - SDK accepts int or str for service
@@ -211,7 +296,17 @@ def update_cmd(
         ),
     ] = None,
 ) -> None:
-    """Update NAS volume settings."""
+    """Update NAS volume settings.
+
+    Volumes can be grown with `--size-gb` but not shrunk. Assigning a
+    `--snapshot-profile` replaces any existing profile.
+
+    **Examples:**
+
+        vrg nas volume update shared-data --size-gb 200
+        vrg nas volume update shared-data --read-only
+        vrg nas volume update shared-data --snapshot-profile nightly --automount-snapshots
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_volumes, volume, "NAS volume")
 
@@ -250,7 +345,16 @@ def delete_cmd(
     volume: Annotated[str, typer.Argument(help="NAS volume name or hex key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete a NAS volume."""
+    """Delete a NAS volume.
+
+    Destroys the filesystem and all data on it. Shares bound to the
+    volume are removed. Prompts before acting unless `--yes` is passed.
+
+    **Examples:**
+
+        vrg nas volume delete shared-data
+        vrg nas volume delete shared-data --yes
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_volumes, volume, "NAS volume")
 
@@ -268,7 +372,15 @@ def enable_cmd(
     ctx: typer.Context,
     volume: Annotated[str, typer.Argument(help="NAS volume name or hex key")],
 ) -> None:
-    """Enable a NAS volume."""
+    """Enable a NAS volume.
+
+    Mounts the volume on the NAS service so its shares can serve
+    traffic.
+
+    **Examples:**
+
+        vrg nas volume enable shared-data
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_volumes, volume, "NAS volume")
     vctx.client.nas_volumes.enable(key)
@@ -281,7 +393,15 @@ def disable_cmd(
     ctx: typer.Context,
     volume: Annotated[str, typer.Argument(help="NAS volume name or hex key")],
 ) -> None:
-    """Disable a NAS volume."""
+    """Disable a NAS volume.
+
+    Unmounts the volume — its CIFS and NFS shares stop serving until
+    the volume is re-enabled.
+
+    **Examples:**
+
+        vrg nas volume disable shared-data
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_volumes, volume, "NAS volume")
     vctx.client.nas_volumes.disable(key)
@@ -294,7 +414,15 @@ def reset_cmd(
     ctx: typer.Context,
     volume: Annotated[str, typer.Argument(help="NAS volume name or hex key")],
 ) -> None:
-    """Reset a NAS volume to recover from error state."""
+    """Reset a NAS volume to recover from error state.
+
+    Use when a volume shows an error status and needs to be re-mounted
+    by the service.
+
+    **Examples:**
+
+        vrg nas volume reset shared-data
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nas_volumes, volume, "NAS volume")
     vctx.client.nas_volumes.reset(key)

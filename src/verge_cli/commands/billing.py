@@ -10,12 +10,53 @@ import typer
 from verge_cli.columns import ColumnDef, format_epoch
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action
 
 app = typer.Typer(
     name="billing",
-    help="Billing and usage reports.",
+    rich_markup_mode="markdown",
+    help=(
+        "Cluster resource-usage snapshots for chargeback and capacity"
+        " tracking.\n\n"
+        "Billing records are time-series snapshots of how much of the"
+        " cluster is currently allocated: vCPU cores, RAM, vSAN tier"
+        " usage, GPU/vGPU allocation, online node count, and running"
+        " VM/container count. They are produced periodically by the"
+        " platform and retained up to 100,000 rows. Service providers"
+        " use them to meter consumption and drive chargeback; operators"
+        " use them for capacity trending.\n\n"
+        "Use `-o json` for machine-readable output, `-o wide` to include"
+        " storage and online-node columns, and `--query` to pluck"
+        " specific fields (e.g., `--query '[].{k:$key,cores:used_cores,"
+        "ram:used_ram_gb,vms:running_machines}'`). Records are identified"
+        " only by numeric `$key` — there are no names to resolve.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # Most recent snapshot\n"
+        "    vrg billing latest\n\n"
+        "    # Full table, wide columns, JSON for agents\n"
+        "    vrg billing list\n"
+        "    vrg -o wide billing list\n"
+        "    vrg -o json billing list --limit 50\n\n"
+        "    # Narrow to a date window (ISO format)\n"
+        "    vrg billing list --since 2026-01-01 --until 2026-02-01\n\n"
+        "    # Fetch a specific record by key\n"
+        "    vrg billing get 4217\n\n"
+        "    # Aggregate summary (avg/peak CPU, RAM, storage)\n"
+        "    vrg billing summary --since 2026-01-01\n\n"
+        "    # Force an out-of-cycle snapshot\n"
+        "    vrg billing generate --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`generate` triggers the `/api/v4/billing_actions` endpoint to"
+        " create a new record on demand; it is not normally needed since"
+        " records are produced on a schedule. `--since` / `--until`"
+        " accept `YYYY-MM-DD` or full ISO (`2026-01-01T00:00:00`)."
+        " This group is cluster-scoped — per-tenant usage reporting"
+        " lives under `vrg tenant stats`."
+    ),
     no_args_is_help=True,
 )
 
@@ -130,6 +171,9 @@ def list_cmd(
     ] = None,
 ) -> None:
     """List billing records."""
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(ctx, lambda c: c.billing.list(), _billing_to_dict, BILLING_COLUMNS)
+        return
     vctx = get_context(ctx)
 
     kwargs: dict[str, Any] = {}

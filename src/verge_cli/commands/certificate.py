@@ -10,13 +10,66 @@ import typer
 from verge_cli.columns import CERTIFICATE_COLUMNS
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action
 
 app = typer.Typer(
     name="certificate",
-    help="Manage TLS/SSL certificates.",
+    help=(
+        "Manage TLS/SSL certificates on VergeOS.\n\n"
+        "Certificates secure the VergeOS web UI and API — every system runs"
+        " HTTPS and must be configured with at least one certificate. VergeOS"
+        " supports three types: **self-signed** (auto-generated on install,"
+        " kept for local console fallback on the `Verge-API` interface),"
+        " **letsencrypt** (ACME-based, requires a publicly resolvable domain"
+        " and auto-renews), and **manual** (uploaded PEM files from any"
+        " CA). Since v26, a system may carry multiple certificates bound to"
+        " different listeners.\n\n"
+        "Certificates are referenced by numeric `$key` or by **domain**"
+        " — there is no separate `name` field. Use `-o json` for parsing;"
+        " useful fields for `--query` include `$key`, `domain`, `type`,"
+        " `valid`, and `days_until_expiry`. The `expires` field is a Unix"
+        " epoch. Two or more certificates sharing a domain raise exit"
+        " code 7 (multiple matches) on `get`, `update`, `delete`, and"
+        " `renew` — disambiguate by numeric `$key`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every certificate\n"
+        "    vrg certificate list\n\n"
+        "    # Machine-readable output for agents\n"
+        "    vrg -o json certificate list\n\n"
+        "    # Narrow the list\n"
+        "    vrg certificate list --type letsencrypt\n"
+        "    vrg certificate list --expiring-in 30\n"
+        "    vrg certificate list --expired\n\n"
+        "    # Inspect one certificate (by $key or domain)\n"
+        "    vrg -o json certificate get verge.example.com\n"
+        "    vrg certificate get 1 --show-keys\n\n"
+        "    # Request a Let's Encrypt certificate\n"
+        "    vrg certificate create --type letsencrypt \\\n"
+        "        --domain verge.example.com --contact-user 3 --agree-tos\n\n"
+        "    # Install a CA-issued certificate from PEM files\n"
+        "    vrg certificate import --domain verge.example.com \\\n"
+        "        --public-key ./fullchain.pem --private-key ./privkey.pem\n\n"
+        "    # Force-renew a certificate (self-signed regenerates, Let's\n"
+        "    # Encrypt triggers ACME immediately)\n"
+        "    vrg certificate renew verge.example.com --force\n\n"
+        "    # Delete a certificate (cannot be undone)\n"
+        "    vrg certificate delete old.example.com --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Use `create` for self-signed and Let's Encrypt certificates, and"
+        " `import` for manual certificates — `create --type manual` is"
+        " rejected because PEM file arguments only exist on `import`."
+        " `renew` regenerates self-signed certificates and triggers ACME"
+        " renewal for Let's Encrypt; manual certificates cannot be renewed"
+        " (upload replacement keys via `update` instead). `--show-keys` on"
+        " `get` includes the PEM public key, private key, and chain in the"
+        " output — treat that output as sensitive."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Map CLI type names to SDK cert_type parameter values
@@ -99,7 +152,22 @@ def cert_list(
         typer.Option("--expiring-in", help="Show certificates expiring within N days."),
     ] = None,
 ) -> None:
-    """List certificates."""
+    """List certificates.
+
+    Examples:
+
+        vrg certificate list
+        vrg -o json certificate list
+        vrg certificate list --type letsencrypt
+        vrg certificate list --expiring-in 30
+        vrg certificate list --expired
+
+    `--valid` and `--expired` are mutually exclusive. `--expiring-in N`
+    shows certificates that expire within N days.
+    """
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(ctx, lambda c: c.certificates.list(), _cert_to_dict, CERTIFICATE_COLUMNS)
+        return
     vctx = get_context(ctx)
 
     if valid and expired:
@@ -139,7 +207,17 @@ def cert_get(
         typer.Option("--show-keys", help="Include PEM certificate/key/chain in output."),
     ] = False,
 ) -> None:
-    """Get certificate details."""
+    """Get certificate details.
+
+    Examples:
+
+        vrg certificate get verge.example.com
+        vrg -o json certificate get 1
+        vrg certificate get verge.example.com --show-keys
+
+    Accepts a numeric `$key` or a domain. `--show-keys` includes the PEM
+    public key, private key, and chain in the output — treat as sensitive.
+    """
     vctx = get_context(ctx)
 
     if cert.isdigit():
@@ -199,9 +277,25 @@ def cert_create(
         typer.Option("--agree-tos", help="Agree to Let's Encrypt Terms of Service."),
     ] = False,
 ) -> None:
-    """Create a new certificate.
+    """Create a new certificate (self-signed or Let's Encrypt).
 
-    For manual certificates (uploading PEM files), use 'vrg certificate import' instead.
+    Examples:
+
+        # Self-signed (default)
+        vrg certificate create --domain verge.internal
+
+        # Let's Encrypt — domain must be publicly resolvable
+        vrg certificate create --type letsencrypt \\
+            --domain verge.example.com --contact-user 3 --agree-tos
+
+        # Custom ACME server
+        vrg certificate create --type letsencrypt \\
+            --domain verge.example.com --contact-user 3 --agree-tos \\
+            --acme-server https://ca.internal/acme/acme/directory
+
+    For manual (CA-issued) certificates, use `vrg certificate import` —
+    `--type manual` is rejected here because PEM file flags only exist on
+    `import`.
     """
     vctx = get_context(ctx)
 
@@ -275,7 +369,25 @@ def cert_import(
         typer.Option("--description", help="Certificate description."),
     ] = None,
 ) -> None:
-    """Import a manual certificate from PEM files."""
+    """Import a manual certificate from PEM files.
+
+    Examples:
+
+        vrg certificate import --domain verge.example.com \\
+            --public-key ./fullchain.pem \\
+            --private-key ./privkey.pem
+
+        # With separate chain file and SANs
+        vrg certificate import --domain verge.example.com \\
+            --public-key ./cert.pem --private-key ./privkey.pem \\
+            --chain ./chain.pem \\
+            --domains api.example.com,admin.example.com
+
+    Use this when the certificate was issued by any CA other than a
+    Let's Encrypt / ACME provider. `--public-key` may point at a single
+    cert or a combined fullchain file; when the chain is in a separate
+    file, pass it via `--chain`.
+    """
     vctx = get_context(ctx)
 
     pub_content = _read_pem_file(public_key)
@@ -357,7 +469,26 @@ def cert_update(
         typer.Option("--agree-tos/--no-agree-tos", help="Agree to TOS."),
     ] = None,
 ) -> None:
-    """Update a certificate."""
+    """Update a certificate.
+
+    Examples:
+
+        # Edit metadata
+        vrg certificate update verge.example.com \\
+            --description 'Primary UI cert'
+
+        # Replace keys on a manual certificate
+        vrg certificate update verge.example.com \\
+            --public-key ./new-fullchain.pem \\
+            --private-key ./new-privkey.pem
+
+        # Add Subject Alternative Names
+        vrg certificate update verge.example.com \\
+            --domains api.example.com,admin.example.com
+
+    At least one update flag is required. Accepts a numeric `$key` or
+    domain to identify the certificate.
+    """
     vctx = get_context(ctx)
 
     key = _resolve_certificate(vctx.client, cert)
@@ -408,7 +539,18 @@ def cert_delete(
     cert: Annotated[str, typer.Argument(help="Certificate key or domain name.")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation.")] = False,
 ) -> None:
-    """Delete a certificate."""
+    """Delete a certificate.
+
+    Examples:
+
+        vrg certificate delete old.example.com
+        vrg certificate delete 4 --yes
+
+    Destructive. Prompts for confirmation unless `--yes` is passed. Do
+    not delete the self-signed certificate bound to the `Verge-API`
+    interface unless you have another certificate configured for local
+    console access.
+    """
     vctx = get_context(ctx)
 
     key = _resolve_certificate(vctx.client, cert)
@@ -437,9 +579,22 @@ def cert_renew(
 ) -> None:
     """Renew or regenerate a certificate.
 
-    Self-signed: regenerates the certificate.
-    Let's Encrypt: triggers ACME renewal.
-    Manual: not supported (upload new keys via update instead).
+    Examples:
+
+        # Renew if the system considers it due (typically within 30 days
+        # of expiry for Let's Encrypt)
+        vrg certificate renew verge.example.com
+
+        # Force immediate renewal regardless of expiry
+        vrg certificate renew verge.example.com --force
+
+    Behaviour by type:
+
+    - **self-signed**: regenerates the certificate.
+    - **letsencrypt**: triggers ACME renewal; without `--force` the
+      request is queued for the next daily renewal cycle.
+    - **manual**: not supported — upload replacement keys via
+      `vrg certificate update`.
     """
     vctx = get_context(ctx)
 

@@ -9,13 +9,60 @@ import typer
 from verge_cli.columns import ColumnDef, format_bool_yn, format_epoch
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="category",
-    help="Manage tag categories.",
+    help=(
+        "Manage tag categories on VergeOS.\n\n"
+        "Tag **categories** are the schema layer above individual tags. Every"
+        " tag must belong to a category, and the category controls **which"
+        " object types** the tag may be applied to (VMs, networks, volumes,"
+        " nodes, tenants, users, clusters, sites, groups) via its"
+        " `taggable_*` flags. A category with `single_tag_selection=true`"
+        " enforces mutual exclusivity — a given object may carry at most one"
+        " tag from that category at a time (e.g., an `Environment` category"
+        " where a VM is either `prod`, `staging`, or `dev` but never"
+        " two).\n\n"
+        "Use this group to create the category first, then create tags"
+        " inside it with `vrg tag create --category <name>`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every category and what it can tag\n"
+        "    vrg tag category list\n\n"
+        "    # Machine-readable output for agents\n"
+        "    vrg -o json tag category list\n\n"
+        "    # Inspect a single category (name or numeric $key)\n"
+        "    vrg tag category get Environment\n\n"
+        "    # Create an exclusive category that applies only to VMs\n"
+        "    vrg tag category create --name Environment \\\n"
+        "        --taggable-vms --single-selection\n\n"
+        "    # Create a multi-target category (VMs and networks)\n"
+        "    vrg tag category create --name Owner \\\n"
+        "        --taggable-vms --taggable-networks \\\n"
+        "        --description 'Team ownership labels'\n\n"
+        "    # Widen an existing category to also tag tenants\n"
+        "    vrg tag category update Owner --taggable-tenants\n\n"
+        "    # Delete a category (cascades — see notes)\n"
+        "    vrg tag category delete Owner\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Categories are referenced by **name** or **numeric key** (`$key`)."
+        " Ambiguous name resolution exits with code 7.\n\n"
+        "A category's `taggable_*` flags must match the target resource at"
+        " assignment time. Attempting `vrg tag assign mytag vm web-01` when"
+        " the tag's category does not have `taggable_vms=true` is"
+        " rejected.\n\n"
+        "Deleting a category **cascades** to every tag inside it and every"
+        " membership row attached to those tags (objects stop carrying the"
+        " tags). There is no soft-delete — inspect `vrg tag list --category"
+        " <name>` and `vrg tag members <tag>` first if you need a reference"
+        " of what will be removed."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 TAG_CATEGORY_COLUMNS: list[ColumnDef] = [
@@ -71,7 +118,22 @@ def list_cmd(
         typer.Option("--filter", help="OData filter expression."),
     ] = None,
 ) -> None:
-    """List tag categories."""
+    """List tag categories.
+
+    Examples:
+
+        vrg tag category list
+        vrg -o json tag category list
+        vrg -o json tag category list | jq '.[] | select(.single_selection) | .name'
+
+    Useful `--query` fields: `name`, `single_selection`,
+    `taggable_types`, `description`.
+    """
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(
+            ctx, lambda c: c.tag_categories.list(), _category_to_dict, TAG_CATEGORY_COLUMNS
+        )
+        return
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filter_expr is not None:
@@ -93,7 +155,16 @@ def get_cmd(
     ctx: typer.Context,
     category: Annotated[str, typer.Argument(help="Category name or key.")],
 ) -> None:
-    """Get a tag category by name or key."""
+    """Get a tag category by name or key.
+
+    Examples:
+
+        vrg tag category get Environment
+        vrg -o json tag category get 3
+
+    Resolves by name or numeric `$key`. Ambiguous names exit with
+    code 7 — use the key to disambiguate.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tag_categories, category, "Tag category")
     item = vctx.client.tag_categories.get(key)
@@ -184,7 +255,24 @@ def create_cmd(
         ),
     ] = False,
 ) -> None:
-    """Create a new tag category."""
+    """Create a new tag category.
+
+    Examples:
+
+        # Mutually-exclusive environment category for VMs only
+        vrg tag category create --name Environment \\
+            --taggable-vms --single-selection
+
+        # Multi-target ownership category
+        vrg tag category create --name Owner \\
+            --taggable-vms --taggable-networks \\
+            --description "Team ownership labels"
+
+    At least one `--taggable-*` flag should be set — a category with no
+    taggable types cannot be assigned to any object. Use
+    `--single-selection` to enforce that an object carries at most one
+    tag from this category at a time.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {"name": name}
     if description is not None:
@@ -302,7 +390,25 @@ def update_cmd(
         ),
     ] = None,
 ) -> None:
-    """Update a tag category."""
+    """Update a tag category.
+
+    Examples:
+
+        # Widen Owner to also tag tenants
+        vrg tag category update Owner --taggable-tenants
+
+        # Rename and adjust description
+        vrg tag category update Env --name Environment \\
+            --description "Deployment environment"
+
+        # Toggle exclusivity off
+        vrg tag category update Environment --no-single-selection
+
+    Only flags passed on the command line are changed — omitting a
+    `--taggable-*` flag leaves its current value alone. Narrowing a
+    category (e.g., removing `--taggable-vms`) does not automatically
+    detach existing tags from VMs.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tag_categories, category, "Tag category")
     kwargs: dict[str, Any] = {}
@@ -352,7 +458,18 @@ def delete_cmd(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete a tag category."""
+    """Delete a tag category.
+
+    Examples:
+
+        vrg tag category delete Owner
+        vrg tag category delete Owner --yes
+
+    Destructive: cascades to every tag inside the category and to
+    every membership row on those tags. Inspect
+    `vrg tag list --category <name>` and `vrg tag members <tag>`
+    before deleting if you need a reference of what will be removed.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.tag_categories, category, "Tag category")
     if not confirm_action(f"Delete tag category '{category}'?", yes=yes):

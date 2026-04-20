@@ -14,8 +14,35 @@ from verge_cli.utils import resolve_resource_id
 
 app = typer.Typer(
     name="branch",
-    help="View update branches.",
+    help=(
+        "View update branches published by configured update sources.\n\n"
+        "An *update branch* is a named release train hosted on an update"
+        " source — similar to an APT release codename. The branch scopes"
+        " which package set is visible: `stable` exposes GA releases,"
+        " `beta` exposes pre-release builds, and so on. The active branch"
+        " is stored in `update_settings.branch` and determines what"
+        " `vrg update available list` returns after the next check.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `name`, `description`. Looking up by name returns exit 6 (not"
+        " found) or exit 7 (multiple matches) when ambiguous — pass the"
+        " numeric `$key` to disambiguate.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all branches published by configured sources\n"
+        "    vrg update branch list\n\n"
+        "    # Inspect one branch as JSON\n"
+        "    vrg -o json update branch get stable\n\n"
+        "    # Look up a branch by numeric key\n"
+        "    vrg update branch get 2\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`vrg update branch` is read-only. To switch which branch is"
+        " active, update `update_settings.branch` and run `vrg update"
+        " check` to refresh the available-package list against the new"
+        " release train."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 BRANCH_COLUMNS: list[ColumnDef] = [
@@ -45,7 +72,18 @@ def list_cmd(
         typer.Option("--filter", help="OData filter expression."),
     ] = None,
 ) -> None:
-    """List update branches."""
+    """List update branches.
+
+    Examples:
+
+        vrg update branch list
+        vrg -o json update branch list
+        vrg update branch list --filter "name eq 'stable'"
+
+    Useful `--query` fields: `name`, `description`, `created`. The
+    active branch is whichever one is currently referenced in
+    `update_settings.branch`.
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filter_expr is not None:
@@ -68,7 +106,18 @@ def get_cmd(
     ctx: typer.Context,
     identifier: Annotated[str, typer.Argument(help="Branch key or name.")],
 ) -> None:
-    """Get an update branch by key or name."""
+    """Get an update branch by key or name.
+
+    Examples:
+
+        vrg update branch get stable
+        vrg update branch get 2
+        vrg -o json update branch get stable
+
+    Name lookups exit 6 (not found) or exit 7 (multiple matches) when
+    the same branch name is published by more than one source — pass
+    the numeric `$key` to disambiguate.
+    """
     vctx = get_context(ctx)
     key = resolve_resource_id(vctx.client.update_branches, identifier, "Update branch")
     branch = vctx.client.update_branches.get(key=key)

@@ -14,8 +14,54 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="node",
-    help="Manage tenant compute nodes.",
+    help=(
+        "Manage compute nodes (virtual machines) that power a tenant.\n\n"
+        "A **tenant node** is a virtual machine that provides the CPU and"
+        " RAM for the nested VergeOS instance inside a tenant. A tenant's"
+        " total compute capacity equals the sum across all its nodes, and"
+        " each node has its own `cpu_cores` and `ram` allocation, cluster"
+        " placement, and optional failover cluster. Defaults are 4 cores"
+        " and 16 GB RAM; the minimums are 1 core and 2 GB. Before CPU or"
+        " RAM changes take effect, the system validates that both the"
+        " primary and (if configured) failover clusters have enough"
+        " capacity, so over-commitment is rejected up front.\n\n"
+        "Tenant nodes are referenced by **numeric key** or by node name."
+        " Use `-o json` for machine-readable output; the `$key`, `name`,"
+        " `cpu_cores`, `ram_gb`, `status`, and `cluster_name` fields are"
+        " the most useful targets for `--query`. Name lookups that match"
+        " multiple nodes exit with code 7 — pass a numeric key to"
+        " disambiguate.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List compute nodes allocated to a tenant\n"
+        "    vrg tenant node list acme-corp\n\n"
+        "    # JSON output for agents\n"
+        "    vrg -o json tenant node list acme-corp\n\n"
+        "    # Inspect a specific tenant node by name\n"
+        "    vrg tenant node get acme-corp acme-corp1\n\n"
+        "    # Add a second node: 8 cores, 32 GB RAM on cluster key 2\n"
+        "    vrg tenant node create acme-corp --cpu-cores 8 --ram-gb 32"
+        " --cluster 2\n\n"
+        "    # Scale an existing node up to 16 cores / 64 GB RAM\n"
+        "    vrg tenant node update acme-corp acme-corp1 --cpu-cores 16"
+        " --ram-gb 64\n\n"
+        "    # Disable a node (stops new placements) without deleting it\n"
+        "    vrg tenant node update acme-corp acme-corp2 --disabled\n\n"
+        "    # Remove a tenant node\n"
+        "    vrg tenant node delete acme-corp acme-corp2 -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Prefer scaling an existing node up to the cluster's per-machine"
+        " CPU/RAM limit before adding another node; once near the limit,"
+        " balance capacity across nodes rather than leaving a tiny second"
+        " node. The `--preferred-node` option is an advanced placement"
+        " hint that can defeat built-in HA — leave it unset unless"
+        " directed by support. CPU and RAM edits are accepted only if the"
+        " cluster (and failover cluster, if configured) can satisfy the"
+        " new allocation."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 

@@ -14,8 +14,79 @@ from verge_cli.utils import confirm_action, resolve_nas_resource
 
 app = typer.Typer(
     name="nfs",
-    help="Manage NAS NFS shares.",
+    help=(
+        "Manage NFS exports — kernel NFS server entries layered on top of a"
+        " NAS volume.\n\n"
+        "An NFS share is a child record of a volume (`volume_nfs_shares`"
+        " schema table; cascade-deletes with the parent). The kernel NFS"
+        " server exports the share to UNIX/Linux/macOS clients. Multiple"
+        " shares can target the same volume to export different subpaths"
+        " with different access rules.\n\n"
+        "Host access is gated by `allowed_hosts` (FQDNs with wildcards like"
+        " `*.example.com`, hostnames, IPs, CIDR such as `192.168.0.0/28`, or"
+        " NIS netgroups like `@admins`) or `allow_all` (the `*` equivalent in"
+        " `/etc/exports`). If neither is set, **no hosts can connect** — the"
+        " CLI enforces this at create time and requires `--allowed-hosts` or"
+        " `--allow-all`.\n\n"
+        "`--data-access` is `ro` (read-only, default) or `rw`. `--squash`"
+        " controls UID mapping: `root_squash` (default) maps remote root to"
+        " anonymous UID/GID and passes other UIDs through; `all_squash` maps"
+        " every user to anonymous (use for public shares); `no_root_squash`"
+        " disables remapping so remote root has full root access (trusted"
+        " environments only). Anonymous UID/GID default to `65534`"
+        " (`nobody`/`nogroup`) — override with `--anon-uid` / `--anon-gid`.\n\n"
+        "`--async` trades durability for write performance (risk of data loss"
+        " on unclean shutdown). `--insecure` permits clients from unprivileged"
+        " ports (>= 1024) — required by some NFS client stacks.\n\n"
+        "Shares are referenced by name or hex `$key`. Ambiguous names exit"
+        " with code 7 — disambiguate with the key. Use `-o json` for"
+        " machine-readable output.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List all NFS shares, or filter by volume / enabled state\n"
+        "    vrg nas nfs list\n"
+        "    vrg nas nfs list --volume shared-data\n"
+        "    vrg nas nfs list --enabled\n\n"
+        "    # Get one share as JSON for scripting / agents\n"
+        "    vrg -o json nas nfs get nfs-share\n\n"
+        "    # Create a read/write export scoped to a subnet\n"
+        "    vrg nas nfs create \\\n"
+        "        --volume shared-data --name nfs-share \\\n"
+        "        --allowed-hosts '10.10.0.0/24' \\\n"
+        "        --data-access rw\n\n"
+        "    # Public-ish export — allow all hosts, map everyone to anonymous\n"
+        "    vrg nas nfs create \\\n"
+        "        --volume public-data --name public-nfs \\\n"
+        "        --allow-all --squash all_squash\n\n"
+        "    # Trusted export — preserve remote root identity\n"
+        "    vrg nas nfs create \\\n"
+        "        --volume backups --name backup-nfs \\\n"
+        "        --allowed-hosts 'backup-01,backup-02' \\\n"
+        "        --data-access rw --squash no_root_squash\n\n"
+        "    # Toggle availability without destroying config\n"
+        "    vrg nas nfs disable nfs-share\n"
+        "    vrg nas nfs enable nfs-share\n\n"
+        "    # Delete a share (volume data is retained)\n"
+        "    vrg nas nfs delete nfs-share --yes\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "The parent NAS service VM **must be running** and the parent volume"
+        " must be `online` for an NFS share to serve clients. Shares on a"
+        " stopped service stay in `offline` / `needsrefresh` regardless of"
+        " their own enabled state.\n\n"
+        "Config changes to an active share transition it to `needsrefresh`"
+        " — toggle `disable` then `enable` (or run `update` and then"
+        " re-enable) to apply. Brief disconnects are expected; warn connected"
+        " clients or schedule off-hours where practical.\n\n"
+        "The `--volume` binding is **immutable** after creation — to move an"
+        " export to a different volume, delete and recreate it."
+        " `--allowed-hosts` replaces the entire list; there is no incremental"
+        " add/remove. `--filesystem-id` must be unique among shares on the"
+        " same volume (integer, `root`, or UUID); clients use `fsid` to track"
+        " mounts across server restarts."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 NAS_NFS_COLUMNS: list[ColumnDef] = [
@@ -68,7 +139,15 @@ def list_cmd(
         typer.Option("--enabled/--disabled", help="Filter by enabled state"),
     ] = None,
 ) -> None:
-    """List all NFS shares."""
+    """List all NFS shares.
+
+    **Examples:**
+
+        vrg nas nfs list
+        vrg nas nfs list --volume shared-data
+        vrg nas nfs list --enabled
+        vrg -o json nas nfs list
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if volume is not None:
@@ -95,7 +174,13 @@ def get_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="NFS share name or hex key")],
 ) -> None:
-    """Get details of an NFS share."""
+    """Get details of an NFS share.
+
+    **Examples:**
+
+        vrg nas nfs get nfs-export
+        vrg -o json nas nfs get nfs-export
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nfs_shares, share, "NFS share")
     item = vctx.client.nfs_shares.get(key=key)
@@ -163,7 +248,20 @@ def create_cmd(
         typer.Option("--filesystem-id", help="Custom filesystem ID (fsid)"),
     ] = None,
 ) -> None:
-    """Create a new NFS share."""
+    """Create a new NFS share.
+
+    Exports a directory on a NAS volume over NFSv3/v4. Either
+    `--allowed-hosts` (CIDR list) or `--allow-all` is required — an
+    export with no clients permitted is refused. Squash modes:
+    `root_squash`, `all_squash`, `no_root_squash`.
+
+    **Examples:**
+
+        vrg nas nfs create --volume shared-data --name nfs-export --allowed-hosts 10.0.0.0/24
+        vrg nas nfs create --volume shared-data --name read-only --allow-all --data-access ro
+        vrg nas nfs create --volume shared-data --name k8s-pv \\
+            --allowed-hosts 10.0.10.0/24 --squash no_root_squash --async
+    """
     vctx = get_context(ctx)
 
     # Validate: require either --allowed-hosts or --allow-all
@@ -263,7 +361,17 @@ def update_cmd(
         typer.Option("--filesystem-id", help="Custom filesystem ID (fsid)"),
     ] = None,
 ) -> None:
-    """Update an NFS share."""
+    """Update an NFS share.
+
+    `--allowed-hosts` replaces the full host list. Toggle `--allow-all`
+    / `--no-allow-all` to open or close to the world.
+
+    **Examples:**
+
+        vrg nas nfs update nfs-export --allowed-hosts 10.0.0.0/24,10.0.1.0/24
+        vrg nas nfs update nfs-export --data-access ro
+        vrg nas nfs update nfs-export --squash root_squash --no-async
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nfs_shares, share, "NFS share")
 
@@ -302,7 +410,16 @@ def delete_cmd(
     share: Annotated[str, typer.Argument(help="NFS share name or hex key")],
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Delete an NFS share (data is retained on volume)."""
+    """Delete an NFS share (data is retained on volume).
+
+    Removes the NFS export only — the underlying directory and files on
+    the volume are kept.
+
+    **Examples:**
+
+        vrg nas nfs delete nfs-export
+        vrg nas nfs delete nfs-export --yes
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nfs_shares, share, "NFS share")
 
@@ -320,7 +437,12 @@ def enable_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="NFS share name or hex key")],
 ) -> None:
-    """Enable an NFS share."""
+    """Enable an NFS share.
+
+    **Examples:**
+
+        vrg nas nfs enable nfs-export
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nfs_shares, share, "NFS share")
     vctx.client.nfs_shares.enable(key)
@@ -333,7 +455,15 @@ def disable_cmd(
     ctx: typer.Context,
     share: Annotated[str, typer.Argument(help="NFS share name or hex key")],
 ) -> None:
-    """Disable an NFS share."""
+    """Disable an NFS share.
+
+    Stops serving the export without deleting it. Data remains on the
+    volume.
+
+    **Examples:**
+
+        vrg nas nfs disable nfs-export
+    """
     vctx = get_context(ctx)
     key = resolve_nas_resource(vctx.client.nfs_shares, share, "NFS share")
     vctx.client.nfs_shares.disable(key)

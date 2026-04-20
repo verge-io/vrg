@@ -13,8 +13,41 @@ from verge_cli.output import output_result
 
 app = typer.Typer(
     name="package",
-    help="View installed update packages.",
+    help=(
+        "View installed update packages on the local system.\n\n"
+        "An *installed package* is a record in `update_packages` — the"
+        " local catalog of ybpkg payloads that have been extracted and"
+        " applied to this VergeOS cluster. Each row tracks the package"
+        " name, installed version, type (squashfs/tgz/vdb/gguf), and the"
+        " branch it was sourced from.\n\n"
+        "This is the *state* side of the update pipeline (what's on disk"
+        " right now). For *candidate* packages that could be installed"
+        " next, see `vrg update available`. For update history and the"
+        " events that produced the current state, see `vrg update log`.\n\n"
+        "Use `-o json` for structured output. Useful fields to `--query`:"
+        " `name`, `version`, `type`, `optional`, `branch`. Packages are"
+        " keyed by name (strings), so `vrg update package get <name>`"
+        " takes the name directly and returns exit 6 if no match.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List every installed package\n"
+        "    vrg update package list\n\n"
+        "    # Scope to packages installed from a specific branch\n"
+        "    vrg update package list --branch 1\n\n"
+        "    # Inspect one package as JSON\n"
+        "    vrg -o json update package get verge-os\n\n"
+        "    # Extract just name and version for scripting\n"
+        "    vrg -o json update package list --query '[].[name,version]'\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`vrg update package` is read-only. To change what is installed,"
+        " drive the pipeline: `vrg update check` → `vrg update download`"
+        " → `vrg update install` (or `vrg update apply` for the full cycle).\n\n"
+        "Optional packages (`optional: Y`) are components that ship with"
+        " a branch but are not applied unless explicitly selected."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 PACKAGE_COLUMNS: list[ColumnDef] = [
@@ -54,7 +87,19 @@ def list_cmd(
         typer.Option("--branch", help="Filter by branch key."),
     ] = None,
 ) -> None:
-    """List installed update packages."""
+    """List installed update packages.
+
+    Examples:
+
+        vrg update package list
+        vrg update package list --branch 1
+        vrg -o json update package list
+        vrg -o json update package list --query "[].[name,version]"
+
+    Useful `--query` fields: `name`, `version`, `type`, `optional`,
+    `branch`. The `type` column identifies the payload format
+    (squashfs, tgz, vdb, gguf).
+    """
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if filter_expr is not None:
@@ -79,7 +124,17 @@ def get_cmd(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument(help="Package name.")],
 ) -> None:
-    """Get an installed update package by name."""
+    """Get an installed update package by name.
+
+    Examples:
+
+        vrg update package get verge-os
+        vrg -o json update package get verge-os
+
+    Installed packages are keyed by name (string), so the argument is
+    passed directly to the SDK — no numeric lookup. Exit 6 if the
+    package isn't installed.
+    """
     vctx = get_context(ctx)
     # Package keys are strings (name), not integers — pass directly
     pkg = vctx.client.update_packages.get(key=name)

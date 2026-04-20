@@ -14,8 +14,57 @@ from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="share",
-    help="Manage tenant shared objects.",
+    help=(
+        "Share VM snapshots from the parent system into a tenant.\n\n"
+        "**Shared objects** are the cross-tenant sharing mechanism VergeOS"
+        " uses to push a VM snapshot from the parent system down to one of"
+        " its tenants. The parent creates a shared object pointing at a"
+        " specific VM snapshot; the tenant then runs `refresh` to re-fetch"
+        " source metadata or `import` to materialize a local VM copy via"
+        " the normal VM import pipeline. Only VM snapshots can be shared"
+        " today (`type = vm`), and a tenant can hold up to 1,000 shared"
+        " objects. Creation is one-way — tenants cannot create shared"
+        " objects for themselves, only the parent can.\n\n"
+        "Every shared object command takes a tenant as the first argument"
+        " (name or numeric key). The share itself is identified by name"
+        " within a tenant for `get`/`delete`, but `import` and `refresh`"
+        " require the numeric key. Use `-o json` for machine-readable"
+        " output; useful `--query` targets are `$key`, `name`,"
+        " `tenant_name`, `object_type`, and `is_inbox`. Name lookups that"
+        " match multiple objects exit with code 7 — pass the key to"
+        " disambiguate.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List everything shared with a tenant\n"
+        "    vrg tenant share list acme-corp\n\n"
+        "    # List only items waiting in the tenant inbox\n"
+        "    vrg tenant share list acme-corp --inbox\n\n"
+        "    # Inspect a shared object by name\n"
+        "    vrg -o json tenant share get acme-corp golden-web-image\n\n"
+        "    # Push a VM's current snapshot into a tenant\n"
+        "    vrg tenant share create acme-corp --vm web-01 --name"
+        " golden-web-image\n\n"
+        "    # Push a specific named snapshot instead of the latest\n"
+        "    vrg tenant share create acme-corp --vm web-01 --snapshot"
+        " release-2025-10 --name golden-web-image\n\n"
+        "    # Tenant re-checks source metadata for updates\n"
+        "    vrg tenant share refresh acme-corp 42\n\n"
+        "    # Tenant imports the shared snapshot as a local VM\n"
+        "    vrg tenant share import acme-corp 42\n\n"
+        "    # Revoke a shared object\n"
+        "    vrg tenant share delete acme-corp golden-web-image -y\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "`import` kicks off the full VM import pipeline inside the tenant"
+        " and returns once the job is initiated — track progress with"
+        " `vrg task list` in the tenant context. When an inbox-gated share"
+        " is created, the tenant must explicitly accept it before the"
+        " object appears in their working environment; `--inbox` on `list`"
+        " surfaces those pending items. Deleting a shared object cascades"
+        " to any in-flight import jobs that originated from it."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 SHARE_COLUMNS: list[ColumnDef] = [

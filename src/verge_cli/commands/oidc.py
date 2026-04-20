@@ -10,12 +10,76 @@ from verge_cli.columns import OIDC_APP_COLUMNS
 from verge_cli.commands import oidc_group, oidc_log, oidc_user
 from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
+from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success, output_warning
 from verge_cli.utils import confirm_action, resolve_resource_id
 
 app = typer.Typer(
     name="oidc",
-    help="Manage OIDC applications (VergeOS as identity provider).",
+    help=(
+        "Manage OIDC applications that let VergeOS act AS an OpenID Connect"
+        " identity provider for external applications.\n\n"
+        "An OIDC application registers a third-party client (another VergeOS"
+        " system, a web app, a portal) so it can delegate login to this"
+        " VergeOS system. The external app redirects users to VergeOS, which"
+        " authenticates them against the local user directory (or a chained"
+        " upstream auth source) and returns an ID token. This is how MSPs"
+        " centralize login across tenants and how VergeOS clusters federate"
+        " SSO.\n\n"
+        "This is the opposite direction of `vrg auth-source`: oidc = VergeOS"
+        " → external application; auth-source = external IdP → VergeOS."
+        " Don't confuse them.\n\n"
+        "Use `-o json` for machine-readable output. `--query` on fields like"
+        " `name`, `client_id`, `enabled`, `restrict_access`. `client_secret`"
+        " is hidden by default — pass `--show-secret` on `get` to reveal it."
+        " `well_known_configuration` is the `.well-known/openid-configuration`"
+        " discovery URL external clients auto-configure from; show it with"
+        " `--show-well-known`.\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    # List OIDC applications\n"
+        "    vrg oidc list\n\n"
+        "    # Show only enabled applications as JSON\n"
+        "    vrg -o json oidc list --enabled\n\n"
+        "    # Register a new application (client_id/secret auto-generated)\n"
+        "    vrg oidc create --name partner-portal \\\n"
+        "        --redirect-uri https://portal.example.com/callback\n\n"
+        "    # Inspect an application including its client_secret\n"
+        "    vrg -o json oidc get partner-portal --show-secret\n\n"
+        "    # Restrict access to specific users/groups and manage the ACL\n"
+        "    vrg oidc update partner-portal --restrict-access\n"
+        "    vrg oidc user add partner-portal deploy-bot\n"
+        "    vrg oidc group add partner-portal platform-eng\n\n"
+        "    # Review audit logs for an application\n"
+        "    vrg oidc log list partner-portal --errors\n\n"
+        "    # Disable without deleting\n"
+        "    vrg oidc disable partner-portal\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "**client_id and client_secret are locked after creation.** Both are"
+        " auto-generated. `client_id` never changes. To rotate the secret you"
+        " must delete and recreate the application — there is no rotation"
+        " command.\n\n"
+        "**Redirect URIs support wildcards.** Pass comma-separated values to"
+        " `--redirect-uri`; wildcards like `https://*.example.com/callback`"
+        " are allowed. The server stores them newline-delimited internally.\n\n"
+        "**`--restrict-access` gates the ACL subcommands.** When enabled,"
+        " only users/groups added via `vrg oidc user add` and `vrg oidc"
+        " group add` may authenticate. When disabled, any enabled VergeOS"
+        " user can authenticate through the application.\n\n"
+        "**`--force-auth-source` skips the IdP picker.** Users sent to this"
+        " application are redirected straight to the specified auth source"
+        " instead of seeing the VergeOS login page's provider selector.\n\n"
+        "**`--map-user` collapses all logins to one identity.** Every"
+        " successful authentication is mapped to the specified user account."
+        " Useful for service integrations that need a fixed VergeOS identity"
+        " regardless of who logged in. A user referenced as `map_user`"
+        " cannot be deleted until the reference is cleared.\n\n"
+        "**Name resolution**: commands that take `<oidc-app>` accept the"
+        " application name or numeric key. Ambiguous names exit with code"
+        " 7.\n"
+    ),
+    rich_markup_mode="markdown",
     no_args_is_help=True,
 )
 
@@ -85,7 +149,24 @@ def oidc_list(
         typer.Option("--disabled", help="Show only disabled applications."),
     ] = False,
 ) -> None:
-    """List OIDC applications."""
+    """List OIDC applications.
+
+    Examples:
+
+        vrg oidc list
+        vrg oidc list --enabled
+        vrg -o json oidc list | jq '.[] | select(.restrict_access) | .name'
+
+    Use `-A` / `--all-profiles` to fan out across every configured profile.
+    `--enabled` and `--disabled` are mutually exclusive (exits 2 together).
+    Useful `--query` fields: `name`, `client_id`, `enabled`,
+    `restrict_access`, `redirect_uris`.
+    """
+    if ctx.obj.get("all_profiles"):
+        list_all_profiles(
+            ctx, lambda c: c.oidc_applications.list(), _oidc_app_to_dict, OIDC_APP_COLUMNS
+        )
+        return
     vctx = get_context(ctx)
 
     if enabled and disabled:
@@ -126,7 +207,20 @@ def oidc_get(
         typer.Option("--show-well-known", help="Include well-known configuration URL."),
     ] = False,
 ) -> None:
-    """Get OIDC application details."""
+    """Get OIDC application details.
+
+    Examples:
+
+        vrg oidc get partner-portal
+        vrg -o json oidc get partner-portal --show-secret
+        vrg -o json oidc get partner-portal --show-well-known \\
+            --query "well_known_configuration"
+
+    `client_secret` is hidden by default — pass `--show-secret` to
+    reveal it. `--show-well-known` adds the
+    `.well-known/openid-configuration` discovery URL that external
+    clients auto-configure from. Ambiguous names exit 7.
+    """
     vctx = get_context(ctx)
 
     if oidc_app.isdigit():
@@ -200,8 +294,19 @@ def oidc_create(
 ) -> None:
     """Create a new OIDC application.
 
-    The client_secret is generated automatically and shown once at creation time.
-    Unlike API keys, the secret CAN be retrieved later with 'vrg oidc get --show-secret'.
+    Examples:
+
+        vrg oidc create --name partner-portal \\
+            --redirect-uri https://portal.example.com/callback
+        vrg oidc create --name internal-app --restrict-access \\
+            --redirect-uri https://app.example.com/oidc/cb,https://*.example.com/cb
+        vrg oidc create --name service-hook --map-user svc-account \\
+            --redirect-uri https://svc.example.com/oauth
+
+    `client_id` and `client_secret` are generated automatically. The
+    secret is shown once at creation time but (unlike API keys) can be
+    retrieved later with `vrg oidc get --show-secret`. `client_id` never
+    changes; to rotate the secret, delete and recreate the application.
     """
     vctx = get_context(ctx)
 
@@ -313,8 +418,17 @@ def oidc_update(
 ) -> None:
     """Update an OIDC application.
 
-    Note: client_id and client_secret cannot be changed. To get a new secret,
-    delete and recreate the application.
+    Examples:
+
+        vrg oidc update partner-portal --restrict-access
+        vrg oidc update partner-portal \\
+            --redirect-uri https://portal.example.com/callback,https://staging.example.com/callback
+        vrg oidc update internal-app --force-auth-source corporate-sso
+
+    Pass at least one field to change; calling without any option exits 2.
+    `client_id` and `client_secret` are locked — delete and recreate to
+    rotate. Redirect URIs support wildcards like
+    `https://*.example.com/callback`.
     """
     vctx = get_context(ctx)
 
@@ -379,7 +493,18 @@ def oidc_delete(
         typer.Option("--yes", "-y", help="Skip confirmation."),
     ] = False,
 ) -> None:
-    """Delete an OIDC application."""
+    """Delete an OIDC application.
+
+    Examples:
+
+        vrg oidc delete partner-portal
+        vrg oidc delete partner-portal -y
+        vrg oidc delete 7 -y
+
+    **Destructive.** External clients using this application stop
+    authenticating immediately. All user/group ACL entries and audit log
+    history for the application are also removed.
+    """
     vctx = get_context(ctx)
 
     key = _resolve_oidc_app(vctx.client, oidc_app)
@@ -402,7 +527,16 @@ def oidc_enable(
     ctx: typer.Context,
     oidc_app: Annotated[str, typer.Argument(help="OIDC application name or key.")],
 ) -> None:
-    """Enable an OIDC application."""
+    """Enable an OIDC application.
+
+    Examples:
+
+        vrg oidc enable partner-portal
+        vrg oidc enable 7
+
+    Re-activates an application so external clients can authenticate
+    through it again.
+    """
     vctx = get_context(ctx)
 
     key = _resolve_oidc_app(vctx.client, oidc_app)
@@ -418,7 +552,17 @@ def oidc_disable(
     ctx: typer.Context,
     oidc_app: Annotated[str, typer.Argument(help="OIDC application name or key.")],
 ) -> None:
-    """Disable an OIDC application."""
+    """Disable an OIDC application.
+
+    Examples:
+
+        vrg oidc disable partner-portal
+        vrg oidc disable 7
+
+    External clients stop authenticating through the application until
+    it is re-enabled. Configuration, ACLs, and client credentials are
+    preserved.
+    """
     vctx = get_context(ctx)
 
     key = _resolve_oidc_app(vctx.client, oidc_app)

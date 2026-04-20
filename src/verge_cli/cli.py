@@ -18,6 +18,7 @@ from verge_cli.commands import (
     cluster,
     completion,
     configure,
+    doctor,
     file,
     gpu,
     group,
@@ -47,8 +48,39 @@ from verge_cli.config import get_effective_config
 
 app = typer.Typer(
     name="vrg",
-    help="Command-line interface for VergeOS.",
+    help=(
+        "CLI for managing VergeOS infrastructure — an ultraconverged platform"
+        " that unifies compute, storage, networking, and multi-tenancy.\n\n"
+        "Manages VMs, networks, tenants, storage, snapshots, and more via the"
+        " VergeOS API. Resources can be referenced by **name** or **numeric key**."
+        "\n\n"
+        "**For scripts and agents:** use `-o json` for structured output,"
+        " `--query` for field extraction, and `-q` to suppress decorative output."
+        "\n\n"
+        "---\n\n"
+        "**Examples:**\n\n"
+        "    vrg configure setup --profile prod\n\n"
+        "    vrg vm list\n\n"
+        "    vrg -o json vm get web-01\n\n"
+        "    vrg --query status vm get web-01\n\n"
+        "    vrg vm create -f web-server.vrg.yaml --set name=web-02\n\n"
+        "    vrg -A vm list\n\n"
+        "---\n\n"
+        "**Notes:**\n\n"
+        "Resources can be referenced by name or numeric key. When a name matches"
+        " multiple resources, vrg prints all matches and exits with code 7.\n\n"
+        "Use `-o json` for machine-readable output. Pipe through jq or use"
+        " `--query` for field extraction. Use `-q` (quiet) to suppress"
+        " non-essential output in scripts.\n\n"
+        "Authentication: vrg reads credentials from CLI flags, environment"
+        " variables (`VERGE_HOST`, `VERGE_TOKEN`, etc.), or `~/.vrg/config.toml`"
+        " profiles. Run `vrg configure` to set up profiles.\n\n"
+        "Exit codes: 0=success, 1=general error, 2=usage, 3=config, 4=auth,"
+        " 5=forbidden, 6=not found, 7=conflict, 8=validation, 9=timeout,"
+        " 10=connection error."
+    ),
     no_args_is_help=True,
+    rich_markup_mode="markdown",
 )
 
 # Register sub-commands
@@ -61,6 +93,7 @@ app.add_typer(certificate.app, name="certificate")
 app.add_typer(cluster.app, name="cluster")
 app.add_typer(completion.app, name="completion")
 app.add_typer(configure.app, name="configure")
+app.add_typer(doctor.app, name="doctor")
 app.add_typer(file.app, name="file")
 app.add_typer(gpu.app, name="gpu")
 app.add_typer(group.app, name="group")
@@ -181,6 +214,14 @@ def main(
             help="Suppress non-essential output.",
         ),
     ] = False,
+    all_profiles: Annotated[
+        bool,
+        typer.Option(
+            "--all-profiles",
+            "-A",
+            help="Run list commands across all configured profiles.",
+        ),
+    ] = False,
     no_color: Annotated[
         bool,
         typer.Option(
@@ -200,7 +241,7 @@ def main(
         ),
     ] = False,
 ) -> None:
-    """Verge CLI - Command-line interface for VergeOS."""
+    """Verge CLI — manage VergeOS infrastructure from the command line."""
     # Load configuration with environment overrides
     config = get_effective_config(profile)
 
@@ -228,4 +269,5 @@ def main(
     ctx.obj["quiet"] = quiet
     ctx.obj["query"] = query
     ctx.obj["no_color"] = no_color
+    ctx.obj["all_profiles"] = all_profiles
     ctx.obj["_client"] = None  # Lazy-loaded client

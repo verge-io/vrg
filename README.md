@@ -6,6 +6,12 @@ Command-line interface for [VergeOS](https://www.verge.io) — manage virtual ma
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
+<p align="center">
+  <img src="vrg-demo.gif" alt="Claude Code using vrg to deploy an internal network and VM" width="800">
+  <br>
+  <em>Claude Code deploying an internal network and VM with vrg</em>
+</p>
+
 ## Installation
 
 ### pipx (recommended)
