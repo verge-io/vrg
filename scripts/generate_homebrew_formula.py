@@ -19,6 +19,10 @@ PYTHON_VERSION = "3.12"
 # Dependencies that are part of the Python stdlib (for 3.11+) and should be skipped
 STDLIB_PACKAGES = {"tomli"}
 
+# Packages that require Rust to build from source (maturin-based).
+# When any of these appear in the dependency tree, add `depends_on "rust" => :build`.
+RUST_PACKAGES = {"rpds-py"}
+
 # Packages that require Rust/C compilation and are already handled by Homebrew core
 SKIP_PACKAGES: set[str] = set()
 
@@ -157,6 +161,10 @@ def generate_formula(package: str) -> str:
         "",
         '  depends_on "python@3.12"',
     ]
+
+    # Add rust build dependency if any resource needs it
+    if RUST_PACKAGES & set(resources):
+        lines.append('  depends_on "rust" => :build')
 
     # Add resources sorted by name
     for name in sorted(resources):
