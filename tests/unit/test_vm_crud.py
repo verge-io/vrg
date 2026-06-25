@@ -168,14 +168,24 @@ def test_vm_delete_running_without_force_fails(cli_runner, mock_client, mock_vm)
 
 
 def test_vm_delete_running_with_force(cli_runner, mock_client, mock_vm):
-    """vrg vm delete --force --yes on running VM should succeed."""
+    """vrg vm delete --force --yes powers off a running VM before deleting."""
     mock_vm.is_running = True
     mock_client.vms.list.return_value = [mock_vm]
     mock_client.vms.get.return_value = mock_vm
 
-    result = cli_runner.invoke(app, ["vm", "delete", "test-vm", "--force", "--yes"])
+    with patch("verge_cli.commands.vm.wait_for_state", return_value=mock_vm) as wait_for_state:
+        result = cli_runner.invoke(app, ["vm", "delete", "test-vm", "--force", "--yes"])
 
     assert result.exit_code == 0
+    mock_vm.power_off.assert_called_once_with(force=True)
+    wait_for_state.assert_called_once_with(
+        get_resource=mock_client.vms.get,
+        resource_key=1,
+        target_state=["stopped", "offline"],
+        state_field="status",
+        resource_type="VM",
+        quiet=False,
+    )
     mock_client.vms.delete.assert_called_once_with(1)
 
 

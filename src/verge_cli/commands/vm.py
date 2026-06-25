@@ -409,6 +409,17 @@ def vm_delete(
         typer.echo("Cancelled.")
         raise typer.Exit(0)
 
+    if vm_obj.is_running and force:
+        vm_obj.power_off(force=True)
+        wait_for_state(
+            get_resource=vctx.client.vms.get,
+            resource_key=key,
+            target_state=["stopped", "offline"],
+            state_field="status",
+            resource_type="VM",
+            quiet=vctx.quiet,
+        )
+
     vctx.client.vms.delete(key)
     output_success(f"Deleted VM '{vm_obj.name}'", quiet=vctx.quiet)
 
