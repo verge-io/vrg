@@ -1038,8 +1038,7 @@ Delete all test resources in reverse order. Verify each deletion.
 ### VM Cleanup
 
 - [ ] Delete remaining drives: `vrg vm drive delete shakedown-vm "OS Disk" --yes`
-- [ ] Stop VM: `vrg vm stop shakedown-vm --force`
-- [ ] Delete VM: `vrg vm delete shakedown-vm --yes`
+- [ ] Delete VM: `vrg vm delete shakedown-vm --force --yes`
 
 ### Network Cleanup
 
