@@ -192,6 +192,7 @@ vrg alarm list|get|snooze|unsnooze|resolve|summary [options]
 vrg alarm history list|get [options]
 vrg log list|get|search [options]       # list --errors, --level, --type, --since; search <term>
 vrg system info|version
+vrg theme list|get|create|update|enable|disable|delete|export|import [options]
 vrg billing list|get|generate|latest|summary [options]
 vrg webhook list|get|create|update|delete|send|history [options]
 vrg update settings|source|branch|package|available|log [subcommands]
