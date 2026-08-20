@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+from enum import Enum
 from pathlib import Path
 from typing import Annotated, Any, NoReturn
 
-import click
 import typer
 from pyvergeos.resources.base import ResourceManager, ResourceObject
 
@@ -17,6 +17,12 @@ from verge_cli.errors import handle_errors
 from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_nas_resource
+
+
+class BaseTheme(str, Enum):
+    light = "light"
+    dark = "dark"
+
 
 app = typer.Typer(
     name="theme",
@@ -82,7 +88,7 @@ def _usage_error(message: str) -> NoReturn:
 def _definitions(values: list[str] | None) -> list[dict[str, str]]:
     try:
         parsed = _parse_set_args(values or [])
-    except click.BadParameter as exc:
+    except typer.BadParameter as exc:
         _usage_error(str(exc))
     return [{"property": property_name, "value": value} for property_name, value in parsed.items()]
 
@@ -186,13 +192,12 @@ def create_cmd(
         str | None, typer.Option("--description", "-d", help="Theme description.")
     ] = None,
     based_on: Annotated[
-        str,
+        BaseTheme,
         typer.Option(
             "--based-on",
             help="Base system theme.",
-            click_type=click.Choice(["light", "dark"]),
         ),
-    ] = "light",
+    ] = BaseTheme.light,
     enabled: Annotated[bool, typer.Option("--enabled/--disabled", help="Enable the theme.")] = True,
     definition: Annotated[
         list[str] | None,
@@ -201,7 +206,7 @@ def create_cmd(
 ) -> None:
     """Create a custom theme."""
     vctx = get_context(ctx)
-    kwargs: dict[str, Any] = {"name": name, "based_on": based_on, "enabled": enabled}
+    kwargs: dict[str, Any] = {"name": name, "based_on": based_on.value, "enabled": enabled}
     if description is not None:
         kwargs["description"] = description
     if definition:

@@ -96,11 +96,6 @@ module = "verge_cli.utils"
 # SDK returns Any types, difficult to fix without casts everywhere
 warn_return_any = false
 
-[[tool.mypy.overrides]]
-module = "verge_cli.auth"
-# typer.Choice is a click type wrapper, mypy stubs incomplete
-disable_error_code = ["attr-defined"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

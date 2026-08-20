@@ -32,6 +32,7 @@ class TestCliBasic:
         assert "cluster" in result.stdout
         assert "node" in result.stdout
         assert "storage" in result.stdout
+        assert "table|wide|json|csv" in result.stdout
 
     def test_no_args_shows_help(self, cli_runner: CliRunner) -> None:
         """Test that running without args shows help."""
@@ -113,6 +114,8 @@ class TestOutputFlag:
         """Test that --output rejects invalid formats."""
         result = cli_runner.invoke(app, ["--output", "yaml", "system", "info"])
         assert result.exit_code == 2
+        assert "Invalid value for '--output'" in result.output
+        assert "Traceback" not in result.output
 
 
 class TestSystemCommands:

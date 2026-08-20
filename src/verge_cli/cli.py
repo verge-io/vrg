@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated
 
-import click
 import typer
 
 from verge_cli import __version__
@@ -46,6 +46,14 @@ from verge_cli.commands import (
     webhook,
 )
 from verge_cli.config import get_effective_config
+
+
+class OutputFormat(str, Enum):
+    table = "table"
+    wide = "wide"
+    json = "json"
+    csv = "csv"
+
 
 app = typer.Typer(
     name="vrg",
@@ -184,14 +192,13 @@ def main(
         ),
     ] = None,
     output: Annotated[
-        str,
+        OutputFormat,
         typer.Option(
             "--output",
             "-o",
             help="Output format.",
-            click_type=click.Choice(["table", "wide", "json", "csv"]),
         ),
-    ] = "table",
+    ] = OutputFormat.table,
     query: Annotated[
         str | None,
         typer.Option(
@@ -260,7 +267,7 @@ def main(
         config.password = password
 
     # Use output format from CLI or fall back to config
-    effective_output = output if output != "table" else config.output
+    effective_output = output.value if output is not OutputFormat.table else config.output
 
     # Store CLI overrides for lazy client creation
     ctx.ensure_object(dict)
