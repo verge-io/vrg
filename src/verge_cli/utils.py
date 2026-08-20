@@ -122,7 +122,7 @@ def resolve_nas_resource(
     for resource in resources:
         if isinstance(resource, dict):
             name = resource.get("name", "")
-            key = resource.get("$key", resource.get("key"))
+            key = resource.get("$key", resource.get("key", resource.get("id")))
         else:
             name = getattr(resource, "name", "")
             key = getattr(resource, "key", getattr(resource, "$key", None))

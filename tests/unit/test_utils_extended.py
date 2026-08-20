@@ -76,6 +76,17 @@ class TestResolveNasResource:
 
         assert result == "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
 
+    def test_handles_id_key_from_live_api(self) -> None:
+        """Some string-key tables return id instead of $key in list views."""
+        manager = MagicMock()
+        manager.list.return_value = [
+            {"name": "ocean", "id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"},
+        ]
+
+        result = resolve_nas_resource(manager, "ocean", "theme")
+
+        assert result == "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+
 
 def _make_resource(status: str) -> dict[str, str]:
     """Create a dict resource with the given status (avoids MagicMock getattr issues)."""

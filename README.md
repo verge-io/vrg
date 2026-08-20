@@ -98,7 +98,7 @@ vrg <domain> [sub-domain] <action> [options]
 | **Updates** | `update`, `update source`, `update branch`, `update package`, `update available` |
 | **Monitoring** | `alarm`, `alarm history`, `log` |
 | **Tagging** | `tag`, `tag category`, `resource-group` |
-| **System** | `system`, `configure`, `file`, `completion` |
+| **System** | `system`, `theme`, `configure`, `file`, `completion` |
 
 Most commands follow a consistent CRUD pattern (`list`, `get`, `create`, `update`, `delete`). Destructive operations require `--yes` to skip confirmation.
 
