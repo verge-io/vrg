@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,13 @@ ENV_TIMEOUT = "VERGE_TIMEOUT"
 ENV_OUTPUT = "VERGE_OUTPUT"
 
 
+class OutputFormat(str, Enum):
+    table = "table"
+    wide = "wide"
+    json = "json"
+    csv = "csv"
+
+
 @dataclass
 class ProfileConfig:
     """Configuration for a single profile."""
@@ -43,6 +51,16 @@ class ProfileConfig:
     verify_ssl: bool = True
     output: str = "table"
     timeout: int = 30
+
+    def __post_init__(self) -> None:
+        """Validate values used by every config entry point."""
+        try:
+            self.output = OutputFormat(self.output).value
+        except ValueError:
+            choices = ", ".join(item.value for item in OutputFormat)
+            raise ValueError(
+                f"Invalid output format '{self.output}'; choose from: {choices}"
+            ) from None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary, excluding None values."""

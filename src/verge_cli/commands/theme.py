@@ -116,8 +116,10 @@ def _import_payload(data: Any) -> dict[str, Any]:
         _usage_error("Theme JSON must contain an object.")
     if not isinstance(data.get("name"), str) or not data["name"].strip():
         _usage_error("Theme JSON requires a non-empty string 'name'.")
-    if data.get("based_on") not in ("light", "dark"):
-        _usage_error("Theme JSON 'based_on' must be 'light' or 'dark'.")
+    base_themes = {item.value for item in BaseTheme}
+    if data.get("based_on") not in base_themes:
+        choices = " or ".join(f"'{item.value}'" for item in BaseTheme)
+        _usage_error(f"Theme JSON 'based_on' must be {choices}.")
     if "enabled" in data and not isinstance(data["enabled"], bool):
         _usage_error("Theme JSON 'enabled' must be a boolean.")
     definitions = data.get("set_definitions", [])

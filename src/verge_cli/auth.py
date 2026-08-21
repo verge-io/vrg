@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-from enum import Enum
 from typing import TYPE_CHECKING
 
 import typer
@@ -14,13 +13,6 @@ from verge_cli.config import ProfileConfig
 
 if TYPE_CHECKING:
     pass
-
-
-class AuthMethod(str, Enum):
-    """Supported interactive authentication methods."""
-
-    token = "token"
-    basic = "basic"
 
 
 def get_client(
@@ -88,12 +80,7 @@ def get_client(
     if not effective_token and not (effective_username and effective_password):
         if sys.stdin.isatty():
             typer.echo("No credentials found. Please provide authentication:")
-            auth_choice = typer.prompt(
-                "Authentication method",
-                type=AuthMethod,
-                default="token",
-            )
-            if auth_choice is AuthMethod.token:
+            if typer.confirm("Use token authentication?", default=True):
                 effective_token = typer.prompt("API token")
             else:
                 effective_username = typer.prompt("Username")

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import Annotated
 
 import typer
@@ -45,15 +44,7 @@ from verge_cli.commands import (
     vm,
     webhook,
 )
-from verge_cli.config import get_effective_config
-
-
-class OutputFormat(str, Enum):
-    table = "table"
-    wide = "wide"
-    json = "json"
-    csv = "csv"
-
+from verge_cli.config import OutputFormat, get_effective_config
 
 app = typer.Typer(
     name="vrg",
@@ -192,13 +183,13 @@ def main(
         ),
     ] = None,
     output: Annotated[
-        OutputFormat,
+        OutputFormat | None,
         typer.Option(
             "--output",
             "-o",
             help="Output format.",
         ),
-    ] = OutputFormat.table,
+    ] = None,
     query: Annotated[
         str | None,
         typer.Option(
@@ -252,7 +243,11 @@ def main(
 ) -> None:
     """Verge CLI — manage VergeOS infrastructure from the command line."""
     # Load configuration with environment overrides
-    config = get_effective_config(profile)
+    try:
+        config = get_effective_config(profile)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(3) from None
 
     # Apply CLI overrides to config
     if host:
@@ -267,7 +262,7 @@ def main(
         config.password = password
 
     # Use output format from CLI or fall back to config
-    effective_output = output.value if output is not OutputFormat.table else config.output
+    effective_output = output.value if output is not None else config.output
 
     # Store CLI overrides for lazy client creation
     ctx.ensure_object(dict)

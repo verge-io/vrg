@@ -171,7 +171,9 @@ def rule_list(
     direction: Annotated[
         str | None, typer.Option("--direction", "-d", help="Filter by direction")
     ] = None,
-    action: Annotated[str | None, typer.Option("--action", "-a", help="Filter by action")] = None,
+    action: Annotated[
+        RuleAction | None, typer.Option("--action", "-a", help="Filter by action")
+    ] = None,
     enabled: Annotated[
         bool | None, typer.Option("--enabled/--disabled", help="Filter by enabled state")
     ] = None,
@@ -198,7 +200,7 @@ def rule_list(
     if direction:
         filter_kwargs["direction"] = direction
     if action:
-        filter_kwargs["action"] = action
+        filter_kwargs["action"] = action.value
     if enabled is not None:
         filter_kwargs["enabled"] = enabled
 

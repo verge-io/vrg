@@ -383,7 +383,7 @@ def gpu_update(
     ctx: typer.Context,
     gpu: Annotated[str, typer.Argument(help="GPU ID or name.")],
     mode: Annotated[
-        str,
+        GpuMode,
         typer.Option("--mode", help="GPU mode to set."),
     ],
     profile: Annotated[
@@ -401,10 +401,10 @@ def gpu_update(
     gpu_obj = vctx.client.nodes.all_gpus.get(gpu_key)
     node_key = int(getattr(gpu_obj, "node_key", gpu_obj.get("node_key", gpu_obj.get("node", 0))))
 
-    if not confirm_action(f"Update GPU '{gpu}' mode to '{mode}'?", yes=yes):
+    if not confirm_action(f"Update GPU '{gpu}' mode to '{mode.value}'?", yes=yes):
         return
 
-    update_kwargs: dict[str, Any] = {"mode": mode}
+    update_kwargs: dict[str, Any] = {"mode": mode.value}
     if profile is not None:
         profile_key = int(resolve_resource_id(vctx.client.vgpu_profiles, profile, "vGPU profile"))
         update_kwargs["nvidia_vgpu_profile"] = profile_key

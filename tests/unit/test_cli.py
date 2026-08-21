@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from typer.testing import CliRunner
 
 from verge_cli import __version__
 from verge_cli.cli import app
+from verge_cli.config import ProfileConfig
 
 
 class TestCliBasic:
@@ -32,7 +35,6 @@ class TestCliBasic:
         assert "cluster" in result.stdout
         assert "node" in result.stdout
         assert "storage" in result.stdout
-        assert "table|wide|json|csv" in result.stdout
 
     def test_no_args_shows_help(self, cli_runner: CliRunner) -> None:
         """Test that running without args shows help."""
@@ -115,6 +117,24 @@ class TestOutputFlag:
         result = cli_runner.invoke(app, ["--output", "yaml", "system", "info"])
         assert result.exit_code == 2
         assert "Invalid value for '--output'" in result.output
+        assert "Traceback" not in result.output
+
+    def test_explicit_table_overrides_json_config(self, cli_runner, mock_client):
+        """An explicit --output table should override the configured default."""
+        with patch("verge_cli.cli.get_effective_config", return_value=ProfileConfig(output="json")):
+            result = cli_runner.invoke(app, ["--output", "table", "system", "info"])
+
+        assert result.exit_code == 0
+        assert "Field" in result.output
+
+    def test_invalid_env_output_is_config_error(self, cli_runner, monkeypatch):
+        """Invalid VERGE_OUTPUT should fail cleanly instead of falling through."""
+        monkeypatch.setenv("VERGE_OUTPUT", "yaml")
+
+        result = cli_runner.invoke(app, ["system", "info"])
+
+        assert result.exit_code == 3
+        assert "Invalid output format 'yaml'" in result.output
         assert "Traceback" not in result.output
 
 

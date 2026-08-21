@@ -8,7 +8,7 @@ import pytest
 import typer
 from pyvergeos.exceptions import AuthenticationError, VergeConnectionError
 
-from verge_cli.auth import AuthMethod, get_client
+from verge_cli.auth import get_client
 from verge_cli.config import ProfileConfig
 
 
@@ -149,7 +149,8 @@ class TestGetClient:
 
         with (
             patch("sys.stdin.isatty", return_value=True),
-            patch("verge_cli.auth.typer.prompt", side_effect=[AuthMethod.token, "my-token"]),
+            patch("verge_cli.auth.typer.confirm", return_value=True),
+            patch("verge_cli.auth.typer.prompt", return_value="my-token"),
             patch("verge_cli.auth.VergeClient") as mock_cls,
         ):
             get_client(config)
