@@ -116,7 +116,7 @@ class TestOutputFlag:
         """Test that --output rejects invalid formats."""
         result = cli_runner.invoke(app, ["--output", "yaml", "system", "info"])
         assert result.exit_code == 2
-        assert "Invalid value for '--output'" in result.output
+        assert "'yaml' is not one of" in result.output
         assert "Traceback" not in result.output
 
     def test_explicit_table_overrides_json_config(self, cli_runner, mock_client):
