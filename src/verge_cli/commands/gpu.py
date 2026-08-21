@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated, Any
 
-import click
 import typer
 
 from verge_cli.columns import (
@@ -18,6 +18,25 @@ from verge_cli.errors import handle_errors
 from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
+
+
+class ProfileType(str, Enum):
+    a = "A"
+    b = "B"
+    c = "C"
+    q = "Q"
+
+
+class GpuMode(str, Enum):
+    gpu = "gpu"
+    nvidia_vgpu = "nvidia_vgpu"
+    none = "none"
+
+
+class DeviceType(str, Enum):
+    vgpu = "vgpu"
+    host = "host"
+
 
 app = typer.Typer(
     name="gpu",
@@ -249,11 +268,10 @@ def _device_to_dict(device: Any) -> dict[str, Any]:
 def profile_list(
     ctx: typer.Context,
     profile_type: Annotated[
-        str | None,
+        ProfileType | None,
         typer.Option(
             "--type",
             help="Filter by profile type.",
-            click_type=click.Choice(["A", "B", "C", "Q"]),
         ),
     ] = None,
 ) -> None:
@@ -261,7 +279,7 @@ def profile_list(
     vctx = get_context(ctx)
     kwargs: dict[str, Any] = {}
     if profile_type is not None:
-        kwargs["profile_type"] = profile_type
+        kwargs["profile_type"] = profile_type.value
     profiles = vctx.client.vgpu_profiles.list(**kwargs)
     data = [_profile_to_dict(p) for p in profiles]
     output_result(
@@ -308,11 +326,10 @@ def gpu_list(
         typer.Option("--node", help="Filter by node name or ID."),
     ] = None,
     mode: Annotated[
-        str | None,
+        GpuMode | None,
         typer.Option(
             "--mode",
             help="Filter by GPU mode.",
-            click_type=click.Choice(["gpu", "nvidia_vgpu", "none"]),
         ),
     ] = None,
 ) -> None:
@@ -327,7 +344,7 @@ def gpu_list(
     else:
         kwargs: dict[str, Any] = {}
         if mode is not None:
-            kwargs["mode"] = mode
+            kwargs["mode"] = mode.value
         gpus = vctx.client.nodes.all_gpus.list(**kwargs)
     data = [_gpu_to_dict(g) for g in gpus]
     output_result(
@@ -366,7 +383,7 @@ def gpu_update(
     ctx: typer.Context,
     gpu: Annotated[str, typer.Argument(help="GPU ID or name.")],
     mode: Annotated[
-        str,
+        GpuMode,
         typer.Option("--mode", help="GPU mode to set."),
     ],
     profile: Annotated[
@@ -384,10 +401,10 @@ def gpu_update(
     gpu_obj = vctx.client.nodes.all_gpus.get(gpu_key)
     node_key = int(getattr(gpu_obj, "node_key", gpu_obj.get("node_key", gpu_obj.get("node", 0))))
 
-    if not confirm_action(f"Update GPU '{gpu}' mode to '{mode}'?", yes=yes):
+    if not confirm_action(f"Update GPU '{gpu}' mode to '{mode.value}'?", yes=yes):
         return
 
-    update_kwargs: dict[str, Any] = {"mode": mode}
+    update_kwargs: dict[str, Any] = {"mode": mode.value}
     if profile is not None:
         profile_key = int(resolve_resource_id(vctx.client.vgpu_profiles, profile, "vGPU profile"))
         update_kwargs["nvidia_vgpu_profile"] = profile_key
@@ -453,11 +470,10 @@ def device_list(
         typer.Option("--node", help="Filter by node name or ID."),
     ] = None,
     device_type: Annotated[
-        str | None,
+        DeviceType | None,
         typer.Option(
             "--type",
             help="Filter by device type.",
-            click_type=click.Choice(["vgpu", "host"]),
         ),
     ] = None,
 ) -> None:
@@ -467,14 +483,14 @@ def device_list(
 
     if node is not None:
         node_key = int(resolve_resource_id(vctx.client.nodes, node, "node"))
-        if device_type is None or device_type == "vgpu":
+        if device_type is None or device_type is DeviceType.vgpu:
             devices.extend(vctx.client.nodes.vgpu_devices(node_key).list())
-        if device_type is None or device_type == "host":
+        if device_type is None or device_type is DeviceType.host:
             devices.extend(vctx.client.nodes.host_gpu_devices(node_key).list())
     else:
-        if device_type is None or device_type == "vgpu":
+        if device_type is None or device_type is DeviceType.vgpu:
             devices.extend(vctx.client.nodes.all_vgpu_devices.list())
-        if device_type is None or device_type == "host":
+        if device_type is None or device_type is DeviceType.host:
             devices.extend(vctx.client.nodes.all_host_gpu_devices.list())
 
     data = [_device_to_dict(d) for d in devices]

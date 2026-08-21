@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated, Any
 
-import click
 import typer
 
 from verge_cli.columns import SITE_COLUMNS
@@ -14,6 +14,14 @@ from verge_cli.errors import handle_errors
 from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
+
+
+class CloudSnapshotMode(str, Enum):
+    disabled = "disabled"
+    send = "send"
+    receive = "receive"
+    both = "both"
+
 
 app = typer.Typer(
     name="site",
@@ -190,13 +198,12 @@ def create_cmd(
         bool, typer.Option("--allow-insecure", help="Allow insecure SSL connections")
     ] = False,
     cloud_snapshots: Annotated[
-        str,
+        CloudSnapshotMode,
         typer.Option(
             "--cloud-snapshots",
             help="Cloud snapshot config",
-            click_type=click.Choice(["disabled", "send", "receive", "both"]),
         ),
-    ] = "disabled",
+    ] = CloudSnapshotMode.disabled,
     auto_create_syncs: Annotated[
         bool,
         typer.Option("--auto-create-syncs/--no-auto-create-syncs", help="Auto-create sync configs"),
@@ -227,7 +234,7 @@ def create_cmd(
         "username": username,
         "password": password,
         "allow_insecure": allow_insecure,
-        "config_cloud_snapshots": cloud_snapshots,
+        "config_cloud_snapshots": cloud_snapshots.value,
         "auto_create_syncs": auto_create_syncs,
     }
     if description is not None:
@@ -252,11 +259,10 @@ def update_cmd(
         str | None, typer.Option("--description", "-d", help="Site description")
     ] = None,
     cloud_snapshots: Annotated[
-        str | None,
+        CloudSnapshotMode | None,
         typer.Option(
             "--cloud-snapshots",
             help="Cloud snapshot config",
-            click_type=click.Choice(["disabled", "send", "receive", "both"]),
         ),
     ] = None,
 ) -> None:
@@ -280,7 +286,7 @@ def update_cmd(
     if description is not None:
         kwargs["description"] = description
     if cloud_snapshots is not None:
-        kwargs["config_cloud_snapshots"] = cloud_snapshots
+        kwargs["config_cloud_snapshots"] = cloud_snapshots.value
 
     vctx.client.sites.update(key, **kwargs)
     output_success(f"Updated site '{site}'", quiet=vctx.quiet)

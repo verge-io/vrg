@@ -66,6 +66,16 @@ def test_rule_list(cli_runner, mock_client, mock_network_for_rules, mock_rule):
     assert "accept" in result.output
 
 
+def test_rule_list_rejects_invalid_action(cli_runner, mock_client):
+    """Rule list should reject action typos before calling the API."""
+    result = cli_runner.invoke(
+        app, ["network", "rule", "list", "test-network", "--action", "tranlsate"]
+    )
+
+    assert result.exit_code == 2
+    assert "translate" in result.output
+
+
 def test_rule_get(cli_runner, mock_client, mock_network_for_rules, mock_rule):
     """Rule get should show rule details."""
     mock_client.networks.list.return_value = [mock_network_for_rules]

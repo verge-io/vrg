@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+from enum import Enum
 from pathlib import Path
 from typing import Annotated, Any, NoReturn
 
-import click
 import typer
 from pyvergeos.resources.base import ResourceManager, ResourceObject
 
@@ -17,6 +17,12 @@ from verge_cli.errors import handle_errors
 from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_nas_resource
+
+
+class BaseTheme(str, Enum):
+    light = "light"
+    dark = "dark"
+
 
 app = typer.Typer(
     name="theme",
@@ -82,7 +88,7 @@ def _usage_error(message: str) -> NoReturn:
 def _definitions(values: list[str] | None) -> list[dict[str, str]]:
     try:
         parsed = _parse_set_args(values or [])
-    except click.BadParameter as exc:
+    except typer.BadParameter as exc:
         _usage_error(str(exc))
     return [{"property": property_name, "value": value} for property_name, value in parsed.items()]
 
@@ -110,8 +116,10 @@ def _import_payload(data: Any) -> dict[str, Any]:
         _usage_error("Theme JSON must contain an object.")
     if not isinstance(data.get("name"), str) or not data["name"].strip():
         _usage_error("Theme JSON requires a non-empty string 'name'.")
-    if data.get("based_on") not in ("light", "dark"):
-        _usage_error("Theme JSON 'based_on' must be 'light' or 'dark'.")
+    base_themes = {item.value for item in BaseTheme}
+    if data.get("based_on") not in base_themes:
+        choices = " or ".join(f"'{item.value}'" for item in BaseTheme)
+        _usage_error(f"Theme JSON 'based_on' must be {choices}.")
     if "enabled" in data and not isinstance(data["enabled"], bool):
         _usage_error("Theme JSON 'enabled' must be a boolean.")
     definitions = data.get("set_definitions", [])
@@ -186,13 +194,12 @@ def create_cmd(
         str | None, typer.Option("--description", "-d", help="Theme description.")
     ] = None,
     based_on: Annotated[
-        str,
+        BaseTheme,
         typer.Option(
             "--based-on",
             help="Base system theme.",
-            click_type=click.Choice(["light", "dark"]),
         ),
-    ] = "light",
+    ] = BaseTheme.light,
     enabled: Annotated[bool, typer.Option("--enabled/--disabled", help="Enable the theme.")] = True,
     definition: Annotated[
         list[str] | None,
@@ -201,7 +208,7 @@ def create_cmd(
 ) -> None:
     """Create a custom theme."""
     vctx = get_context(ctx)
-    kwargs: dict[str, Any] = {"name": name, "based_on": based_on, "enabled": enabled}
+    kwargs: dict[str, Any] = {"name": name, "based_on": based_on.value, "enabled": enabled}
     if description is not None:
         kwargs["description"] = description
     if definition:

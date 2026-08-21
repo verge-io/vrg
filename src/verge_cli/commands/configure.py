@@ -8,6 +8,7 @@ from rich.table import Table
 
 from verge_cli.config import (
     CONFIG_FILE,
+    OutputFormat,
     ProfileConfig,
     get_effective_config,
     load_config,
@@ -133,7 +134,8 @@ def configure_setup(
     )
 
     output_format = typer.prompt(
-        "Default output format",
+        "Default output format (table, wide, json, csv)",
+        type=OutputFormat,
         default=existing.output,
         show_default=True,
     )
@@ -152,7 +154,7 @@ def configure_setup(
         username=username if username else None,
         password=password if password else None,
         verify_ssl=verify_ssl,
-        output=output_format,
+        output=output_format.value,
         timeout=int(timeout),
     )
 

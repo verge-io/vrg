@@ -162,6 +162,14 @@ def test_gpu_update(cli_runner, mock_client, mock_node_gpu, mock_vgpu_profile):
     mock_client.nodes.gpus.return_value.update.assert_called_once_with(1, mode="gpu")
 
 
+def test_gpu_update_rejects_invalid_mode(cli_runner, mock_client):
+    """GPU update should reject mode typos before calling the API."""
+    result = cli_runner.invoke(app, ["gpu", "update", "1", "--mode", "nvidia-vgpu", "--yes"])
+
+    assert result.exit_code == 2
+    assert "nvidia_vgpu" in result.output
+
+
 def test_gpu_update_with_profile(cli_runner, mock_client, mock_node_gpu, mock_vgpu_profile):
     """vrg gpu update with --profile should include profile key."""
     mock_client.nodes.all_gpus.list.return_value = [mock_node_gpu]

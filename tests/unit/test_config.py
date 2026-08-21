@@ -45,6 +45,11 @@ class TestProfileConfig:
         assert result["output"] == "table"
         assert result["timeout"] == 30
 
+    def test_rejects_invalid_output(self) -> None:
+        """Invalid output formats should fail at the shared config boundary."""
+        with pytest.raises(ValueError, match="Invalid output format 'yaml'"):
+            ProfileConfig(output="yaml")
+
 
 class TestConfig:
     """Tests for Config dataclass."""
@@ -99,6 +104,14 @@ class TestLoadConfig:
         assert config.profiles["dev"].host == "https://192.168.1.100"
         assert config.profiles["dev"].username == "admin"
         assert config.profiles["dev"].verify_ssl is False
+
+    def test_load_rejects_invalid_output(self, tmp_path: Path) -> None:
+        """Invalid output formats in config.toml should be rejected."""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text('[default]\noutput = "yaml"\n')
+
+        with pytest.raises(ValueError, match="Invalid output format 'yaml'"):
+            load_config(config_path)
 
 
 class TestSaveConfig:
@@ -170,6 +183,13 @@ class TestEnvOverrides:
         result = apply_env_overrides(profile)
 
         assert result.timeout == 60
+
+    def test_env_rejects_invalid_output(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """VERGE_OUTPUT should use the same validation as config files."""
+        monkeypatch.setenv("VERGE_OUTPUT", "yaml")
+
+        with pytest.raises(ValueError, match="Invalid output format 'yaml'"):
+            apply_env_overrides(ProfileConfig())
 
     def test_no_env_uses_config(self) -> None:
         """Test that config values are used when no env vars are set."""
