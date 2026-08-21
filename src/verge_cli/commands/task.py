@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
+from enum import Enum
 from typing import Annotated, Any
 
-import click
 import typer
 
 from verge_cli.columns import TASK_COLUMNS
@@ -15,6 +15,12 @@ from verge_cli.errors import handle_errors
 from verge_cli.multi import list_all_profiles
 from verge_cli.output import output_error, output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
+
+
+class TaskStatus(str, Enum):
+    idle = "idle"
+    running = "running"
+
 
 app = typer.Typer(
     name="task",
@@ -125,11 +131,10 @@ def task_list(
         typer.Option("--enabled/--disabled", help="Filter by enabled/disabled status."),
     ] = None,
     status: Annotated[
-        str | None,
+        TaskStatus | None,
         typer.Option(
             "--status",
             help="Filter by status.",
-            click_type=click.Choice(["idle", "running"]),
         ),
     ] = None,
 ) -> None:
@@ -157,7 +162,7 @@ def task_list(
     if enabled is not None:
         kwargs["enabled"] = enabled
     if status:
-        kwargs["status"] = status
+        kwargs["status"] = status.value
     tasks = vctx.client.tasks.list(**kwargs)
     output_result(
         [_task_to_dict(t) for t in tasks],

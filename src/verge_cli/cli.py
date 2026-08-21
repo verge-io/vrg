@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Annotated
 
-import click
 import typer
 
 from verge_cli import __version__
@@ -39,12 +38,13 @@ from verge_cli.commands import (
     task,
     tenant,
     tenant_recipe,
+    theme,
     update,
     user,
     vm,
     webhook,
 )
-from verge_cli.config import get_effective_config
+from verge_cli.config import OutputFormat, get_effective_config
 
 app = typer.Typer(
     name="vrg",
@@ -114,6 +114,7 @@ app.add_typer(tag.app, name="tag")
 app.add_typer(task.app, name="task")
 app.add_typer(tenant.app, name="tenant")
 app.add_typer(tenant_recipe.app, name="tenant-recipe")
+app.add_typer(theme.app, name="theme")
 app.add_typer(update.app, name="update")
 app.add_typer(user.app, name="user")
 app.add_typer(vm.app, name="vm")
@@ -182,14 +183,13 @@ def main(
         ),
     ] = None,
     output: Annotated[
-        str,
+        OutputFormat | None,
         typer.Option(
             "--output",
             "-o",
             help="Output format.",
-            click_type=click.Choice(["table", "wide", "json", "csv"]),
         ),
-    ] = "table",
+    ] = None,
     query: Annotated[
         str | None,
         typer.Option(
@@ -243,7 +243,11 @@ def main(
 ) -> None:
     """Verge CLI — manage VergeOS infrastructure from the command line."""
     # Load configuration with environment overrides
-    config = get_effective_config(profile)
+    try:
+        config = get_effective_config(profile)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(3) from None
 
     # Apply CLI overrides to config
     if host:
@@ -258,7 +262,7 @@ def main(
         config.password = password
 
     # Use output format from CLI or fall back to config
-    effective_output = output if output != "table" else config.output
+    effective_output = output.value if output is not None else config.output
 
     # Store CLI overrides for lazy client creation
     ctx.ensure_object(dict)

@@ -98,7 +98,7 @@ vrg <domain> [sub-domain] <action> [options]
 | **Updates** | `update`, `update source`, `update branch`, `update package`, `update available` |
 | **Monitoring** | `alarm`, `alarm history`, `log` |
 | **Tagging** | `tag`, `tag category`, `resource-group` |
-| **System** | `system`, `configure`, `file`, `completion` |
+| **System** | `system`, `theme`, `configure`, `file`, `completion` |
 
 Most commands follow a consistent CRUD pattern (`list`, `get`, `create`, `update`, `delete`). Destructive operations require `--yes` to skip confirmation.
 
@@ -134,6 +134,44 @@ Tab completion is available for bash, zsh, fish, and PowerShell. Run `vrg --inst
 ```bash
 chmod 755 /opt/homebrew/share/zsh /opt/homebrew/share/zsh/site-functions
 ```
+
+## AI Agent Skill
+
+This repo ships an [agent skill](skills/vrg/SKILL.md) that teaches AI coding agents (Claude Code, Codex) how to drive `vrg` — command patterns, domain reference, recipes, and VM templates.
+
+### Claude Code
+
+Copy the skill into your personal skills directory:
+
+```bash
+cp -R skills/vrg ~/.claude/skills/vrg
+```
+
+Or into a single project to share it with your team:
+
+```bash
+cp -R skills/vrg /path/to/project/.claude/skills/vrg
+```
+
+Claude Code picks it up automatically; ask it anything VergeOS-related ("list my VMs", "create a firewall rule") and it will use `vrg`.
+
+### Codex
+
+Codex uses the same SKILL.md format, loaded from `.agents/skills`. Copy into your user-level skills directory:
+
+```bash
+cp -R skills/vrg ~/.agents/skills/vrg
+```
+
+Or into a project to share it with your team:
+
+```bash
+cp -R skills/vrg /path/to/project/.agents/skills/vrg
+```
+
+Codex detects skill changes automatically; if it doesn't appear, restart Codex.
+
+Both agents need `vrg` installed and configured (`vrg configure setup`) to actually run commands.
 
 ## Global Options
 
@@ -191,7 +229,6 @@ By submitting a pull request, you agree to the terms of our [Contributor License
 - [Template Guide](docs/TEMPLATES.md) — Template language reference
 - [Cookbook](docs/COOKBOOK.md) — Task-oriented recipes
 - [Architecture](docs/ARCHITECTURE.md) — Design patterns and internals
-- [Known Issues](docs/KNOWN_ISSUES.md) — Current limitations and workarounds
 
 ## License
 

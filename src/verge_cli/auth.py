@@ -80,12 +80,7 @@ def get_client(
     if not effective_token and not (effective_username and effective_password):
         if sys.stdin.isatty():
             typer.echo("No credentials found. Please provide authentication:")
-            auth_choice = typer.prompt(
-                "Authentication method",
-                type=typer.Choice(["token", "basic"]),
-                default="token",
-            )
-            if auth_choice == "token":
+            if typer.confirm("Use token authentication?", default=True):
                 effective_token = typer.prompt("API token")
             else:
                 effective_username = typer.prompt("Username")

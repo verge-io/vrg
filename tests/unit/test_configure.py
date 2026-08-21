@@ -146,10 +146,12 @@ class TestConfigureSetup:
             result = cli_runner.invoke(
                 app,
                 ["configure", "setup"],
-                input="test.example.com\nmy-token\nyes\ntable\n30\n",
+                input="test.example.com\nmy-token\nyes\nyaml\ntable\n30\n",
             )
 
         assert result.exit_code == 0
+        assert "table, wide, json, csv" in result.output
+        assert "Error: yaml" in result.output
         assert "saved" in result.output.lower()
         mock_save.assert_called_once()
 

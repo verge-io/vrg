@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated, Any
 
-import click
 import typer
 
 from verge_cli.columns import RULE_COLUMNS
@@ -12,6 +12,15 @@ from verge_cli.context import get_context
 from verge_cli.errors import ResourceNotFoundError, handle_errors
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
+
+
+class RuleAction(str, Enum):
+    accept = "accept"
+    drop = "drop"
+    reject = "reject"
+    translate_ = "translate"
+    route = "route"
+
 
 app = typer.Typer(
     name="rule",
@@ -162,7 +171,9 @@ def rule_list(
     direction: Annotated[
         str | None, typer.Option("--direction", "-d", help="Filter by direction")
     ] = None,
-    action: Annotated[str | None, typer.Option("--action", "-a", help="Filter by action")] = None,
+    action: Annotated[
+        RuleAction | None, typer.Option("--action", "-a", help="Filter by action")
+    ] = None,
     enabled: Annotated[
         bool | None, typer.Option("--enabled/--disabled", help="Filter by enabled state")
     ] = None,
@@ -189,7 +200,7 @@ def rule_list(
     if direction:
         filter_kwargs["direction"] = direction
     if action:
-        filter_kwargs["action"] = action
+        filter_kwargs["action"] = action.value
     if enabled is not None:
         filter_kwargs["enabled"] = enabled
 
@@ -249,14 +260,13 @@ def rule_create(
         str, typer.Option("--direction", "-d", help="Direction (incoming/outgoing)")
     ] = "incoming",
     action: Annotated[
-        str,
+        RuleAction,
         typer.Option(
             "--action",
             "-a",
             help="Action",
-            click_type=click.Choice(["accept", "drop", "reject", "translate", "route"]),
         ),
-    ] = "accept",
+    ] = RuleAction.accept,
     protocol: Annotated[
         str, typer.Option("--protocol", "-p", help="Protocol (tcp/udp/tcpudp/icmp/any)")
     ] = "any",
@@ -314,7 +324,7 @@ def rule_create(
     create_kwargs: dict[str, Any] = {
         "name": name,
         "direction": direction,
-        "action": action,
+        "action": action.value,
         "protocol": protocol,
         "interface": interface,
         "enabled": enabled,
@@ -361,12 +371,11 @@ def rule_update(
     name: Annotated[str | None, typer.Option("--name", "-n", help="New rule name")] = None,
     direction: Annotated[str | None, typer.Option("--direction", "-d", help="Direction")] = None,
     action: Annotated[
-        str | None,
+        RuleAction | None,
         typer.Option(
             "--action",
             "-a",
             help="Action",
-            click_type=click.Choice(["accept", "drop", "reject", "translate", "route"]),
         ),
     ] = None,
     protocol: Annotated[str | None, typer.Option("--protocol", "-p", help="Protocol")] = None,
@@ -422,7 +431,7 @@ def rule_update(
     if direction is not None:
         updates["direction"] = direction
     if action is not None:
-        updates["action"] = action
+        updates["action"] = action.value
     if protocol is not None:
         updates["protocol"] = protocol
     if interface is not None:

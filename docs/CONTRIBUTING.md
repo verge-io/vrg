@@ -161,7 +161,6 @@ When to update which file:
 | New test fixture | `docs/TESTING.md` |
 | New workflow recipe | `docs/COOKBOOK.md` |
 | New health check | `docs/COMMANDS.md` doctor section, `docs/COOKBOOK.md` |
-| New known limitation | `docs/KNOWN_ISSUES.md` |
 
 ## Contributor License Agreement
 

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated, Any
 
-import click
 import typer
 
 from verge_cli.columns import SCHEDULE_UPCOMING_COLUMNS, TASK_SCHEDULE_COLUMNS
@@ -12,6 +12,24 @@ from verge_cli.context import get_context
 from verge_cli.errors import handle_errors
 from verge_cli.output import output_result, output_success
 from verge_cli.utils import confirm_action, resolve_resource_id
+
+
+class RepeatEvery(str, Enum):
+    minute = "minute"
+    hour = "hour"
+    day = "day"
+    week = "week"
+    month = "month"
+    year = "year"
+    never = "never"
+
+
+class DayOfMonth(str, Enum):
+    first = "first"
+    last = "last"
+    fifteenth = "15th"
+    start_date = "start_date"
+
 
 app = typer.Typer(
     name="schedule",
@@ -120,11 +138,10 @@ def schedule_list(
         typer.Option("--enabled/--disabled", help="Filter by enabled/disabled status."),
     ] = None,
     repeat_every: Annotated[
-        str | None,
+        RepeatEvery | None,
         typer.Option(
             "--repeat-every",
             help="Filter by repeat interval.",
-            click_type=click.Choice(["minute", "hour", "day", "week", "month", "year", "never"]),
         ),
     ] = None,
 ) -> None:
@@ -145,7 +162,7 @@ def schedule_list(
     if enabled is not None:
         kwargs["enabled"] = enabled
     if repeat_every is not None:
-        kwargs["repeat_every"] = repeat_every
+        kwargs["repeat_every"] = repeat_every.value
     schedules = vctx.client.task_schedules.list(**kwargs)
     output_result(
         [_schedule_to_dict(s) for s in schedules],
@@ -198,13 +215,12 @@ def schedule_create(
         typer.Option("--disabled", help="Create schedule in disabled state."),
     ] = False,
     repeat_every: Annotated[
-        str,
+        RepeatEvery,
         typer.Option(
             "--repeat-every",
             help="Repeat interval.",
-            click_type=click.Choice(["minute", "hour", "day", "week", "month", "year", "never"]),
         ),
-    ] = "hour",
+    ] = RepeatEvery.hour,
     repeat_iteration: Annotated[
         int,
         typer.Option("--repeat-iteration", help="Run every N intervals."),
@@ -226,13 +242,12 @@ def schedule_create(
         typer.Option("--end-time", help="End time in seconds from midnight."),
     ] = 86400,
     day_of_month: Annotated[
-        str,
+        DayOfMonth,
         typer.Option(
             "--day-of-month",
             help="Day of month option.",
-            click_type=click.Choice(["first", "last", "15th", "start_date"]),
         ),
-    ] = "start_date",
+    ] = DayOfMonth.start_date,
     monday: Annotated[bool, typer.Option("--monday/--no-monday")] = True,
     tuesday: Annotated[bool, typer.Option("--tuesday/--no-tuesday")] = True,
     wednesday: Annotated[bool, typer.Option("--wednesday/--no-wednesday")] = True,
@@ -257,11 +272,11 @@ def schedule_create(
     kwargs: dict[str, Any] = {
         "name": name,
         "enabled": not disabled,
-        "repeat_every": repeat_every,
+        "repeat_every": repeat_every.value,
         "repeat_iteration": repeat_iteration,
         "start_time_of_day": start_time,
         "end_time_of_day": end_time,
-        "day_of_month": day_of_month,
+        "day_of_month": day_of_month.value,
         "monday": monday,
         "tuesday": tuesday,
         "wednesday": wednesday,
@@ -298,11 +313,10 @@ def schedule_update(
         typer.Option("--enabled", help="Enable or disable the schedule."),
     ] = None,
     repeat_every: Annotated[
-        str | None,
+        RepeatEvery | None,
         typer.Option(
             "--repeat-every",
             help="Repeat interval.",
-            click_type=click.Choice(["minute", "hour", "day", "week", "month", "year", "never"]),
         ),
     ] = None,
     repeat_iteration: Annotated[
@@ -326,11 +340,10 @@ def schedule_update(
         typer.Option("--end-time", help="End time in seconds from midnight."),
     ] = None,
     day_of_month: Annotated[
-        str | None,
+        DayOfMonth | None,
         typer.Option(
             "--day-of-month",
             help="Day of month option.",
-            click_type=click.Choice(["first", "last", "15th", "start_date"]),
         ),
     ] = None,
     monday: Annotated[bool | None, typer.Option("--monday/--no-monday")] = None,
@@ -360,7 +373,7 @@ def schedule_update(
     if enabled is not None:
         kwargs["enabled"] = enabled
     if repeat_every is not None:
-        kwargs["repeat_every"] = repeat_every
+        kwargs["repeat_every"] = repeat_every.value
     if repeat_iteration is not None:
         kwargs["repeat_iteration"] = repeat_iteration
     if start_date is not None:
@@ -372,7 +385,7 @@ def schedule_update(
     if end_time is not None:
         kwargs["end_time_of_day"] = end_time
     if day_of_month is not None:
-        kwargs["day_of_month"] = day_of_month
+        kwargs["day_of_month"] = day_of_month.value
     if monday is not None:
         kwargs["monday"] = monday
     if tuesday is not None:

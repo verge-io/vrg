@@ -1272,6 +1272,32 @@ System log viewing. Source: `commands/log.py`
 
 ## System
 
+### `vrg theme`
+
+VergeOS UI theme management. Theme names and 40-character keys are accepted.
+
+| Subcommand | Description |
+|------------|-------------|
+| `list` | List themes |
+| `get` | Get a theme with its color definitions |
+| `create` | Create a custom theme (`--set PROPERTY=VALUE` is repeatable) |
+| `update` | Update metadata, state, or color definitions |
+| `enable` | Enable a theme |
+| `disable` | Disable a theme |
+| `delete` | Delete a custom theme |
+| `export` | Save a portable theme JSON file |
+| `import` | Create a theme from exported JSON |
+
+```bash
+vrg theme create --name ocean --based-on dark \
+    --set='--color-primary=#006994'
+vrg theme export ocean --file ocean.json
+vrg theme import ocean.json --name ocean-copy
+```
+
+Exported JSON includes theme metadata and color definitions. Custom logo file
+references are system-local and are not exported.
+
 ### `vrg system`
 
 System information and management. Source: `commands/system.py`

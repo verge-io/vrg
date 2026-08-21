@@ -143,6 +143,25 @@ class TestGetClient:
                 get_client(config)
             assert exc_info.value.exit_code == 4
 
+    def test_interactive_token_auth(self) -> None:
+        """Interactive auth should accept the native token choice."""
+        config = ProfileConfig(host="test.example.com")
+
+        with (
+            patch("sys.stdin.isatty", return_value=True),
+            patch("verge_cli.auth.typer.confirm", return_value=True),
+            patch("verge_cli.auth.typer.prompt", return_value="my-token"),
+            patch("verge_cli.auth.VergeClient") as mock_cls,
+        ):
+            get_client(config)
+
+        mock_cls.assert_called_once_with(
+            host="test.example.com",
+            token="my-token",
+            verify_ssl=True,
+            timeout=30,
+        )
+
     def test_authentication_error_exits(self) -> None:
         """AuthenticationError from SDK should exit with code 4."""
         config = ProfileConfig(host="test.example.com", token="bad-token")
