@@ -72,6 +72,19 @@ def test_vm_create_inline(cli_runner, mock_client, mock_vm):
     )
 
 
+def test_vm_create_inline_dry_run(cli_runner, mock_client):
+    """vrg vm create --dry-run without template should print plan without creating."""
+    result = cli_runner.invoke(
+        app,
+        ["vm", "create", "--name", "test-vm", "--ram", "4096", "--cpu", "2", "--dry-run"],
+    )
+
+    assert result.exit_code == 0
+    assert "Dry run" in result.output
+    assert "test-vm" in result.output
+    mock_client.vms.create.assert_not_called()
+
+
 def test_vm_create_inline_no_name_fails(cli_runner, mock_client):
     """vrg vm create without --name or --file should fail."""
     result = cli_runner.invoke(app, ["vm", "create"])

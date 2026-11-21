@@ -217,7 +217,7 @@ def vm_create(
         if not name:
             typer.echo("Error: --name is required for inline creation.", err=True)
             raise typer.Exit(2)
-        _create_inline(ctx, name, ram, cpu, description, os_family)
+        _create_inline(ctx, name, ram, cpu, description, os_family, dry_run=dry_run)
 
 
 def _create_inline(
@@ -227,8 +227,26 @@ def _create_inline(
     cpu: int,
     description: str,
     os_family: str,
+    dry_run: bool = False,
 ) -> None:
     """Original inline VM creation."""
+    if dry_run:
+        from verge_cli.template.builder import build_dry_run
+
+        vm_config: dict[str, Any] = {
+            "name": name,
+            "ram": ram,
+            "cpu_cores": cpu,
+            "os_family": os_family,
+        }
+        if description:
+            vm_config["description"] = description
+
+        typer.echo("Dry run — no resources will be created.\n")
+        typer.echo(build_dry_run(vm_config))
+        typer.echo("")
+        return
+
     vctx = get_context(ctx)
     vm_obj = vctx.client.vms.create(
         name=name,
